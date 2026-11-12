@@ -102,6 +102,24 @@ th{color:var(--sub);font-weight:600}
 </section>
 
 <section class="clocks">
+  <h2 style="font-size:15px">DAQ channel map <small style="color:var(--sub);font-weight:400">(Differential: AI n+ with AI n+8 −)</small></h2>
+  <table>
+    <tr><th>Signal</th><th>Muscle</th><th>Side</th><th>Channel</th><th>+ pin</th><th>− pin</th></tr>
+    <tr><td class="sync">SYNC</td><td>XIAO D1</td><td>—</td><td><code>ai0</code></td><td>AI 0</td><td>AI 8</td></tr>
+    <tr><td>EMG01</td><td>Lumbar erector spinae</td><td>L</td><td><code>ai16</code></td><td>AI 16</td><td>AI 24</td></tr>
+    <tr><td>EMG02</td><td>Lumbar erector spinae</td><td>R</td><td><code>ai17</code></td><td>AI 17</td><td>AI 25</td></tr>
+    <tr><td>EMG03</td><td>Lumbar multifidus</td><td>L</td><td><code>ai18</code></td><td>AI 18</td><td>AI 26</td></tr>
+    <tr><td>EMG04</td><td>Lumbar multifidus</td><td>R</td><td><code>ai19</code></td><td>AI 19</td><td>AI 27</td></tr>
+    <tr><td>EMG05</td><td>External oblique</td><td>L</td><td><code>ai20</code></td><td>AI 20</td><td>AI 28</td></tr>
+    <tr><td>EMG06</td><td>External oblique</td><td>R</td><td><code>ai21</code></td><td>AI 21</td><td>AI 29</td></tr>
+    <tr><td>EMG07</td><td>Internal oblique</td><td>L</td><td><code>ai22</code></td><td>AI 22</td><td>AI 30</td></tr>
+    <tr><td>EMG08</td><td>Internal oblique</td><td>R</td><td><code>ai23</code></td><td>AI 23</td><td>AI 31</td></tr>
+  </table>
+  <p style="color:var(--sub);font-size:12.5px;margin:8px 0 0">GUI → Time sync → Extra channels: <code>ai16,ai17,ai18,ai19,ai20,ai21,ai22,ai23</code>.
+    EMG system ground also to a DAQ AI GND pin. The range (±5 / ±10 V) applies to all channels.</p>
+</section>
+
+<section class="clocks">
   <h2 style="font-size:15px">How the three clocks are linked</h2>
   <table>
     <tr><th>Link</th><th>How</th><th>Accuracy</th></tr>

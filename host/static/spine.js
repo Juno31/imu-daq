@@ -11,6 +11,7 @@
 //  * Angles: intrinsic X-Y-Z (flexion, then lateral bending, then axial rotation).
 import * as THREE from "three";
 import { OrbitControls } from "three/addons/controls/OrbitControls.js";
+import { mergeVertices } from "three/addons/utils/BufferGeometryUtils.js";
 
 const $ = (id) => document.getElementById(id);
 const D = 180 / Math.PI;
@@ -217,91 +218,72 @@ function connect() {
 }
 
 // ---------------- 3D model ----------------
-// Vertebrae bottom -> top. h = distance to the next vertebra (cm), n = neutral joint angle to the
-// vertebra below (deg, + = flexion); gives ~45 deg lordosis and ~40 deg kyphosis.
-const VERT = [
-  ["S1", 4.2, 34], ["L5", 3.9, -14], ["L4", 3.8, -12], ["L3", 3.7, -10], ["L2", 3.6, -7], ["L1", 3.4, -4],
-  ["T12", 3.0, 2], ["T11", 2.8, 3], ["T10", 2.7, 4], ["T9", 2.6, 4], ["T8", 2.5, 4], ["T7", 2.4, 4],
-  ["T6", 2.3, 4], ["T5", 2.2, 4], ["T4", 2.2, 4], ["T3", 2.1, 3], ["T2", 2.1, 2], ["T1", 2.0, 0],
-];
-const idx = Object.fromEntries(VERT.map((v, i) => [v[0], i]));
+// Bone meshes: OpenSim 4.5 Gait2392 geometry (sacrum, hip bones, L5-C1 vertebrae with discs, ribs,
+// skull), prepared by models/build_model.py into static/models/spine_opensim.json. Frame = OpenSim
+// pelvis frame (X anterior, Y up, Z right), cm. Each segment rotates about the disc below it.
+const ORDER = ["pelvis", "L5", "L4", "L3", "L2", "L1", "T12", "T11", "T10", "T9", "T8", "T7", "T6", "T5", "T4", "T3", "T2", "T1"];
+const idx = Object.fromEntries(ORDER.map((n, i) => [n, i]));
 let three = null;
 
-function initThree() {
+// body frame (X left, Y posterior, Z up) -> OpenSim frame (X anterior, Y up, Z right)
+const toOs = (q) => new THREE.Quaternion(-q[2], q[3], -q[1], q[0]);
+
+async function initThree() {
   const host = $("three");
   const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
   renderer.setPixelRatio(Math.min(2, window.devicePixelRatio));
   host.appendChild(renderer.domElement);
   const scene = new THREE.Scene();
-  const camera = new THREE.PerspectiveCamera(35, 1, 1, 1000);
+  const camera = new THREE.PerspectiveCamera(32, 1, 1, 2000);
   const controls = new OrbitControls(camera, renderer.domElement);
-  controls.target.set(0, 32, 0);
   controls.enableDamping = true;
+  scene.add(new THREE.HemisphereLight(0xffffff, 0x6b7280, 1.4));
+  const key = new THREE.DirectionalLight(0xffffff, 1.8); key.position.set(80, 120, 60); scene.add(key);
+  const rim = new THREE.DirectionalLight(0xbfd4ff, 0.8); rim.position.set(-80, 40, -90); scene.add(rim);
+  const grid = new THREE.GridHelper(120, 24, 0x8a93a3, 0x8a93a3);
+  grid.material.opacity = 0.18; grid.material.transparent = true; grid.position.y = -12; scene.add(grid);
 
-  scene.add(new THREE.HemisphereLight(0xffffff, 0x8090a0, 1.6));
-  const sun = new THREE.DirectionalLight(0xffffff, 1.6); sun.position.set(40, 90, 60); scene.add(sun);
-  const grid = new THREE.GridHelper(80, 16, 0x8a93a3, 0x8a93a3);
-  grid.material.opacity = 0.25; grid.material.transparent = true; scene.add(grid);
-
-  // root: body frame (X left, Y posterior, Z up) -> three.js (Y up). Subject faces +Z in three.
-  const root = new THREE.Group(); root.rotation.x = -Math.PI / 2; root.position.y = 4; scene.add(root);
-  const bone = new THREE.MeshStandardMaterial({ color: 0xe9e1cf, roughness: 0.6 });
-  const boneThor = new THREE.MeshStandardMaterial({ color: 0xdcd6ea, roughness: 0.6 });
-  const live1 = new THREE.MeshStandardMaterial({ color: 0x3867d6, roughness: 0.5 });
-  const disc = new THREE.MeshStandardMaterial({ color: 0x7cc4d8, roughness: 0.4, transparent: true, opacity: 0.85 });
+  $("overlay").textContent = "Loading OpenSim bone meshes…";
+  const model = await (await fetch("/static/models/spine_opensim.json")).json();
+  const mats = {
+    bone: new THREE.MeshStandardMaterial({ color: 0xeee6d3, roughness: 0.55, metalness: 0 }),
+    sensorBone: new THREE.MeshStandardMaterial({ color: 0x9db4f0, roughness: 0.5 }),
+    disc: new THREE.MeshStandardMaterial({ color: 0x6fb7cf, roughness: 0.35 }),
+    ribs: new THREE.MeshStandardMaterial({ color: 0xeee6d3, roughness: 0.6, transparent: true, opacity: 0.7, depthWrite: false }),
+    head: new THREE.MeshStandardMaterial({ color: 0xeee6d3, roughness: 0.6, transparent: true, opacity: 0.85 }),
+  };
   const sensorMat = new THREE.MeshStandardMaterial({ color: 0xea7a1a, roughness: 0.4, emissive: 0x3a1a00 });
-  const ribMat = new THREE.MeshStandardMaterial({ color: 0xe9e1cf, roughness: 0.7, transparent: true, opacity: 0.55 });
 
-  const nodes = [], ribs = [];
-  let parent = root, prevH = 0;
-  for (const [name, h, n] of VERT) {
-    const node = new THREE.Group();
-    node.position.set(0, 0, prevH);
+  // node hierarchy: each node sits at its pivot; meshes are offset by -pivot so they stay in place
+  const nodes = [], ribs = [], piv = model.pivots;
+  let parent = scene, prev = [0, 0, 0];
+  const root = new THREE.Group(); root.position.y = 0; scene.add(root); parent = root;
+  for (const name of ORDER) {
+    const p = piv[name], node = new THREE.Group();
+    node.position.set(p[0] - prev[0], p[1] - prev[1], p[2] - prev[2]);
     parent.add(node);
-    const lumbar = name[0] === "L" || name === "S1";
-    const r = lumbar ? 2.0 : 1.4 + 0.04 * (12 - Math.min(12, +name.slice(1) || 12));
-    const sensorHere = name === "T7" || name === "T12";
-    const mat = sensorHere ? live1 : lumbar ? bone : boneThor;
-    if (name === "S1") {
-      const sac = new THREE.Mesh(new THREE.CylinderGeometry(3.4, 1.4, 9, 20), bone);
-      sac.rotation.x = Math.PI / 2; sac.position.set(0, 1.0, -3.6); node.add(sac);
-      const pelvis = new THREE.Mesh(new THREE.TorusGeometry(8, 1.1, 12, 40, Math.PI * 1.25), bone);
-      pelvis.rotation.z = -Math.PI * 0.125 - Math.PI / 2; pelvis.position.set(0, -4, -2.5); node.add(pelvis);
-    }
-    const body = new THREE.Mesh(new THREE.CylinderGeometry(r, r * 1.05, h * 0.68, 24), mat);
-    body.rotation.x = Math.PI / 2; body.position.set(0, -r * 0.9, h * 0.34); node.add(body);
-    if (name !== "T1") {
-      const d = new THREE.Mesh(new THREE.CylinderGeometry(r * 0.95, r * 0.95, h * 0.28, 24), disc);
-      d.rotation.x = Math.PI / 2; d.position.set(0, -r * 0.9, h * 0.84); node.add(d);
-    }
-    const spLen = lumbar ? 3.0 : 3.4, spDown = lumbar ? 0.15 : 0.6;
-    const sp = new THREE.Mesh(new THREE.BoxGeometry(0.7, spLen, 1.1), mat);
-    sp.position.set(0, spLen / 2 + 0.3, h * 0.35); sp.rotation.x = -spDown; node.add(sp);
-    const tp = new THREE.Mesh(new THREE.BoxGeometry(lumbar ? 7 : 5.4, 0.8, 0.8), mat);
-    tp.position.set(0, 0.6, h * 0.4); node.add(tp);
-    if (!lumbar) {
-      const k = +name.slice(1);
-      const w = 6 + 7 * Math.sin(Math.PI * Math.min(1, (k + 1) / 9)) - (k > 9 ? (k - 9) * 1.2 : 0);
-      for (const side of [-1, 1]) {
-        // hoop centred in front of the spine; each arc starts at the posterior point (angle +90 deg,
-        // at the transverse process) and runs round one side towards the sternum
-        const arc = Math.PI * 0.8;
-        const rib = new THREE.Mesh(new THREE.TorusGeometry(w, 0.35, 8, 30, arc), ribMat);
-        const tilt = new THREE.Group();
-        tilt.position.set(0, 0.6, h * 0.4); tilt.rotation.x = 0.35;   // ribs slope downward to the front
-        rib.position.set(0, -w, 0); rib.rotation.z = side > 0 ? Math.PI / 2 - arc : Math.PI / 2;
-        rib.scale.set(0.95, 0.8, 1);
-        tilt.add(rib); node.add(tilt); ribs.push(rib);
-      }
-    }
-    if (sensorHere) {
-      const s = new THREE.Mesh(new THREE.BoxGeometry(2.6, 0.5, 2.0), sensorMat);
-      s.position.set(0, spLen + 0.6, h * 0.35); node.add(s);
-    }
-    nodes.push({ name, node, n: n / D });
-    parent = node; prevH = h;
+    const holder = new THREE.Group(); holder.position.set(-p[0], -p[1], -p[2]); node.add(holder);
+    nodes.push({ name, node, holder });
+    parent = node; prev = p;
   }
-  // T7 path trail
+  for (const m of model.meshes) {
+    const i = idx[m.segment]; if (i === undefined) continue;
+    const g = new THREE.BufferGeometry();
+    g.setAttribute("position", new THREE.Float32BufferAttribute(m.pos, 3));
+    g.setIndex(m.idx);
+    const geo = mergeVertices(g, 1e-3); geo.computeVertexNormals();
+    const isSensor = m.kind === "bone" && (m.segment === "T7" || m.segment === "T12");
+    const mesh = new THREE.Mesh(geo, isSensor ? mats.sensorBone : mats[m.kind] || mats.bone);
+    if (m.kind === "ribs") { ribs.push(mesh); mesh.renderOrder = 2; }
+    nodes[i].holder.add(mesh);
+    if (isSensor) {                 // IMU on the spinous-process tip = most posterior point
+      const a = geo.attributes.position; let best = 0;
+      for (let k = 1; k < a.count; k++) if (a.getX(k) < a.getX(best)) best = k;
+      const s = new THREE.Mesh(new THREE.BoxGeometry(0.5, 2.0, 2.6), sensorMat);
+      s.position.set(a.getX(best) - 0.45, a.getY(best), a.getZ(best));
+      nodes[i].holder.add(s);
+    }
+  }
   const trailN = 400, trailPos = new Float32Array(trailN * 3);
   const trailGeo = new THREE.BufferGeometry(); trailGeo.setAttribute("position", new THREE.BufferAttribute(trailPos, 3));
   const trail = new THREE.Line(trailGeo, new THREE.LineBasicMaterial({ color: 0xea7a1a })); trail.frustumCulled = false; scene.add(trail);
@@ -318,42 +300,34 @@ function resize() {
   camera.aspect = w / Math.max(1, h); camera.updateProjectionMatrix();
 }
 
-function setView(v) {
-  const p = { side: [-120, 36, 0], front: [0, 36, 120], back: [0, 36, -120], iso: [-85, 55, 80] }[v];
-  three.camera.position.set(...p); three.controls.target.set(0, 32, 0); three.controls.update();
+function setView(v) {      // subject faces +X; right side is +Z
+  const T = [-6, 32, 0];
+  const p = { side: [-6, 38, 190], front: [190, 38, 0], back: [-200, 38, 0], iso: [-140, 85, 135] }[v];
+  three.camera.position.set(...p); three.controls.target.set(...T); three.controls.update();
 }
 document.querySelectorAll("[data-view]").forEach((b) => (b.onclick = () => three && setView(b.dataset.view)));
 
-const tmpQ = new THREE.Quaternion(), neutralQ = new THREE.Quaternion(), axisX = new THREE.Vector3(1, 0, 0), wp = new THREE.Vector3();
+const wp = new THREE.Vector3();
 function updateModel() {
   const mp = mapping();
   const qT7 = segment(mp.T7), qT12 = segment(mp.T12);
   const share = +$("lumbarShare").value / 100;
-  // joint rotations (body frame, child relative to parent), on top of the neutral curve
-  const J = VERT.map(() => [1, 0, 0, 0]);
+  const J = ORDER.map(() => [1, 0, 0, 0]);       // joint rotation of each segment w.r.t. the one below
   if (qT7 && qT12) {
-    const lumbJoints = idx.T12 - idx.S1;                      // L5..T12 joints (6)
-    const pel = qpow(qT12, 1 - share), lumb = qpow(qmul(qconj(pel), qT12), 1 / lumbJoints);
-    J[idx.S1] = pel;
-    for (let i = idx.S1 + 1; i <= idx.T12; i++) J[i] = lumb;
-    const rel = qmul(qconj(qT12), qT7), thor = qpow(rel, 1 / (idx.T7 - idx.T12));
+    const pel = qpow(qT12, 1 - share), lumb = qpow(qmul(qconj(pel), qT12), 1 / (idx.T12 - idx.pelvis));
+    J[idx.pelvis] = pel;
+    for (let i = idx.L5; i <= idx.T12; i++) J[i] = lumb;
+    const thor = qpow(qmul(qconj(qT12), qT7), 1 / (idx.T7 - idx.T12));
     for (let i = idx.T12 + 1; i <= idx.T7; i++) J[i] = thor;
-    // above T7: rigid with T7 (not instrumented)
   }
-  three.nodes.forEach((nd, i) => {
-    neutralQ.setFromAxisAngle(axisX, nd.n);
-    const q = J[i];
-    tmpQ.set(q[1], q[2], q[3], q[0]);
-    nd.node.quaternion.copy(neutralQ).multiply(tmpQ);
-  });
+  three.nodes.forEach((nd, i) => nd.node.quaternion.copy(toOs(J[i])));
   for (const r of three.ribs) r.visible = $("showRibs").checked;
-  // trail
   const t = three; t.trail.visible = $("showTrail").checked;
   if (t.trail.visible && qT7) {
-    t.nodes[idx.T7].node.updateWorldMatrix(true, false);
-    wp.setFromMatrixPosition(t.nodes[idx.T7].node.matrixWorld);
+    const n7 = t.nodes[idx.T7].node; n7.updateWorldMatrix(true, false);
+    wp.set(-6, 3, 0).applyMatrix4(n7.matrixWorld);
     t.trailPos.copyWithin(0, 3); t.trailPos.set([wp.x, wp.y, wp.z], (t.trailN - 1) * 3);
-    if (t.trailCount < t.trailN) { for (let k = 0; k < t.trailN - 1 - t.trailCount; k++) t.trailPos.set([wp.x, wp.y, wp.z], k * 3); t.trailCount = t.trailN; }
+    if (t.trailCount < t.trailN) { for (let k = 0; k < t.trailN - 1; k++) t.trailPos.set([wp.x, wp.y, wp.z], k * 3); t.trailCount = t.trailN; }
     t.trail.geometry.attributes.position.needsUpdate = true;
   } else t.trailCount = 0;
   angleBox($("angRel"), qT7 && qT12 ? eulerXYZ(qmul(qconj(qT12), qT7)) : null);
@@ -390,6 +364,6 @@ function loop() {
 
 updateCalUi();
 if (cal.q0) setMsg(cal.B ? "Loaded the last calibration. Recalibrate if the sensors were moved or restarted." : "Neutral loaded; do step 2.", cal.B ? "" : "");
-try { initThree(); } catch (e) { $("overlay").textContent = "3D view failed: " + e.message; }
+initThree().catch((e) => { $("overlay").textContent = "3D view failed: " + e.message; });
 connect();
 requestAnimationFrame(loop);
