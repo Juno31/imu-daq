@@ -283,10 +283,15 @@ function initThree() {
       const k = +name.slice(1);
       const w = 6 + 7 * Math.sin(Math.PI * Math.min(1, (k + 1) / 9)) - (k > 9 ? (k - 9) * 1.2 : 0);
       for (const side of [-1, 1]) {
-        const rib = new THREE.Mesh(new THREE.TorusGeometry(w, 0.35, 8, 30, Math.PI * 0.85), ribMat);
-        rib.position.set(side * 0.6, -w * 0.55, h * 0.4 - 1.2); rib.rotation.set(-0.25, side > 0 ? 0 : Math.PI, side > 0 ? Math.PI * 0.08 : -Math.PI * 0.08);
-        rib.scale.set(1, 1.05, 1);
-        node.add(rib); ribs.push(rib);
+        // hoop centred in front of the spine; each arc starts at the posterior point (angle +90 deg,
+        // at the transverse process) and runs round one side towards the sternum
+        const arc = Math.PI * 0.8;
+        const rib = new THREE.Mesh(new THREE.TorusGeometry(w, 0.35, 8, 30, arc), ribMat);
+        const tilt = new THREE.Group();
+        tilt.position.set(0, 0.6, h * 0.4); tilt.rotation.x = 0.35;   // ribs slope downward to the front
+        rib.position.set(0, -w, 0); rib.rotation.z = side > 0 ? Math.PI / 2 - arc : Math.PI / 2;
+        rib.scale.set(0.95, 0.8, 1);
+        tilt.add(rib); node.add(tilt); ribs.push(rib);
       }
     }
     if (sensorHere) {
