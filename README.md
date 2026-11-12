@@ -26,7 +26,7 @@ IMU frame time-locked to an NI DAQ through a SYNC pulse line.
 ## Start
 
 1. Plug in the XIAO (and the NI DAQ if you use it). Close the Arduino Serial Monitor.
-2. Double-click **`start.bat`**. The browser opens at http://127.0.0.1:8765.
+2. Double-click **`start.bat`** (or the desktop shortcut made once by right-click → Run with PowerShell on `make_shortcut.ps1`). The browser opens at http://127.0.0.1:8765.
 3. Enter Subject / Trial, press **Start**, press **Stop**. Each recording is a folder in `data\`
    (not uploaded to git).
 
