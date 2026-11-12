@@ -14,111 +14,93 @@
   <div class="timer" id="timer">00:00.0</div>
   <div class="spacer"></div>
   <div class="chip mono" id="rateChip">— Hz</div>
-  <div class="chip mono" id="clockChip" title="Board ↔ PC clock">clock —</div>
-  <div class="chip mono" id="daqChip" title="NI DAQ">DAQ —</div>
+  <div class="chip mono hidden" id="clockChip" title="Board ↔ PC clock">clock —</div>
+  <div class="chip mono hidden" id="daqChip" title="NI DAQ">DAQ —</div>
   <a class="chip" href="/spine" target="_blank" style="text-decoration:none;color:inherit" title="Calibrated 3D spine view (opens a new tab)">Spine view ↗</a>
+  <button class="btn small ghost" id="btnKeys" title="Keyboard shortcuts (?)">⌨ Keys</button>
+  <button class="btn small ghost" id="btnSettings" title="DAQ, time sync and board settings (S)">⚙ Settings</button>
 </header>
 
 <div class="banner hidden" id="banner"></div>
 
+<div class="shell">
 <main class="layout">
-  <aside class="side">
-    <!-- Recording -->
-    <section class="card">
-      <h2>Recording</h2>
-      <div class="grid2">
-        <label>Subject<input id="subject" placeholder="S01" autocomplete="off"></label>
-        <label>Trial<input id="label" placeholder="static01" autocomplete="off"></label>
-      </div>
-      <label>Notes<textarea id="notes" rows="2" placeholder="optional"></textarea></label>
-      <div class="btnrow">
-        <button class="btn start" id="btnStart">● Start</button>
-        <button class="btn stop" id="btnStop" disabled>■ Stop</button>
-      </div>
-      <div class="markrow">
-        <input id="markText" placeholder="Event marker text" autocomplete="off">
-        <button class="btn" id="btnMark" title="Shortcut: M">Mark</button>
-      </div>
-      <dl class="stats">
-        <div><dt>Frames</dt><dd id="recFrames">—</dd></div>
-        <div><dt>Missing</dt><dd id="recMissing">—</dd></div>
-        <div><dt>Markers</dt><dd id="recMarkers">—</dd></div>
-        <div><dt>Session</dt><dd id="recName" class="ellip">—</dd></div>
-      </dl>
-    </section>
+  <!-- 1. Status at a glance -->
+  <div class="statusrow">
+    <button class="stile" id="stDaq" data-go="drawer" title="NI DAQ: device found and reading (click for settings)">
+      <span class="sl"></span><span class="st"><small>DAQ</small><b>—</b><span class="sd">—</span></span></button>
+    <button class="stile" id="stImu" data-go="foldImu" title="XIAO board and IMUs (click for detail)">
+      <span class="sl"></span><span class="st"><small>IMU</small><b>—</b><span class="sd">—</span></span></button>
+    <button class="stile" id="stEmg" data-go="emgCard" title="EMG channels on the DAQ (click for detail)">
+      <span class="sl"></span><span class="st"><small>EMG</small><b>—</b><span class="sd">—</span></span></button>
+    <button class="stile" id="stSync" data-go="syncCard" title="Time sync between board, DAQ and PC (click for detail)">
+      <span class="sl"></span><span class="st"><small>Sync</small><b>—</b><span class="sd">—</span></span></button>
+  </div>
 
-    <!-- Time sync -->
-    <section class="card">
-      <h2>Time sync</h2>
-      <dl class="stats">
-        <div><dt>Round trip</dt><dd id="csRtt">—</dd></div>
-        <div><dt>Uncertainty</dt><dd id="csUnc">—</dd></div>
-        <div><dt>Clock drift</dt><dd id="csDrift">—</dd></div>
-        <div><dt>Fit residual</dt><dd id="csRes">—</dd></div>
-      </dl>
-      <h3>NI DAQ <span class="hint">SYNC → AI0</span></h3>
-      <div class="row">
-        <label class="switch"><input type="checkbox" id="daqEnabled"><span></span> Record DAQ</label>
-        <button class="btn small ghost" id="btnDaqRefresh">Refresh</button>
-      </div>
-      <div class="grid2">
-        <label>Device<select id="daqDevice"></select></label>
-        <label>SYNC channel<input id="daqSync" value="ai0"></label>
-        <label>Rate<select id="daqRate">
-          <option value="2000">2 kHz</option><option value="5000">5 kHz</option>
-          <option value="10000">10 kHz</option><option value="20000" selected>20 kHz</option><option value="50000">50 kHz</option></select></label>
-        <label>Input<select id="daqTerm">
-          <option value="DIFF">Differential</option><option value="RSE">RSE</option><option value="NRSE">NRSE</option></select></label>
-        <label>Range<select id="daqRange"><option value="5">±5 V</option><option value="10">±10 V</option></select></label>
-        <label>Extra channels<input id="daqExtra" placeholder="ai1,ai2"></label>
-      </div>
-      <p class="note" id="daqNote">—</p>
-      <dl class="stats" id="daqLive">
-        <div><dt>DAQ pulses</dt><dd id="daqPulses">—</dd></div>
-        <div><dt>SYNC level</dt><dd id="daqLevel">—</dd></div>
-      </dl>
-    </section>
-
-    <!-- Device -->
-    <section class="card">
-      <h2>Device</h2>
-      <div class="row">
-        <select id="portSel"></select>
-        <button class="btn small" id="btnConnect">Connect</button>
-        <button class="btn small ghost" id="btnDisconnect">Disconnect</button>
-      </div>
-      <div class="grid2">
-        <label>IMU rate<select id="rateSel">
-          <option value="10">100 Hz</option><option value="5">200 Hz</option>
-          <option value="20">50 Hz</option><option value="40">25 Hz</option></select></label>
-        <label>&nbsp;<button class="btn ghost" id="btnRestart">Restart IMUs</button></label>
-      </div>
-      <dl class="stats">
-        <div><dt>Firmware</dt><dd id="fwInfo" class="ellip">—</dd></div>
-        <div><dt>Pins</dt><dd id="fwPins">—</dd></div>
-        <div><dt>Lines dropped</dt><dd id="fwDropped">—</dd></div>
-        <div><dt>Clock resyncs</dt><dd id="fwResync">—</dd></div>
-      </dl>
-    </section>
-  </aside>
-
-  <section class="main">
-    <div class="toolbar">
-      <span class="hint">Shortcuts: <kbd>M</kbd> marker · <kbd>Z</kbd> zero display</span>
-      <div class="spacer"></div>
-      <div class="seg" id="winSeg">
-        <button data-w="5">5 s</button><button data-w="10" class="on">10 s</button><button data-w="30">30 s</button>
-      </div>
-      <button class="btn small ghost" id="btnZero">Zero display</button>
-      <button class="btn small ghost" id="btnUnzero">Reset zero</button>
+  <!-- 2. Recording: one row -->
+  <section class="card recbar">
+    <label class="f-subj">Subject<input id="subject" placeholder="S01" autocomplete="off"></label>
+    <label class="f-trial">Trial<input id="label" placeholder="static01" autocomplete="off"></label>
+    <label class="f-notes">Notes<input id="notes" placeholder="optional" autocomplete="off"></label>
+    <div class="recbtns">
+      <button class="btn start" id="btnStart" title="Shortcut: Space">● Start <kbd class="k">Space</kbd></button>
+      <button class="btn stop" id="btnStop" disabled title="Shortcut: Space">■ Stop <kbd class="k">Space</kbd></button>
     </div>
-    <div class="pods" id="pods"></div>
+    <div class="markrow">
+      <input id="markText" placeholder="Marker text (M)" autocomplete="off">
+      <button class="btn" id="btnMark" title="Shortcut: M">Mark</button>
+    </div>
+    <dl class="recstats">
+      <div><dt>Frames</dt><dd id="recFrames">—</dd></div>
+      <div><dt>Missing</dt><dd id="recMissing">—</dd></div>
+      <div><dt>Markers</dt><dd id="recMarkers">—</dd></div>
+      <div class="wide"><dt>Session</dt><dd id="recName" class="ellip">—</dd></div>
+    </dl>
+  </section>
 
-    <section class="card syncmon" id="syncCard">
-      <div class="cardhead">
-        <h2>Sync monitor <span class="hint" id="smHint"></span></h2>
-        <span class="pill" id="smState">WAITING</span>
+  <!-- 3. Detail sections (click a header to open / close) -->
+  <section class="card fold" id="foldImu" data-fold="imu">
+    <div class="foldhead" tabindex="0" role="button" aria-expanded="true">
+      <span class="chev">›</span><h2>IMU</h2><span class="foldsum" id="sumImu"></span>
+      <div class="spacer"></div>
+      <div class="foldtools">
+        <div class="seg" id="winSeg">
+          <button data-w="5">5 s</button><button data-w="10" class="on">10 s</button><button data-w="30">30 s</button>
+        </div>
+        <button class="btn small ghost" id="btnZero" title="Shortcut: Z">Zero</button>
+        <button class="btn small ghost" id="btnUnzero">Reset</button>
       </div>
+    </div>
+    <div class="foldbody">
+      <div class="pods" id="pods"></div>
+    </div>
+  </section>
+
+  <section class="card fold emgcard" id="emgCard" data-fold="emg">
+    <div class="foldhead" tabindex="0" role="button" aria-expanded="true">
+      <span class="chev">›</span><h2>EMG</h2><span class="foldsum hint" id="emgHint"></span>
+      <div class="spacer"></div>
+      <div class="foldtools emgtools">
+        <div class="seg" id="emgScale" title="Vertical scale">
+          <button data-s="0" class="on">Auto</button><button data-s="0.1">±0.1 V</button><button data-s="1">±1 V</button><button data-s="5">±5 V</button>
+        </div>
+        <button class="btn small" id="btnPreview" title="Run the DAQ while not recording, to check the electrodes (nothing is saved)">Preview</button>
+        <span class="pill" id="emgState">OFF</span>
+      </div>
+    </div>
+    <div class="foldbody">
+      <div class="emggrid" id="emgGrid"></div>
+      <p class="cap" id="emgCap">Last 2 s per channel (min/max envelope) · RMS of the last 100 ms · left and right side by side.</p>
+    </div>
+  </section>
+
+  <section class="card fold syncmon" id="syncCard" data-fold="sync">
+    <div class="foldhead" tabindex="0" role="button" aria-expanded="true">
+      <span class="chev">›</span><h2>Sync detail</h2><span class="foldsum hint" id="smHint"></span>
+      <div class="spacer"></div>
+      <div class="foldtools"><span class="pill" id="smState">WAITING</span></div>
+    </div>
+    <div class="foldbody">
       <div class="smgrid">
         <div class="smcell">
           <div class="smtitle"><b>SYNC line at the DAQ</b><span class="hint" id="smScopeHint"></span>
@@ -126,7 +108,7 @@
             <div class="seg" id="scopeSeg"><button data-m="live" class="on">Live</button><button data-m="marker">Start marker</button></div>
           </div>
           <canvas id="cvScope" class="smcv"></canvas>
-          <p class="cap">One pulse per IMU frame, sent by the board's frame timer. The 3 ms pulse is frame 0; the number on each pulse is the frame it is matched to.</p>
+          <p class="cap">One pulse per IMU frame. The 3 ms pulse is frame 0; each pulse is labelled with its frame.</p>
         </div>
         <div class="smcell">
           <div class="smtitle"><b>Pulse ↔ frame matching</b><span class="hint" id="smLag"></span></div>
@@ -145,38 +127,127 @@
         <div class="smcell">
           <div class="smtitle"><b>Board clock ↔ DAQ clock</b><span class="hint mono" id="smDaqStat"></span></div>
           <canvas id="cvResid" class="smcv"></canvas>
-          <p class="cap">Each dot is one frame: its DAQ pulse time minus a straight-line fit of DAQ time vs. board time.
-            The shaded band is ±½ DAQ sample, the resolution of the DAQ edge.</p>
+          <p class="cap">Per frame: DAQ pulse time minus a line fit to board time. Band = ±½ DAQ sample.</p>
         </div>
         <div class="smcell">
           <div class="smtitle"><b>Board clock ↔ PC clock</b><span class="hint mono" id="smPcStat"></span></div>
           <canvas id="cvClock" class="smcv"></canvas>
-          <p class="cap">One ping per second over USB. The bar is the round trip (the board's reply happened somewhere inside it),
-            the dot its midpoint vs. the fit. Filled dots (fastest third) are used for the fit.</p>
+          <p class="cap">One USB ping per second: bar = round trip, dot = midpoint vs. the fit. Filled = used for the fit.</p>
         </div>
       </div>
-    </section>
+    </div>
+  </section>
 
-    <div class="lower">
-      <section class="card logcard">
-        <div class="cardhead"><h2>Event log</h2>
-          <div class="seg" id="logSeg"><button data-l="all" class="on">All</button><button data-l="warn">Warnings</button></div>
-        </div>
-        <div class="log" id="log"></div>
-      </section>
-      <section class="card sesscard">
-        <div class="cardhead"><h2>Recent sessions</h2>
-          <button class="btn small ghost" id="btnOpenData">Open folder</button></div>
-        <div class="sessions" id="sessions"></div>
-      </section>
+  <section class="card fold" id="foldLog" data-fold="log">
+    <div class="foldhead" tabindex="0" role="button" aria-expanded="true">
+      <span class="chev">›</span><h2>Event log</h2><span class="foldsum hint" id="sumLog"></span>
+      <div class="spacer"></div>
+      <div class="foldtools">
+        <div class="seg" id="logSeg"><button data-l="all" class="on">All</button><button data-l="warn">Warnings</button></div>
+      </div>
+    </div>
+    <div class="foldbody">
+      <div class="log" id="log"></div>
     </div>
   </section>
 </main>
 
+<!-- Saved recordings (right side on wide screens, below on narrow ones) -->
+<aside class="files card" id="filesPanel">
+  <div class="fileshead">
+    <h2>Saved recordings</h2><span class="hint" id="filesCount"></span>
+    <div class="spacer"></div>
+    <button class="btn small ghost" id="btnRefreshFiles" title="Reload the list">↻</button>
+    <button class="btn small ghost" id="btnOpenData" title="Open the data folder in Explorer">Open folder</button>
+  </div>
+  <input class="filesearch" id="filesSearch" placeholder="Filter by subject, trial or date" autocomplete="off">
+  <div class="sessions" id="sessions"></div>
+  <p class="hint filesfoot" id="filesFoot"></p>
+</aside>
+</div>
+
+<!-- Settings drawer -->
+<div class="scrim hidden" id="scrim"></div>
+<aside class="drawer" id="drawer" aria-hidden="true">
+  <div class="drawerhead"><h2>Settings</h2><button class="btn small ghost" id="btnCloseDrawer" title="Close (Esc)">✕</button></div>
+
+  <section class="card" id="daqCard">
+    <h2>NI DAQ <span class="hint">SYNC → AI0</span></h2>
+    <div class="row">
+      <label class="switch"><input type="checkbox" id="daqEnabled"><span></span> Record DAQ</label>
+      <button class="btn small ghost" id="btnDaqRefresh">Refresh</button>
+    </div>
+    <div class="grid2">
+      <label>Device<select id="daqDevice"></select></label>
+      <label>SYNC channel<input id="daqSync" value="ai0"></label>
+      <label>Rate<select id="daqRate">
+        <option value="2000">2 kHz</option><option value="5000">5 kHz</option>
+        <option value="10000">10 kHz</option><option value="20000" selected>20 kHz</option><option value="50000">50 kHz</option></select></label>
+      <label>Input<select id="daqTerm">
+        <option value="DIFF">Differential</option><option value="RSE">RSE</option><option value="NRSE">NRSE</option></select></label>
+      <label>Range<select id="daqRange"><option value="5">±5 V</option><option value="10">±10 V</option></select></label>
+      <label>EMG / extra channels<input id="daqExtra" placeholder="ai16,ai17"></label>
+    </div>
+    <p class="note" id="daqNote">—</p>
+    <dl class="stats" id="daqLive">
+      <div><dt>DAQ pulses</dt><dd id="daqPulses">—</dd></div>
+      <div><dt>SYNC level</dt><dd id="daqLevel">—</dd></div>
+    </dl>
+  </section>
+
+  <section class="card">
+    <h2>Board ↔ PC clock</h2>
+    <dl class="stats">
+      <div><dt>Round trip</dt><dd id="csRtt">—</dd></div>
+      <div><dt>Uncertainty</dt><dd id="csUnc">—</dd></div>
+      <div><dt>Clock drift</dt><dd id="csDrift">—</dd></div>
+      <div><dt>Fit residual</dt><dd id="csRes">—</dd></div>
+    </dl>
+  </section>
+
+  <section class="card">
+    <h2>Board</h2>
+    <div class="row">
+      <select id="portSel"></select>
+      <button class="btn small" id="btnConnect">Connect</button>
+      <button class="btn small ghost" id="btnDisconnect">Disconnect</button>
+    </div>
+    <div class="grid2">
+      <label>IMU rate<select id="rateSel">
+        <option value="10">100 Hz</option><option value="5">200 Hz</option>
+        <option value="20">50 Hz</option><option value="40">25 Hz</option></select></label>
+      <label>&nbsp;<button class="btn ghost" id="btnRestart">Restart IMUs</button></label>
+    </div>
+    <dl class="stats">
+      <div><dt>Firmware</dt><dd id="fwInfo" class="ellip">—</dd></div>
+      <div><dt>Pins</dt><dd id="fwPins">—</dd></div>
+      <div><dt>Lines dropped</dt><dd id="fwDropped">—</dd></div>
+      <div><dt>Clock resyncs</dt><dd id="fwResync">—</dd></div>
+    </dl>
+  </section>
+  <p class="hint drawerfoot">Keyboard shortcuts: press <kbd>?</kbd> anywhere.</p>
+</aside>
+
 <div class="toast hidden" id="toast"></div>
 
+<div class="keyshelp hidden" id="keysHelp" role="dialog" aria-label="Keyboard shortcuts">
+  <div class="kh">
+    <h2>Keyboard shortcuts</h2>
+    <dl>
+      <dt><kbd>Space</kbd></dt><dd>Start / stop recording</dd>
+      <dt><kbd>M</kbd></dt><dd>Event marker (uses the marker text, if any)</dd>
+      <dt><kbd>Z</kbd></dt><dd>Zero the IMU display (data unchanged)</dd>
+      <dt><kbd>1</kbd> <kbd>2</kbd> <kbd>3</kbd> <kbd>4</kbd></dt><dd>Open / close IMU · EMG · Sync detail · Event log</dd>
+      <dt><kbd>S</kbd></dt><dd>Settings panel</dd>
+      <dt><kbd>Esc</kbd></dt><dd>Leave a text field · close panels</dd>
+      <dt><kbd>?</kbd></dt><dd>This list</dd>
+    </dl>
+    <p class="hint">Keys do nothing while typing in a text field: press <kbd>Esc</kbd> first. Space ignores a second press within 1 s.</p>
+  </div>
+</div>
+
 <template id="podTpl">
-  <section class="card pod">
+  <section class="pod">
     <div class="podhead">
       <span class="light"></span>
       <h2 class="podname">A4B</h2>

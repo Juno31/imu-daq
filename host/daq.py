@@ -11,6 +11,8 @@ import time
 
 import numpy as np
 
+import channels
+
 try:
     import nidaqmx
     from nidaqmx.constants import AcquisitionType, TerminalConfiguration
@@ -22,7 +24,8 @@ except Exception as e:          # pragma: no cover - depends on the PC
     _IMPORT_ERROR = str(e)
 
 TERMINALS = {"DIFF": "DIFF", "RSE": "RSE", "NRSE": "NRSE", "PSEUDO_DIFF": "PSEUDO_DIFF"}
-HI_V, LO_V = 2.0, 1.0           # Schmitt thresholds for a 3.3 V logic pulse
+HI_V, LO_V = 2.0, 1.0
+RING_S = 2.0                    # seconds of every channel kept in memory for the live views           # Schmitt thresholds for a 3.3 V logic pulse
 
 
 def list_devices():
@@ -90,24 +93,30 @@ class DaqRecorder:
         self.pc_start = None
         self.last_v = 0.0
         self.fh = None
-        self.ring = np.zeros(max(100, int(self.rate * 0.5)))     # last 0.5 s of the SYNC channel
+        # last RING_S seconds of every channel (row 0 = SYNC): live scope and EMG view
+        self.ring = np.zeros((len(self.channels), max(100, int(self.rate * RING_S))))
         self.ring_lock = threading.Lock()
+        self.ch_stats = []          # per extra channel, last 50 ms: (sd_V, absmax_V)
+        self.sync_hi = 0.0          # max SYNC level in the last 50 ms
 
     @property
     def channels(self):
         return [self.sync_chan] + self.extra_chans
 
     def start(self, pc_clock):
-        os.makedirs(self.out_dir, exist_ok=True)
+        """out_dir None = preview only (nothing written)."""
+        if self.out_dir:
+            os.makedirs(self.out_dir, exist_ok=True)
         term = getattr(TerminalConfiguration, TERMINALS.get(self.terminal, "DIFF"))
-        self.task = nidaqmx.Task("imu_daq_sync")
+        self.task = nidaqmx.Task("imu_daq_sync" if self.out_dir else "imu_daq_preview")
         for ch in self.channels:
             self.task.ai_channels.add_ai_voltage_chan(f"{self.device}/{ch}", terminal_config=term,
                                                       min_val=-self.vrange, max_val=self.vrange)
         self.task.timing.cfg_samp_clk_timing(self.rate, sample_mode=AcquisitionType.CONTINUOUS,
                                              samps_per_chan=int(self.rate * 10))
         self.reader = AnalogMultiChannelReader(self.task.in_stream)
-        self.fh = open(os.path.join(self.out_dir, "daq_raw.f32"), "wb")
+        if self.out_dir:
+            self.fh = open(os.path.join(self.out_dir, "daq_raw.f32"), "wb")
         self.task.start()
         self.pc_start = pc_clock()
         self.stop_evt.clear()
@@ -124,12 +133,16 @@ class DaqRecorder:
                 if not self.stop_evt.is_set():
                     self.error = f"DAQ read error: {e}"
                 break
-            self.fh.write(buf.T.astype(np.float32).tobytes())   # sample-major: s0c0 s0c1 ...
+            if self.fh:
+                self.fh.write(buf.T.astype(np.float32).tobytes())   # sample-major: s0c0 s0c1 ...
+            self.sync_hi = float(buf[0].max())
+            if len(buf) > 1:
+                self.ch_stats = [(float(r.std()), float(np.abs(r).max())) for r in buf[1:]]
             self.edges.feed(buf[0], self.n_samples)
             with self.ring_lock:
-                L = len(self.ring)
+                L = self.ring.shape[1]
                 idx = np.arange(self.n_samples, self.n_samples + n) % L
-                self.ring[idx] = buf[0]
+                self.ring[:, idx] = buf
                 self.n_samples += n
             self.last_v = float(buf[0, -1])
 
@@ -151,10 +164,13 @@ class DaqRecorder:
         if self.fh:
             self.fh.close()
             self.fh = None
+        if not self.out_dir:
+            return None
         meta = {"device": self.device, "channels": self.channels, "rate_hz": self.rate,
                 "range_v": self.vrange, "terminal": self.terminal, "n_samples": self.n_samples,
                 "pc_start_s": self.pc_start, "dtype": "float32", "layout": "sample-major (n_samples x n_channels)",
-                "file": "daq_raw.f32", "error": self.error}
+                "file": "daq_raw.f32", "error": self.error,
+                "channel_labels": [channels.label(c, self.sync_chan) for c in self.channels]}
         with open(os.path.join(self.out_dir, "daq_meta.json"), "w") as f:
             json.dump(meta, f, indent=2)
         return meta
@@ -163,13 +179,43 @@ class DaqRecorder:
         """(absolute index of the first sample, last n samples of the SYNC channel)."""
         with self.ring_lock:
             end = self.n_samples
-            n = int(min(n, len(self.ring), end))
-            idx = np.arange(end - n, end) % len(self.ring)
-            return end - n, self.ring[idx].copy()
+            n = int(min(n, self.ring.shape[1], end))
+            idx = np.arange(end - n, end) % self.ring.shape[1]
+            return end - n, self.ring[0, idx].copy()
+
+    def emg_view(self, points=300, seconds=RING_S, rms_s=0.1):
+        """Per extra channel: min/max envelope of the last `seconds` (points bins), RMS of the last
+        `rms_s` (mean removed) and a clipping flag (|v| > 98 % of the range in the window)."""
+        if not self.extra_chans:
+            return None
+        with self.ring_lock:
+            end = self.n_samples
+            n = int(min(seconds * self.rate, self.ring.shape[1], end))
+            idx = np.arange(end - n, end) % self.ring.shape[1]
+            x = self.ring[1:, idx].copy()
+        out = []
+        b = max(1, n // points)
+        m = n // b * b
+        nr = max(1, int(rms_s * self.rate))
+        for c, row in zip(self.extra_chans, x):
+            lab = channels.label(c, self.sync_chan)
+            if m == 0:
+                out.append(dict(lab, lo=[], hi=[], rms_mv=None, clip=False))
+                continue
+            r = row[n - m:].reshape(-1, b)
+            tail = row[-nr:]
+            out.append(dict(lab, lo=np.round(r.min(axis=1), 5).tolist(), hi=np.round(r.max(axis=1), 5).tolist(),
+                            rms_mv=round(float(tail.std()) * 1e3, 4),
+                            clip=bool(np.abs(row).max() > 0.98 * self.vrange)))
+        return {"seconds": m / self.rate, "range_v": self.vrange, "chans": out}
 
     def live(self):
+        ex = [{"chan": c, "sd_mv": round(sd * 1e3, 3), "max_v": round(mx, 3)}
+              for c, (sd, mx) in zip(self.extra_chans, self.ch_stats)]
         return {"samples": self.n_samples, "seconds": self.n_samples / self.rate if self.rate else 0,
-                "pulses": len(self.edges.pulses), "last_v": self.last_v, "error": self.error}
+                "pulses": len(self.edges.pulses), "last_v": self.last_v, "sync_hi": self.sync_hi,
+                "error": self.error, "extra": ex, "range_v": self.vrange,
+                "running": bool(self.thread and self.thread.is_alive())}
 
 
 def align(pulses, rate, n_frames, frame_us):

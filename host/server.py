@@ -28,6 +28,7 @@ sys.path.insert(0, HERE)
 import daq as daqmod                      # noqa: E402
 from clocksync import ClockSync           # noqa: E402
 from syncmon import SyncMonitor           # noqa: E402
+import channels                           # noqa: E402
 from device import Device, guess_port, list_serial_ports   # noqa: E402
 from session import Session               # noqa: E402
 
@@ -63,7 +64,12 @@ class App:
         self.session = None
         self.daq = None
         self.syncmon = None               # live SYNC matching view (kept after Stop)
-        self.daq_cfg = {"enabled": True, "device": "", "sync_chan": "ai0", "extra_chans": "",
+        self.preview = None               # DAQ running while idle (nothing saved): live levels
+        self.preview_err = ""
+        self.preview_retry = 0.0
+        self.preview_lock = threading.RLock()
+        self.preview_on = True            # GUI "Preview" toggle
+        self.daq_cfg = {"enabled": True, "device": "", "sync_chan": "ai0", "extra_chans": channels.DEFAULT_EXTRA,
                         "rate": 20000, "range": 5.0, "terminal": "DIFF", "require": False}
         self.daq_devices = daqmod.list_devices()
         if self.daq_devices["devices"]:
@@ -255,6 +261,7 @@ class App:
                     if now - self.last_status >= 2.0:
                         self.last_status = now
                         self.dev.send("status")
+                self._manage_preview(now)
                 d = self.daq
                 if d is not None and d.error and not getattr(d, "_error_logged", False):
                     d._error_logged = True
@@ -289,6 +296,54 @@ class App:
             raise RuntimeError("only possible while idle")
         self.dev.send(cmd)
 
+    # ---------------- DAQ preview (idle) ----------------
+    def _stop_preview(self):
+        with self.preview_lock:
+            p, self.preview = self.preview, None
+        if p is not None:
+            p.stop()
+
+    def _manage_preview(self, now):
+        with self.preview_lock:
+            cfg = self.daq_cfg
+            want = (self.preview_on and self.state in ("idle", "disconnected", "connecting") and cfg["enabled"]
+                    and cfg["device"] and daqmod.HAVE_NIDAQMX)
+            p = self.preview
+            if p is not None:
+                if p.error:
+                    err = p.error.splitlines()[0][:200]
+                    if err != self.preview_err:
+                        self.log("warn", f"DAQ preview stopped: {err}", "daq")
+                    self.preview_err, self.preview_retry = err, now + 3.0
+                    self._stop_preview()
+                elif not want:
+                    self._stop_preview()
+                return
+            if not want or now < self.preview_retry:
+                return
+            try:
+                r = daqmod.DaqRecorder(None, cfg["device"], cfg["sync_chan"],
+                                       [c.strip() for c in str(cfg["extra_chans"]).split(",") if c.strip()],
+                                       cfg["rate"], cfg["range"], cfg["terminal"])
+                r.start(self.unix)
+                self.preview, self.preview_err = r, ""
+            except Exception as e:
+                try:
+                    r.stop()
+                except Exception:
+                    pass
+                err = str(e).splitlines()[0][:200] if str(e) else repr(e)
+                if err != self.preview_err:
+                    self.log("warn", f"DAQ preview failed: {err}", "daq")
+                self.preview_err, self.preview_retry = err, now + 5.0
+
+    def set_preview(self, on):
+        self.preview_on = bool(on)
+        self.preview_err, self.preview_retry = "", 0.0
+        if not self.preview_on:
+            self._stop_preview()
+        self.log("info", "DAQ preview " + ("on" if self.preview_on else "off"), "user")
+
     def set_daq(self, cfg):
         if self.state in ("recording", "starting", "stopping"):
             raise RuntimeError("stop the recording first")
@@ -297,8 +352,12 @@ class App:
                 self.daq_cfg[k] = cfg[k]
         self.daq_cfg["rate"] = float(self.daq_cfg["rate"])
         self.daq_cfg["range"] = float(self.daq_cfg["range"])
+        self._stop_preview()                 # restart the preview with the new settings
+        self.preview_err, self.preview_retry = "", 0.0
 
     def refresh_daq(self):
+        self._stop_preview()
+        self.preview_err, self.preview_retry = "", 0.0
         self.daq_devices = daqmod.list_devices()
         names = [d["name"] for d in self.daq_devices["devices"]]
         if names and self.daq_cfg["device"] not in names:
@@ -321,7 +380,9 @@ class App:
                 raise RuntimeError(f"cannot start while {self.state}")
             if not self.dev.pod_names:
                 raise RuntimeError("board has not reported its IMUs yet")
-            self.state = "starting"
+            with self.preview_lock:
+                self.state = "starting"
+            self._stop_preview()                 # the recording task needs the DAQ
             hello = dict(self.dev.hello)
             frame_us = int(hello.get("frame_us", 10000))
             meta = dict(meta)
@@ -440,6 +501,7 @@ class App:
             self.log("warn", "closing: stopping the recording")
             self._finish("server closed during recording")
         self.auto_connect = False
+        self._stop_preview()
         self.dev.disconnect()
 
     # ---------------- views ----------------
@@ -493,7 +555,9 @@ class App:
                 "app_version": APP_VERSION, "state": self.state, "port": self.dev.port if self.dev.connected else None,
                 "want_port": self.want_port, "hello": self.dev.hello, "rate_hz": round(rate, 2),
                 "board": self.fw_status, "pods": pods, "rec": rec, "clock": self.clock.snapshot(),
-                "daq": {"cfg": self.daq_cfg, "devices": self.daq_devices, "live": d.live() if d else None},
+                "daq": {"cfg": self.daq_cfg, "devices": self.daq_devices, "live": d.live() if d else None,
+                        "preview": self.preview.live() if self.preview else None,
+                        "preview_error": self.preview_err, "preview_on": self.preview_on},
                 "last_summary": self.last_summary, "data_dir": self.data_dir,
                 "bad_lines": self.dev.bad_lines,
             }
@@ -507,6 +571,11 @@ class App:
         else:
             out["sync"] = None
         out["clockplot"] = self.clock.plot_data()
+        src = d if d is not None else self.preview
+        try:
+            out["emg"] = src.emg_view() if src is not None else None
+        except Exception:
+            out["emg"] = None
         return out
 
     def sessions(self, limit=30):
@@ -523,7 +592,22 @@ class App:
                 with open(p) as f:
                     s = json.load(f)
                 ds = s.get("daq_sync")
-                out.append({"name": n, "frames": s.get("frames_received"), "missing": s.get("missing_frames"),
+                folder = os.path.join(self.data_dir, n)
+                files = []
+                for e in sorted(os.scandir(folder), key=lambda e: e.name):
+                    if e.is_file():
+                        files.append({"name": e.name, "bytes": e.stat().st_size})
+                meta = {}
+                try:
+                    with open(os.path.join(folder, "session.json"), encoding="utf-8") as f:
+                        meta = json.load(f)
+                except Exception:
+                    pass
+                out.append({"name": n, "dir": folder, "files": files,
+                            "bytes": sum(f["bytes"] for f in files), "started": s.get("started"),
+                            "subject": meta.get("subject", ""), "trial": meta.get("label", ""),
+                            "notes": meta.get("notes", ""),
+                            "frames": s.get("frames_received"), "missing": s.get("missing_frames"),
                             "duration_s": s.get("duration_s"),
                             "pods": {k: v.get("fresh_pct") for k, v in s.get("pods", {}).items()},
                             "sync": None if ds is None else bool(ds.get("ok")),
@@ -656,6 +740,9 @@ class Handler(BaseHTTPRequestHandler):
                 ms = int(body.get("ms", 10))
                 APP.send_simple(f"rate {ms}")
                 return self._json({"ok": True})
+            if path == "/api/preview":
+                APP.set_preview(body.get("on", True))
+                return self._json({"ok": True, "on": APP.preview_on})
             if path == "/api/daq":
                 APP.set_daq(body)
                 return self._json({"ok": True, "cfg": APP.daq_cfg})
@@ -668,9 +755,19 @@ class Handler(BaseHTTPRequestHandler):
                     sess.event(APP.unix(), "spine_cal", json.dumps(body.get("map")), "", "")
                 return self._json({"ok": True})
             if path == "/api/open":
-                d = body.get("dir") or APP.data_dir
-                if os.path.isdir(d) and os.path.abspath(d).startswith(os.path.abspath(APP.data_dir)):
-                    os.startfile(d)
+                # open a recording folder, or one file in it, with the Windows default program
+                d = body.get("file") or body.get("dir") or APP.data_dir
+                full = os.path.abspath(d)
+                root = os.path.abspath(APP.data_dir)
+                if not (full == root or full.startswith(root + os.sep)):
+                    return self._json({"ok": False, "error": "only files in the data folder can be opened"}, 400)
+                if body.get("file") and body.get("reveal") and os.path.isfile(full):
+                    import subprocess
+                    subprocess.Popen(["explorer", "/select,", full])
+                elif os.path.exists(full):
+                    os.startfile(full)
+                else:
+                    return self._json({"ok": False, "error": "not found"}, 404)
                 return self._json({"ok": True})
             self._json({"ok": False, "error": "not found"}, 404)
         except (BrokenPipeError, ConnectionResetError, ConnectionAbortedError):

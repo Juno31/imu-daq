@@ -401,21 +401,251 @@ function applySync(s) {
     const good = sm.marker_found && !sm.no_pulse && !sm.extra;
     const sofar = sm.active ? " so far" : "";
     setText("smHint", sm.marker_found ? (good ? `every frame has its pulse${sofar}` : `some frames are missing a pulse${sofar}`) : "");
-    $("smHint").className = "hint " + (sm.marker_found ? (good ? "good" : "bad") : "");
+    $("smHint").className = "foldsum hint " + (sm.marker_found ? (good ? "good" : "bad") : "");
   } else {
     for (const id of ["smFrames", "smPulses", "smMatched", "smNoPulse", "smExtra", "smNoLine"]) num(id, null);
     setText("smLag", ""); setText("smHint", sm && !sm.has_daq ? "last recording had no DAQ" : "start a recording with the DAQ on");
-    $("smHint").className = "hint";
+    $("smHint").className = "foldsum hint";
   }
+}
+
+// ---------------- EMG view ----------------
+let EMG = null, emgDirty = false, emgScale = +LS.get("emgScale", 0), emgKey = "";
+const emgViews = new Map();      // chan -> view
+
+function fmtV(v) { return Math.abs(v) >= 1 ? `${+v.toFixed(2)} V` : `${+(v * 1e3).toFixed(v < 0.01 ? 2 : 1)} mV`; }
+
+function buildEmg(chans) {
+  const grid = $("emgGrid");
+  grid.innerHTML = ""; emgViews.clear();
+  for (const ch of chans) {
+    const node = document.createElement("div");
+    node.className = "emgtr";
+    node.innerHTML = `<div class="emghead"><b></b><span class="side"></span><span class="mus"></span>` +
+      `<span class="cl hidden">CLIPPING</span><span class="rms">—</span></div><canvas class="emgcv"></canvas>`;
+    node.querySelector("b").textContent = ch.name;
+    const side = node.querySelector(".side");
+    if (ch.side) side.textContent = ch.side; else side.remove();
+    node.querySelector(".mus").textContent = ch.muscle || "";
+    node.title = `${ch.name} · ${ch.chan}${ch.muscle ? " · " + ch.muscle : ""}${ch.side ? " (" + ch.side + ")" : ""}${ch.group ? " · " + ch.group : ""}`;
+    grid.appendChild(node);
+    emgViews.set(ch.chan, { node, cv: node.querySelector("canvas"), rms: node.querySelector(".rms"), cl: node.querySelector(".cl"), lim: 0 });
+  }
+}
+
+function emgEmpty(text) {
+  if (emgKey !== "") { emgKey = ""; emgViews.clear(); }
+  const grid = $("emgGrid");
+  if (!grid.firstElementChild || !grid.firstElementChild.classList.contains("emgempty") || grid.textContent !== text)
+    grid.innerHTML = `<div class="emgempty"></div>`, grid.firstElementChild.textContent = text;
+}
+
+function applyEmg(s) {
+  const daq = s.daq || {}, cfg = daq.cfg || {}, rec = s.state === "recording";
+  EMG = s.emg;
+  const pill = $("emgState"), btn = $("btnPreview");
+  btn.classList.toggle("on", !!daq.preview_on);
+  btn.textContent = daq.preview_on ? "Preview on" : "Preview";
+  if (rec && EMG) { pill.textContent = "RECORDING"; pill.className = "pill rec"; }
+  else if (daq.preview && EMG) { pill.textContent = "PREVIEW"; pill.className = "pill ok"; }
+  else { pill.textContent = "OFF"; pill.className = "pill"; }
+  if (!EMG || !EMG.chans || !EMG.chans.length) {
+    const devs = (daq.devices && daq.devices.devices) || [];
+    let msg = "Starting the DAQ…";
+    if (!String(cfg.extra_chans || "").trim()) msg = "No EMG channels set (Time sync card → Extra channels).";
+    else if (!devs.length) msg = "DAQ not found: EMG needs the NI DAQ.";
+    else if (!cfg.enabled) msg = "DAQ recording is off.";
+    else if (!rec && !daq.preview_on) msg = "Press Preview to see the electrodes before recording (nothing is saved).";
+    else if (!rec && daq.preview_error) msg = "DAQ preview error: " + daq.preview_error;
+    emgEmpty(msg);
+    setText("emgHint", "");
+    return;
+  }
+  const key = EMG.chans.map((c) => c.chan).join(",");
+  if (key !== emgKey) { emgKey = key; buildEmg(EMG.chans); }
+  const nclip = EMG.chans.filter((c) => c.clip).length;
+  setText("emgHint", `${EMG.chans.length} channels · ±${EMG.range_v} V input` + (nclip ? ` · ${nclip} clipping` : ""));
+  $("emgHint").className = "foldsum hint " + (nclip ? "bad" : "");
+  for (const ch of EMG.chans) {
+    const v = emgViews.get(ch.chan);
+    if (!v) continue;
+    v.data = ch;
+    const r = ch.rms_mv === null ? "—" : `RMS ${ch.rms_mv < 1 ? ch.rms_mv.toFixed(3) : ch.rms_mv < 100 ? ch.rms_mv.toFixed(2) : ch.rms_mv.toFixed(0)} mV`;
+    if (v.rms.textContent !== r) v.rms.textContent = r;
+    v.cl.classList.toggle("hidden", !ch.clip);
+    v.node.classList.toggle("clip", !!ch.clip);
+  }
+  emgDirty = true;
+}
+
+function drawEmg() {
+  for (const v of emgViews.values()) {
+    const ch = v.data;
+    if (!ch) continue;
+    const [ctx, W, H] = fitCanvas(v.cv);
+    ctx.clearRect(0, 0, W, H);
+    const n = ch.hi.length;
+    let peak = 0;
+    for (let i = 0; i < n; i++) peak = Math.max(peak, Math.abs(ch.hi[i]), Math.abs(ch.lo[i]));
+    if (emgScale) v.lim = emgScale;
+    else v.lim = Math.max(peak * 1.15, 0.0005, v.lim * 0.92);    // auto: grows at once, shrinks slowly
+    const lim = v.lim, padL = 2, pw = W - padL;
+    const Y = (x) => H / 2 - (Math.max(-lim, Math.min(lim, x)) / lim) * (H / 2 - 2);
+    ctx.strokeStyle = css("--border"); ctx.lineWidth = 1;
+    ctx.beginPath(); ctx.moveTo(0, Math.round(H / 2) + 0.5); ctx.lineTo(W, Math.round(H / 2) + 0.5); ctx.stroke();
+    if (n) {
+      ctx.strokeStyle = ch.clip ? css("--bad") : css("--accent");
+      ctx.lineWidth = Math.max(1, pw / n);
+      ctx.beginPath();
+      for (let i = 0; i < n; i++) {
+        const x = padL + (i + 0.5) * pw / n;
+        let y1 = Y(ch.hi[i]), y2 = Y(ch.lo[i]);
+        if (y2 - y1 < 1) { y1 -= 0.5; y2 += 0.5; }
+        ctx.moveTo(x, y1); ctx.lineTo(x, y2);
+      }
+      ctx.stroke();
+    }
+    ctx.fillStyle = css("--text-3"); ctx.font = "10.5px " + css("--mono"); ctx.textAlign = "left"; ctx.textBaseline = "top";
+    ctx.fillText(`±${fmtV(lim)}`, 4, 2);
+  }
+}
+
+// ---------------- status tiles (DAQ / IMU / EMG / Sync) ----------------
+function tile(id, level, word, detail, live) {
+  const el = $(id);
+  const cls = "stile " + (level || "") + (live ? " live" : "");
+  if (el.className !== cls) el.className = cls;
+  const b = el.querySelector("b"), d = el.querySelector(".sd");
+  if (b.textContent !== word) b.textContent = word;
+  if (d.textContent !== detail) { d.textContent = detail; d.title = detail; }
+}
+
+function applyTiles(s) {
+  const st = s.state, rec = st === "recording";
+  const daq = s.daq || {}, cfg = daq.cfg || {}, devs = (daq.devices && daq.devices.devices) || [];
+  const dev = devs.find((x) => x.name === cfg.device);
+  const lv = rec ? daq.live : daq.preview;           // DAQ levels: recording task or idle preview
+  const daqOk = !!(dev && cfg.enabled && lv && !lv.error);
+  // DAQ
+  if (daq.devices && !daq.devices.available) tile("stDaq", "bad", "Unavailable", "NI-DAQmx not usable on this PC");
+  else if (!devs.length) tile("stDaq", "bad", "Not found", "Check USB + power, then Refresh");
+  else if (!cfg.enabled) tile("stDaq", "", "Off", "Recordings are IMU-only");
+  else if (lv && lv.error) tile("stDaq", "bad", "Error", lv.error);
+  else if (!rec && daq.preview_error) tile("stDaq", "bad", "Error", daq.preview_error);
+  else if (lv) tile("stDaq", "ok", rec ? "Recording" : "Connected",
+    `${dev ? dev.product : cfg.device} · ${(+cfg.rate / 1000).toFixed(0)} kHz`, rec);
+  else tile("stDaq", "warn", "Starting…", `${cfg.device}`);
+  // IMU
+  const pods = s.pods || [];
+  const fus = s.hello && s.hello.frame_us ? +s.hello.frame_us : 10000;
+  if (!s.port) tile("stImu", "bad", "Board offline", "Plug in the XIAO (USB)");
+  else if (!s.hello || !s.hello.board) tile("stImu", "warn", "Connecting…", s.port);
+  else {
+    const bad = pods.filter((p) => !p.ok || !p.live || (p.silent_s !== null && p.silent_s > 0.5));
+    const weak = pods.filter((p) => p.ok && p.fresh_recent < 90);
+    const okN = pods.length - bad.length;
+    const hz = `${Math.round(1e6 / fus)} Hz`;
+    if (bad.length) tile("stImu", "bad", `${okN} / ${pods.length} OK`,
+      bad.map((p) => `${p.name} ${p.ok ? "stalled" : "not found"}`).join(" · "));
+    else if (weak.length) tile("stImu", "warn", `${okN} / ${pods.length} OK`,
+      weak.map((p) => `${p.name} dropping (${p.fresh_recent.toFixed(0)}%)`).join(" · "));
+    else tile("stImu", "ok", `${okN} / ${pods.length} OK`, `${hz} · ${pods.map((p) => p.name).join(", ")}`, rec);
+  }
+  // EMG = DAQ extra channels
+  const extras = String(cfg.extra_chans || "").split(",").map((x) => x.trim()).filter((x) => x && x !== cfg.sync_chan);
+  if (!extras.length) tile("stEmg", "", "Not set", "Add DAQ channels, e.g. ai1,ai2");
+  else if (!daqOk) tile("stEmg", "", "No DAQ", extras.join(", "));
+  else if (!s.emg || !s.emg.chans || !s.emg.chans.length) tile("stEmg", "warn", "Waiting…", `${extras.length} channels`);
+  else {
+    const ch = s.emg.chans, rng = +s.emg.range_v || +cfg.range || 5;
+    const flat = ch.filter((c) => c.rms_mv !== null && c.rms_mv < 0.2), clip = ch.filter((c) => c.clip);
+    const names = (a) => a.map((c) => c.name).join(", ");
+    const top = Math.max(...ch.map((c) => c.rms_mv || 0));
+    if (clip.length) tile("stEmg", "bad", "Clipping", `${names(clip)} over ±${rng} V`, rec);
+    else if (flat.length === ch.length) tile("stEmg", "warn", "No signal", "all channels flat: amplifier on?", rec);
+    else if (flat.length) tile("stEmg", "warn", `Check ${flat.length} ch`, `flat: ${names(flat)}`, rec);
+    else tile("stEmg", "ok", `${ch.length} ch live`, `${ch[0].name}–${ch[ch.length - 1].name} · max RMS ${top.toFixed(2)} mV`, rec);
+  }
+  // Sync
+  const c = s.clock || {}, sm = s.sync, ls = s.last_summary;
+  const pc = c.n ? `PC ±${c.uncertainty_ms.toFixed(1)} ms` : "";
+  const last = ls && ls.daq_sync ? `last: ${ls.daq_sync.ok ? "PASS" : "FAIL"}` : "";
+  if (rec && sm && sm.has_daq) {
+    if (!sm.marker_found) tile("stSync", "warn", "Waiting for start pulse", "frame-0 marker not seen yet", true);
+    else if (sm.no_pulse || sm.extra) tile("stSync", "bad", "Pulses missing",
+      `${sm.no_pulse} frames without pulse · ${sm.extra} extra`, true);
+    else tile("stSync", "ok", "Locked", `${sm.matched.toLocaleString()} frames matched` +
+      (sm.resid_sd_us !== null ? ` · ±${sm.resid_sd_us} µs` : ""), true);
+  } else if (rec) tile("stSync", "warn", "PC clock only", pc || "no DAQ in this recording", true);
+  else if (!c.n) tile("stSync", "", "Waiting", "needs the board connected");
+  else if (!daqOk) tile("stSync", "warn", "PC clock only", [pc, last].filter(Boolean).join(" · "));
+  else if (lv.sync_hi > 1.0) tile("stSync", "warn", "Check SYNC wire", `ai0 not low while idle (${lv.sync_hi.toFixed(1)} V)`);
+  else if (ls && ls.daq_sync && !ls.daq_sync.ok) tile("stSync", "bad", "Ready · last FAIL", pc + " · DAQ ready");
+  else tile("stSync", "ok", "Ready", [pc, "DAQ ready", last].filter(Boolean).join(" · "));
 }
 
 function drawSync() { drawScope(); drawStrip(); drawResid(); drawClock(); }
 
+// ---------------- collapsible sections + settings drawer ----------------
+const FOLD_DEFAULT = { imu: true, emg: false, sync: false, log: false };
+const isOpen = (name) => { const el = document.querySelector(`.fold[data-fold="${name}"]`); return !!el && el.classList.contains("open"); };
+
+function setFold(el, open) {
+  el.classList.toggle("open", open);
+  el.querySelector(".foldhead").setAttribute("aria-expanded", String(open));
+  LS.set("fold." + el.dataset.fold, open);
+  if (open) {                      // canvases had no size while closed: redraw
+    smDirty = true; emgDirty = true;
+    for (const p of pods.values()) p.dirty = true;
+  }
+}
+
+function wireFolds() {
+  for (const el of document.querySelectorAll(".fold")) {
+    setFold(el, !!LS.get("fold." + el.dataset.fold, FOLD_DEFAULT[el.dataset.fold]));
+    const head = el.querySelector(".foldhead");
+    head.addEventListener("click", (e) => {
+      if (e.target.closest(".foldtools")) return;          // buttons inside the header
+      setFold(el, !el.classList.contains("open"));
+    });
+    head.addEventListener("keydown", (e) => {
+      if ((e.key === "Enter" || e.key === " ") && e.target === head) { e.preventDefault(); setFold(el, !el.classList.contains("open")); }
+    });
+  }
+}
+
+function openDrawer(open) {
+  $("drawer").classList.toggle("open", open);
+  $("drawer").setAttribute("aria-hidden", String(!open));
+  $("scrim").classList.toggle("hidden", !open);
+  if (open) { loadPorts(); $("btnCloseDrawer").focus(); }
+}
+
+function goTo(id) {
+  if (id === "drawer") return openDrawer(true);
+  const el = $(id);
+  if (!el) return;
+  if (el.classList.contains("fold")) setFold(el, true);
+  el.scrollIntoView({ behavior: "smooth", block: "start" });
+}
+
+function imuSummary(s) {
+  if (!s.port) return "board offline";
+  return (s.pods || []).map((pd) => {
+    const p = pods.get(pd.name);
+    const e = p ? euler(p.ref ? qmul(qconj(p.ref), p.q) : p.q) : null;
+    const st = !pd.ok ? "not found" : (!pd.live || (pd.silent_s !== null && pd.silent_s > 0.5)) ? "stalled" : "";
+    return st ? `${pd.name} ${st}` : e ? `${pd.name}: roll ${e[0].toFixed(0)}°  pitch ${e[1].toFixed(0)}°  yaw ${e[2].toFixed(0)}°` : pd.name;
+  }).join("   ·   ");
+}
+
 let lastNum = 0;
 function frameLoop(ts) {
-  if (smDirty) { smDirty = false; drawSync(); }
+  if (smDirty && isOpen("sync")) { smDirty = false; drawSync(); }
+  if (emgDirty && isOpen("emg")) { emgDirty = false; drawEmg(); }
+  const imuOpen = isOpen("imu");
   for (const p of pods.values()) {
-    if (!p.dirty) continue;
+    if (!p.dirty || !imuOpen) continue;
     p.dirty = false;
     drawPlot(p);
     drawCube(p);
@@ -429,6 +659,8 @@ function frameLoop(ts) {
       p.yaw.textContent = e[2].toFixed(1) + "°";
       p.quat.textContent = `q = [${p.q.map((v) => v.toFixed(4)).join(", ")}]` + (p.ref ? "  (display zeroed)" : "");
     }
+    if (S && !imuOpen) setText("sumImu", imuSummary(S));
+    else if (S && imuOpen) setText("sumImu", "");
     tickTimer();
   }
   requestAnimationFrame(frameLoop);
@@ -537,8 +769,10 @@ function applyStatus(s) {
     setCls(p.node, "dim", !pd.ok);
   }
   applySync(s);
+  applyTiles(s);
+  applyEmg(s);
   // summary banner after a recording
-  if (prevState === "stopping" && st !== "stopping" && s.last_summary) { showSummary(s.last_summary); loadSessions(); }
+  if (prevState === "stopping" && st !== "stopping" && s.last_summary) { showSummary(s.last_summary); loadSessions(true); }
 }
 
 function applyDaq(d, st) {
@@ -576,7 +810,8 @@ function applyDaq(d, st) {
   }
   const live = d.live;
   setText("daqPulses", live ? `${live.pulses.toLocaleString()} / ${S && S.rec ? S.rec.frames.toLocaleString() : "—"}` : "—");
-  setText("daqLevel", live ? `${live.last_v.toFixed(2)} V` : "—");
+  const lvl = live || d.preview;
+  setText("daqLevel", lvl ? `${lvl.last_v.toFixed(2)} V` : "—");
   if (live && live.error) { note.textContent = live.error; note.className = "note bad"; }
 }
 
@@ -621,30 +856,94 @@ function addLog(items) {
   }
   while (box.children.length > 500) box.removeChild(box.firstChild);
   if (atBottom) box.scrollTop = box.scrollHeight;
+  if (items.length) {                       // one-line summary for the closed section
+    const it = items[items.length - 1];
+    const sum = $("sumLog");
+    sum.textContent = `${new Date(it.t * 1000).toTimeString().slice(0, 8)}  ${it.text}`;
+    sum.className = "foldsum hint " + (it.level === "error" ? "bad" : "");
+  }
 }
 
-async function loadSessions() {
+// ---------------- saved recordings panel ----------------
+const FILE_DESC = {
+  "imu_synced.csv": "IMU + PC & DAQ time (main file)", "imu.csv": "raw IMU frames", "events.csv": "start/stop, markers, warnings",
+  "summary.json": "quality report", "session.json": "subject, trial, settings", "clock_sync.csv": "PC clock pings",
+  "daq_raw.f32": "DAQ samples (SYNC + EMG)", "daq_meta.json": "DAQ channels & rate", "daq_pulses.csv": "SYNC pulses",
+  "spine_cal.json": "spine calibration",
+};
+const FILE_ORDER = Object.keys(FILE_DESC);
+let SESS = [], openSess = new Set(LS.get("openSess", [])), newestSess = null;
+
+const fmtBytes = (b) => b >= 1 << 30 ? (b / (1 << 30)).toFixed(1) + " GB" : b >= 1 << 20 ? (b / (1 << 20)).toFixed(1) + " MB" : b >= 1024 ? Math.round(b / 1024) + " kB" : b + " B";
+function fmtWhen(s) {                     // "20261113_020556_S02_2" -> "11-13 02:05"
+  const m = /^(\d{4})(\d{2})(\d{2})_(\d{2})(\d{2})(\d{2})/.exec(s.name);
+  return m ? `${m[2]}-${m[3]} ${m[4]}:${m[5]}` : (s.started || "");
+}
+
+async function loadSessions(highlight) {
   try {
     const r = await (await fetch("/api/sessions")).json();
-    const box = $("sessions");
-    box.innerHTML = "";
-    if (!r.sessions.length) { box.innerHTML = `<div class="empty">No recordings yet.</div>`; return; }
-    for (const s of r.sessions) {
-      const el = document.createElement("div");
-      el.className = "sess";
-      const pods = Object.entries(s.pods || {}).map(([k, v]) => `${k} ${(+v).toFixed(1)}%`).join(" · ");
-      let tag = `<span class="pill">IMU only</span>`;
-      if (s.sync === true) tag = `<span class="pill ok">SYNC ✓</span>`;
-      else if (s.sync === false) tag = `<span class="pill bad">SYNC ✗</span>`;
-      if (s.aborted) tag = `<span class="pill warn">ABORTED</span>`;
-      el.innerHTML = `<div class="n"></div>${tag}<div class="d"></div>`;
-      el.querySelector(".n").textContent = s.name;
-      el.querySelector(".d").textContent = `${s.frames} frames · ${s.missing} missing · ${s.duration_s ?? 0} s · ${pods}`;
-      el.title = "Double-click to open the folder";
-      el.ondblclick = () => api("/api/open", { dir: (S && S.data_dir ? S.data_dir + "\\" : "") + s.name });
-      box.appendChild(el);
-    }
+    SESS = r.sessions || [];
+    if (highlight && SESS.length) { newestSess = SESS[0].name; openSess.add(newestSess); }
+    renderSessions();
   } catch { }
+}
+
+function renderSessions() {
+  const box = $("sessions"), q = $("filesSearch").value.trim().toLowerCase();
+  const list = SESS.filter((s) => !q || `${s.name} ${s.subject} ${s.trial} ${s.notes}`.toLowerCase().includes(q));
+  box.innerHTML = "";
+  setText("filesCount", SESS.length ? `${SESS.length}` : "");
+  const total = SESS.reduce((a, s) => a + (s.bytes || 0), 0);
+  setText("filesFoot", SESS.length ? `${fmtBytes(total)} in the latest ${SESS.length} · click a recording for its files, click a file to open it` : "");
+  if (!list.length) { box.innerHTML = `<div class="empty">${SESS.length ? "No match." : "No recordings yet."}</div>`; return; }
+  for (const s of list) {
+    const el = document.createElement("div");
+    el.className = "sess2" + (openSess.has(s.name) ? " open" : "") + (s.name === newestSess ? " new" : "");
+    let tag = `<span class="pill tag">IMU only</span>`;
+    if (s.sync === true) tag = `<span class="pill ok tag">SYNC ✓</span>`;
+    else if (s.sync === false) tag = `<span class="pill bad tag">SYNC ✗</span>`;
+    if (s.aborted) tag = `<span class="pill warn tag">ABORTED</span>`;
+    el.innerHTML = `<div class="sh" title="Show files"><span class="who"></span>${tag}<span class="when"></span><span class="meta"></span></div><div class="fl"></div>`;
+    const who = [s.subject, s.trial].filter(Boolean).join(" · ") || s.name;
+    el.querySelector(".who").textContent = who;
+    el.querySelector(".when").textContent = fmtWhen(s);
+    const miss = s.missing ? `${s.missing} missing · ` : "";
+    el.querySelector(".meta").textContent = `${s.duration_s ?? 0} s · ${(s.frames ?? 0).toLocaleString()} frames · ${miss}${fmtBytes(s.bytes || 0)}`;
+    el.querySelector(".sh").onclick = () => {
+      el.classList.toggle("open");
+      if (el.classList.contains("open")) openSess.add(s.name); else openSess.delete(s.name);
+      LS.set("openSess", [...openSess].slice(-20));
+    };
+    const fl = el.querySelector(".fl");
+    if (s.notes) { const n = document.createElement("div"); n.className = "notes"; n.textContent = s.notes; fl.appendChild(n); }
+    const files = (s.files || []).slice().sort((a, b) => {
+      const ia = FILE_ORDER.indexOf(a.name), ib = FILE_ORDER.indexOf(b.name);
+      return (ia < 0 ? 99 : ia) - (ib < 0 ? 99 : ib) || a.name.localeCompare(b.name);
+    });
+    for (const f of files) {
+      const row = document.createElement("div");
+      row.className = "f" + (f.name === "imu_synced.csv" ? " main" : "");
+      row.title = `Open ${f.name} (Shift+click: show in Explorer)`;
+      row.innerHTML = `<span class="nm"></span><span class="ds"></span><span class="sz"></span>`;
+      row.querySelector(".nm").textContent = f.name;
+      row.querySelector(".ds").textContent = FILE_DESC[f.name] || "";
+      row.querySelector(".sz").textContent = fmtBytes(f.bytes);
+      row.onclick = (e) => api("/api/open", { file: s.dir + "\\" + f.name, reveal: e.shiftKey });
+      fl.appendChild(row);
+    }
+    const acts = document.createElement("div");
+    acts.className = "acts";
+    const ob = document.createElement("button");
+    ob.className = "btn small ghost"; ob.textContent = "Open folder";
+    ob.onclick = () => api("/api/open", { dir: s.dir || ((S && S.data_dir ? S.data_dir + "\\" : "") + s.name) });
+    const cp = document.createElement("button");
+    cp.className = "btn small ghost"; cp.textContent = "Copy path";
+    cp.onclick = async () => { try { await navigator.clipboard.writeText(s.dir); toast("Path copied"); } catch { toast(s.dir); } };
+    acts.append(ob, cp);
+    fl.appendChild(acts);
+    box.appendChild(el);
+  }
 }
 
 // ---------------- actions ----------------
@@ -718,6 +1017,8 @@ function wire() {
   $("btnZero").onclick = () => zeroAll(true);
   $("btnUnzero").onclick = () => zeroAll(false);
   $("btnOpenData").onclick = () => api("/api/open", {});
+  $("btnRefreshFiles").onclick = () => loadSessions();
+  $("filesSearch").addEventListener("input", renderSessions);
   for (const b of $("winSeg").querySelectorAll("button")) {
     b.classList.toggle("on", +b.dataset.w === windowSec);
     b.onclick = () => {
@@ -733,13 +1034,29 @@ function wire() {
       $("log").classList.toggle("onlywarn", lastLogLevelFilter === "warn");
     };
   }
-  document.addEventListener("keydown", (e) => {
-    const tag = (e.target.tagName || "").toLowerCase();
-    if (tag === "input" || tag === "textarea" || tag === "select" || e.ctrlKey || e.metaKey || e.altKey) return;
-    if (e.key === "m" || e.key === "M") { e.preventDefault(); mark(); }
-    if (e.key === "z" || e.key === "Z") { e.preventDefault(); zeroAll(true); }
+  document.addEventListener("keydown", onShortcut);
+  document.addEventListener("keyup", (e) => {          // stop Space from also "clicking" a focused button
+    if (e.code === "Space" && !isTyping(e.target)) e.preventDefault();
   });
+  $("keysHelp").onclick = () => showKeys(false);
+  $("btnKeys").onclick = () => showKeys(true);
   window.addEventListener("resize", () => { for (const p of pods.values()) p.dirty = true; smDirty = true; });
+  $("btnPreview").onclick = () => api("/api/preview", { on: !(S && S.daq && S.daq.preview_on) });
+  for (const b of $("emgScale").querySelectorAll("button")) {
+    b.classList.toggle("on", +b.dataset.s === emgScale);
+    b.onclick = () => {
+      emgScale = +b.dataset.s; LS.set("emgScale", emgScale);
+      for (const x of $("emgScale").querySelectorAll("button")) x.classList.toggle("on", x === b);
+      for (const v of emgViews.values()) v.lim = 0;
+      emgDirty = true;
+    };
+  }
+  for (const t of document.querySelectorAll(".stile")) t.onclick = () => goTo(t.dataset.go);
+  wireFolds();
+  $("btnSettings").onclick = () => openDrawer(!$("drawer").classList.contains("open"));
+  $("btnCloseDrawer").onclick = () => openDrawer(false);
+  $("scrim").onclick = () => openDrawer(false);
+  document.addEventListener("keydown", (e) => { if (e.key === "Escape" && $("drawer").classList.contains("open")) openDrawer(false); });
   for (const b of $("scopeSeg").querySelectorAll("button")) {
     b.classList.toggle("on", b.dataset.m === scopeMode);
     b.onclick = () => {
@@ -748,6 +1065,55 @@ function wire() {
       smDirty = true;
     };
   }
+}
+
+// ---------------- keyboard shortcuts ----------------
+const FOLD_KEYS = { "1": "imu", "2": "emg", "3": "sync", "4": "log" };
+let lastToggle = 0;
+
+function isTyping(el) {
+  const tag = (el && el.tagName || "").toLowerCase();
+  return tag === "input" || tag === "textarea" || tag === "select" || !!(el && el.isContentEditable);
+}
+
+function toggleRecording() {
+  const now = performance.now();
+  if (now - lastToggle < 1000) return;                  // ignore an accidental double press
+  const st = S && S.state;
+  if (st === "idle") { lastToggle = now; startRec(); }
+  else if (st === "recording") { lastToggle = now; stopRec(); }
+  else toast(st ? `Not now: ${st}` : "Server not connected", true);
+}
+
+function showKeys(on) {
+  const el = $("keysHelp");
+  el.classList.toggle("hidden", on === undefined ? !el.classList.contains("hidden") : !on);
+}
+
+function onShortcut(e) {
+  if (isTyping(e.target)) {                              // Esc leaves a text field, so keys work again
+    if (e.key === "Escape") e.target.blur();
+    return;
+  }
+  if (e.ctrlKey || e.metaKey || e.altKey) return;
+  if (e.code === "Space") {
+    e.preventDefault();
+    if (e.repeat) return;
+    if (document.activeElement && document.activeElement !== document.body) document.activeElement.blur();
+    toggleRecording();
+    return;
+  }
+  if (e.repeat) return;
+  const k = e.key.toLowerCase();
+  if (k === "m") { e.preventDefault(); mark(); }
+  else if (k === "z") { e.preventDefault(); zeroAll(true); }
+  else if (k === "s") { e.preventDefault(); openDrawer(!$("drawer").classList.contains("open")); }
+  else if (FOLD_KEYS[k]) {
+    e.preventDefault();
+    const el = document.querySelector(`.fold[data-fold="${FOLD_KEYS[k]}"]`);
+    if (el) setFold(el, !el.classList.contains("open"));
+  } else if (e.key === "?" || k === "h") { e.preventDefault(); showKeys(); }
+  else if (e.key === "Escape") showKeys(false);
 }
 
 // ---------------- stream ----------------
