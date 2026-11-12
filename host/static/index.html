@@ -1,0 +1,204 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>IMU DAQ</title>
+<link rel="stylesheet" href="/static/app.css">
+</head>
+<body>
+<header class="topbar">
+  <div class="brand"><span class="logo">◆</span> IMU DAQ</div>
+  <div class="chip" id="connChip"><span class="dot" id="connDot"></span><span id="connText">Connecting…</span></div>
+  <div class="badge" id="stateBadge">—</div>
+  <div class="timer" id="timer">00:00.0</div>
+  <div class="spacer"></div>
+  <div class="chip mono" id="rateChip">— Hz</div>
+  <div class="chip mono" id="clockChip" title="Board ↔ PC clock">clock —</div>
+  <div class="chip mono" id="daqChip" title="NI DAQ">DAQ —</div>
+  <a class="chip" href="/spine" target="_blank" style="text-decoration:none;color:inherit" title="Calibrated 3D spine view (opens a new tab)">Spine view ↗</a>
+</header>
+
+<div class="banner hidden" id="banner"></div>
+
+<main class="layout">
+  <aside class="side">
+    <!-- Recording -->
+    <section class="card">
+      <h2>Recording</h2>
+      <div class="grid2">
+        <label>Subject<input id="subject" placeholder="S01" autocomplete="off"></label>
+        <label>Trial<input id="label" placeholder="static01" autocomplete="off"></label>
+      </div>
+      <label>Notes<textarea id="notes" rows="2" placeholder="optional"></textarea></label>
+      <div class="btnrow">
+        <button class="btn start" id="btnStart">● Start</button>
+        <button class="btn stop" id="btnStop" disabled>■ Stop</button>
+      </div>
+      <div class="markrow">
+        <input id="markText" placeholder="Event marker text" autocomplete="off">
+        <button class="btn" id="btnMark" title="Shortcut: M">Mark</button>
+      </div>
+      <dl class="stats">
+        <div><dt>Frames</dt><dd id="recFrames">—</dd></div>
+        <div><dt>Missing</dt><dd id="recMissing">—</dd></div>
+        <div><dt>Markers</dt><dd id="recMarkers">—</dd></div>
+        <div><dt>Session</dt><dd id="recName" class="ellip">—</dd></div>
+      </dl>
+    </section>
+
+    <!-- Time sync -->
+    <section class="card">
+      <h2>Time sync</h2>
+      <dl class="stats">
+        <div><dt>Round trip</dt><dd id="csRtt">—</dd></div>
+        <div><dt>Uncertainty</dt><dd id="csUnc">—</dd></div>
+        <div><dt>Clock drift</dt><dd id="csDrift">—</dd></div>
+        <div><dt>Fit residual</dt><dd id="csRes">—</dd></div>
+      </dl>
+      <h3>NI DAQ <span class="hint">SYNC → AI0</span></h3>
+      <div class="row">
+        <label class="switch"><input type="checkbox" id="daqEnabled"><span></span> Record DAQ</label>
+        <button class="btn small ghost" id="btnDaqRefresh">Refresh</button>
+      </div>
+      <div class="grid2">
+        <label>Device<select id="daqDevice"></select></label>
+        <label>SYNC channel<input id="daqSync" value="ai0"></label>
+        <label>Rate<select id="daqRate">
+          <option value="2000">2 kHz</option><option value="5000">5 kHz</option>
+          <option value="10000">10 kHz</option><option value="20000" selected>20 kHz</option><option value="50000">50 kHz</option></select></label>
+        <label>Input<select id="daqTerm">
+          <option value="DIFF">Differential</option><option value="RSE">RSE</option><option value="NRSE">NRSE</option></select></label>
+        <label>Range<select id="daqRange"><option value="5">±5 V</option><option value="10">±10 V</option></select></label>
+        <label>Extra channels<input id="daqExtra" placeholder="ai1,ai2"></label>
+      </div>
+      <p class="note" id="daqNote">—</p>
+      <dl class="stats" id="daqLive">
+        <div><dt>DAQ pulses</dt><dd id="daqPulses">—</dd></div>
+        <div><dt>SYNC level</dt><dd id="daqLevel">—</dd></div>
+      </dl>
+    </section>
+
+    <!-- Device -->
+    <section class="card">
+      <h2>Device</h2>
+      <div class="row">
+        <select id="portSel"></select>
+        <button class="btn small" id="btnConnect">Connect</button>
+        <button class="btn small ghost" id="btnDisconnect">Disconnect</button>
+      </div>
+      <div class="grid2">
+        <label>IMU rate<select id="rateSel">
+          <option value="10">100 Hz</option><option value="5">200 Hz</option>
+          <option value="20">50 Hz</option><option value="40">25 Hz</option></select></label>
+        <label>&nbsp;<button class="btn ghost" id="btnRestart">Restart IMUs</button></label>
+      </div>
+      <dl class="stats">
+        <div><dt>Firmware</dt><dd id="fwInfo" class="ellip">—</dd></div>
+        <div><dt>Pins</dt><dd id="fwPins">—</dd></div>
+        <div><dt>Lines dropped</dt><dd id="fwDropped">—</dd></div>
+        <div><dt>Clock resyncs</dt><dd id="fwResync">—</dd></div>
+      </dl>
+    </section>
+  </aside>
+
+  <section class="main">
+    <div class="toolbar">
+      <span class="hint">Shortcuts: <kbd>M</kbd> marker · <kbd>Z</kbd> zero display</span>
+      <div class="spacer"></div>
+      <div class="seg" id="winSeg">
+        <button data-w="5">5 s</button><button data-w="10" class="on">10 s</button><button data-w="30">30 s</button>
+      </div>
+      <button class="btn small ghost" id="btnZero">Zero display</button>
+      <button class="btn small ghost" id="btnUnzero">Reset zero</button>
+    </div>
+    <div class="pods" id="pods"></div>
+
+    <section class="card syncmon" id="syncCard">
+      <div class="cardhead">
+        <h2>Sync monitor <span class="hint" id="smHint"></span></h2>
+        <span class="pill" id="smState">WAITING</span>
+      </div>
+      <div class="smgrid">
+        <div class="smcell">
+          <div class="smtitle"><b>SYNC line at the DAQ</b><span class="hint" id="smScopeHint"></span>
+            <div class="spacer"></div>
+            <div class="seg" id="scopeSeg"><button data-m="live" class="on">Live</button><button data-m="marker">Start marker</button></div>
+          </div>
+          <canvas id="cvScope" class="smcv"></canvas>
+          <p class="cap">One pulse per IMU frame, sent by the board's frame timer. The 3 ms pulse is frame 0; the number on each pulse is the frame it is matched to.</p>
+        </div>
+        <div class="smcell">
+          <div class="smtitle"><b>Pulse ↔ frame matching</b><span class="hint" id="smLag"></span></div>
+          <div class="smnums">
+            <div><small>Frames (board)</small><b id="smFrames">—</b></div>
+            <div><small>Pulses (DAQ)</small><b id="smPulses">—</b></div>
+            <div><small>Matched</small><b id="smMatched">—</b></div>
+            <div><small>Frames without pulse</small><b id="smNoPulse">—</b></div>
+            <div><small>Extra pulses</small><b id="smExtra">—</b></div>
+            <div><small>Frame lines lost</small><b id="smNoLine">—</b></div>
+          </div>
+          <canvas id="cvStrip" class="smstrip"></canvas>
+          <div class="legend"><span><i class="ok"></i>matched</span><span><i class="bad"></i>no pulse</span>
+            <span><i class="warn"></i>line lost</span><span><i class="pend"></i>waiting (0.6 s)</span></div>
+        </div>
+        <div class="smcell">
+          <div class="smtitle"><b>Board clock ↔ DAQ clock</b><span class="hint mono" id="smDaqStat"></span></div>
+          <canvas id="cvResid" class="smcv"></canvas>
+          <p class="cap">Each dot is one frame: its DAQ pulse time minus a straight-line fit of DAQ time vs. board time.
+            The shaded band is ±½ DAQ sample, the resolution of the DAQ edge.</p>
+        </div>
+        <div class="smcell">
+          <div class="smtitle"><b>Board clock ↔ PC clock</b><span class="hint mono" id="smPcStat"></span></div>
+          <canvas id="cvClock" class="smcv"></canvas>
+          <p class="cap">One ping per second over USB. The bar is the round trip (the board's reply happened somewhere inside it),
+            the dot its midpoint vs. the fit. Filled dots (fastest third) are used for the fit.</p>
+        </div>
+      </div>
+    </section>
+
+    <div class="lower">
+      <section class="card logcard">
+        <div class="cardhead"><h2>Event log</h2>
+          <div class="seg" id="logSeg"><button data-l="all" class="on">All</button><button data-l="warn">Warnings</button></div>
+        </div>
+        <div class="log" id="log"></div>
+      </section>
+      <section class="card sesscard">
+        <div class="cardhead"><h2>Recent sessions</h2>
+          <button class="btn small ghost" id="btnOpenData">Open folder</button></div>
+        <div class="sessions" id="sessions"></div>
+      </section>
+    </div>
+  </section>
+</main>
+
+<div class="toast hidden" id="toast"></div>
+
+<template id="podTpl">
+  <section class="card pod">
+    <div class="podhead">
+      <span class="light"></span>
+      <h2 class="podname">A4B</h2>
+      <span class="addr mono"></span>
+      <span class="pill podstate">—</span>
+      <div class="spacer"></div>
+      <span class="metric"><b class="fresh">—</b><small>new data</small></span>
+      <span class="metric"><b class="stalls">0</b><small>stalls</small></span>
+    </div>
+    <div class="podbody">
+      <canvas class="cube"></canvas>
+      <div class="angles">
+        <div class="ang roll"><small>Roll</small><b>—</b></div>
+        <div class="ang pitch"><small>Pitch</small><b>—</b></div>
+        <div class="ang yaw"><small>Yaw</small><b>—</b></div>
+        <div class="quat mono"></div>
+      </div>
+    </div>
+    <canvas class="plot"></canvas>
+  </section>
+</template>
+
+<script src="/static/app.js"></script>
+</body>
+</html>

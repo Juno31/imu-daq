@@ -1,0 +1,12 @@
+# recordings (large, personal data)
+data/
+*.f32
+# Python
+__pycache__/
+*.pyc
+.venv/
+# Arduino / editor
+build/
+.vscode/
+.idea/
+*.bak

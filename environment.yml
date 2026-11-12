@@ -1,0 +1,12 @@
+# conda env create -f environment.yml   (creates the "daq" environment)
+name: daq
+channels:
+  - conda-forge
+dependencies:
+  - python=3.11
+  - numpy>=1.24
+  - pandas>=2.0
+  - pyserial>=3.5
+  - pip
+  - pip:
+      - nidaqmx>=1.0

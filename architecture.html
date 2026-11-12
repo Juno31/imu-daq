@@ -1,0 +1,113 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>IMU DAQ Architecture</title>
+<style>
+:root{--bg:#f4f5f7;--card:#fff;--line:#d5dae2;--text:#1d2330;--sub:#5b6474;--mcu:#3867d6;--mcu-s:#e8eefc;--daq:#c98512;--daq-s:#fbf1dd;--pc:#1f9d6b;--pc-s:#e3f5ec;--ui:#8b5cf6;--ui-s:#f0eafe;--sync:#d64545}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#12151b;--card:#1a1e26;--line:#323946;--text:#e6e9ef;--sub:#a7afbd;--mcu:#7aa2ff;--mcu-s:#1e2840;--daq:#f0b44c;--daq-s:#33291a;--pc:#3ccf91;--pc-s:#16302a;--ui:#b39cff;--ui-s:#2a2342;--sync:#ff6b6b}}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--text);font:14px/1.5 "Segoe UI",system-ui,sans-serif;padding:24px 16px}
+main{max-width:980px;margin:0 auto}
+h1{font-size:22px;margin:0 0 4px}
+.lead{color:var(--sub);margin:0 0 22px}
+.box{border:2px solid var(--c);background:var(--card);border-radius:14px;padding:14px 16px}
+.box>h2{margin:0 0 10px;font-size:15px;color:var(--c);display:flex;gap:8px;align-items:baseline;flex-wrap:wrap}
+.box>h2 small{color:var(--sub);font-weight:400;font-size:12.5px}
+.mcu{--c:var(--mcu);--s:var(--mcu-s)}.daq{--c:var(--daq);--s:var(--daq-s)}.pc{--c:var(--pc);--s:var(--pc-s)}.ui{--c:var(--ui);--s:var(--ui-s)}
+.flow{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin:6px 0}
+.n{background:var(--s);border-radius:9px;padding:7px 11px;font-size:13px}
+.n b{display:block;font-size:13px}.n span{color:var(--sub);font-size:12px}
+.ar{color:var(--sub);font-size:18px}
+.sync{color:var(--sync)!important;font-weight:600}
+.row2{display:grid;grid-template-columns:1fr 2.2fr;gap:14px}
+.mods{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:8px}
+code{font-family:Consolas,ui-monospace,monospace;font-size:12.5px}
+.link{display:flex;justify-content:space-around;flex-wrap:wrap;gap:8px;padding:10px 0;color:var(--sub);font-size:12.5px;text-align:center}
+.link div{display:flex;flex-direction:column;align-items:center}
+.link .v{font-size:22px;line-height:1}
+.clocks{margin-top:22px}
+table{width:100%;border-collapse:collapse;background:var(--card);border-radius:12px;overflow:hidden}
+th,td{text-align:left;padding:8px 12px;border-bottom:1px solid var(--line);font-size:13px}
+th{color:var(--sub);font-weight:600}
+@media(max-width:700px){.row2{grid-template-columns:1fr}}
+</style>
+</head>
+<body><main>
+<h1>IMU DAQ architecture</h1>
+<p class="lead">Firmware on the XIAO, a Python server on the PC, and a browser GUI. The board's frame timer is the master clock.</p>
+
+<section class="box mcu">
+  <h2>XIAO ESP32S3 <small>firmware/imu_daq/imu_daq.ino</small></h2>
+  <div class="flow">
+    <div class="n"><b>BNO085 A4B</b><span>0x4B</span></div>
+    <div class="n"><b>BNO085 A4A</b><span>0x4A</span></div>
+    <span class="ar">→ I2C →</span>
+    <div class="n"><b>loop()</b><span>reads IMUs, restarts silent ones</span></div>
+    <span class="ar">→</span>
+    <div class="n"><b>latest[]</b><span>newest quaternions</span></div>
+  </div>
+  <div class="flow">
+    <div class="n"><b>esp_timer</b><span>every 10 ms (5 ms at 200 Hz)</span></div>
+    <span class="ar">→</span>
+    <div class="n"><b>onTick()</b><span>snapshot latest[]</span></div>
+    <span class="ar">→</span>
+    <div class="n"><b>ring[512]</b><span>frame queue</span></div>
+    <span class="ar">→</span>
+    <div class="n"><b>USB lines</b><span>F (recording) / P (idle)</span></div>
+  </div>
+  <div class="flow">
+    <div class="n"><b>onTick()</b><span>while recording</span></div>
+    <span class="ar">→</span>
+    <div class="n"><b class="sync">SYNC pin D1 high</b><span>1 ms; 3 ms for frame 0</span></div>
+  </div>
+</section>
+
+<div class="link">
+  <div><span class="v sync">↓</span><span class="sync">SYNC wire</span>one pulse per frame (D1 → ai0)</div>
+  <div><span class="v">↓</span><b>USB serial (COM4)</b>frames, @messages, ping/pong</div>
+</div>
+
+<div class="row2">
+  <section class="box daq">
+    <h2>NI USB-6363</h2>
+    <div class="n" style="margin-bottom:8px"><b class="sync">ai0 = SYNC</b><span>edge timed to 1 sample</span></div>
+    <div class="n"><b>ai1, ai2 … = EMG etc.</b><span>same sample clock</span></div>
+    <p style="color:var(--sub);font-size:12.5px;margin:10px 0 0">→ USB to the PC, read by daq.py</p>
+  </section>
+  <section class="box pc">
+    <h2>PC: server.py <small>conda env "daq"</small></h2>
+    <div class="mods">
+      <div class="n"><b><code>daq.py</code></b><span>DAQ reader thread → daq_raw.f32, edge detection</span></div>
+      <div class="n"><b><code>device.py</code></b><span>serial reader thread → frames, @messages, pongs</span></div>
+      <div class="n"><b><code>clocksync.py</code></b><span>ping/pong → board↔PC clock fit</span></div>
+      <div class="n"><b><code>syncmon.py</code></b><span>live pulse↔frame matching</span></div>
+      <div class="n"><b><code>session.py</code></b><span>writes the session folder</span></div>
+      <div class="n"><b><code>App</code></b><span>state machine + HTTP server (port 8765)</span></div>
+    </div>
+  </section>
+</div>
+
+<div class="link"><div><span class="v">↓</span><b>HTTP + live stream (SSE)</b>frames every 40 ms, status every 250 ms</div></div>
+
+<section class="box ui">
+  <h2>Browser GUI <small>index.html + app.js + app.css</small></h2>
+  <div class="flow">
+    <div class="n"><b>Buttons</b><span>Start / Stop / Marker / settings</span></div>
+    <div class="n"><b>IMU cards</b><span>3D view, angles, plots</span></div>
+    <div class="n"><b>Sync monitor</b><span>scope, match strip, clock plots</span></div>
+    <div class="n"><b>Log + sessions</b><span>events, recent recordings</span></div>
+  </div>
+</section>
+
+<section class="clocks">
+  <h2 style="font-size:15px">How the three clocks are linked</h2>
+  <table>
+    <tr><th>Link</th><th>How</th><th>Accuracy</th></tr>
+    <tr><td>Board → DAQ</td><td>SYNC pulse per frame, in hardware</td><td>≈ 14 µs at 20 kHz</td></tr>
+    <tr><td>Board → PC</td><td>USB ping/pong, line fit</td><td>≈ ±0.4 ms</td></tr>
+    <tr><td>DAQ → EMG / other inputs</td><td>same sample clock</td><td>exact</td></tr>
+  </table>
+</section>
+</main></body></html>

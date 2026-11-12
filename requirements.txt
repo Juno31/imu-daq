@@ -1,0 +1,5 @@
+# Host (PC) dependencies for IMU DAQ. Python 3.10-3.12 recommended (tested on 3.11).
+numpy>=1.24
+pandas>=2.0
+pyserial>=3.5
+nidaqmx>=1.0        # Python API; the NI-DAQmx driver itself is installed separately (see README)

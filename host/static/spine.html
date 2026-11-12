@@ -1,0 +1,93 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Spine View</title>
+<link rel="stylesheet" href="/static/app.css">
+<link rel="stylesheet" href="/static/spine.css">
+<script type="importmap">
+{ "imports": {
+  "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
+  "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"
+} }
+</script>
+</head>
+<body>
+<header class="topbar">
+  <div class="brand"><span class="logo">◆</span> Spine view</div>
+  <div class="chip" id="connChip"><span class="dot" id="connDot"></span><span id="connText">Connecting…</span></div>
+  <div class="badge" id="stateBadge">—</div>
+  <div class="spacer"></div>
+  <div class="chip mono" id="calChip">not calibrated</div>
+  <a class="chip linkchip" href="/" title="Recording, sync and device settings">← Acquisition</a>
+</header>
+
+<main class="spine-layout">
+  <aside class="side">
+    <section class="card">
+      <h2>Sensor placement</h2>
+      <div class="grid2">
+        <label>T7 sensor<select id="mapT7"></select></label>
+        <label>T12 sensor<select id="mapT12"></select></label>
+      </div>
+      <p class="hint">Mount each IMU flat on the spinous process. Board orientation does not matter: calibration finds it.</p>
+    </section>
+
+    <section class="card">
+      <h2>Calibration</h2>
+      <ol class="steps">
+        <li id="stepN"><b>Neutral.</b> Subject stands upright, arms relaxed, looking ahead. Hold still.
+          <button class="btn" id="btnNeutral">Capture neutral (3 s)</button></li>
+        <li id="stepF"><b>Flexion axis.</b> Slowly bend forward about 40–60° and come back up.
+          <button class="btn" id="btnFlex">Capture bend (6 s)</button></li>
+      </ol>
+      <div class="calmsg" id="calMsg">Do step 1, then step 2.</div>
+      <p class="hint">Recalibrate after an IMU restart or a board reset: the sensors' heading reference restarts with them.</p>
+    </section>
+
+    <section class="card">
+      <h2>Model</h2>
+      <label class="row">Lumbar share of T12 motion
+        <input type="range" id="lumbarShare" min="0" max="100" step="5" value="70"><span class="mono" id="lumbarShareV">70%</span></label>
+      <p class="hint">No pelvis sensor yet: this much of T12's motion is spread over S1–L1; the rest is treated as pelvis tilt.</p>
+      <label class="row"><input type="checkbox" id="showRibs" checked> Ribs</label>
+      <label class="row"><input type="checkbox" id="showTrail"> T7 path trail</label>
+      <div class="btnrow">
+        <button class="btn ghost" data-view="side">Side</button>
+        <button class="btn ghost" data-view="front">Front</button>
+        <button class="btn ghost" data-view="back">Back</button>
+        <button class="btn ghost" data-view="iso">3/4</button>
+      </div>
+    </section>
+  </aside>
+
+  <section class="stage card">
+    <div id="three" class="three"></div>
+    <div class="overlay" id="overlay">Loading 3D…</div>
+  </section>
+
+  <aside class="side">
+    <section class="card">
+      <h2>T7 relative to T12 <span class="sub">(mid-thoracic)</span></h2>
+      <div class="angles" id="angRel"></div>
+    </section>
+    <section class="card">
+      <h2>T12 relative to standing <span class="sub">(trunk, incl. pelvis)</span></h2>
+      <div class="angles" id="angT12"></div>
+    </section>
+    <section class="card">
+      <h2>T7 relative to standing</h2>
+      <div class="angles" id="angT7"></div>
+    </section>
+    <section class="card">
+      <h2>T7–T12, last 10 s</h2>
+      <canvas id="plot" class="splot" height="160"></canvas>
+      <div class="legend"><span class="lg flex">Flexion +fwd</span><span class="lg lat">Lat. bend +left</span><span class="lg axi">Axial rot +left</span></div>
+    </section>
+  </aside>
+</main>
+
+<script type="module" src="/static/spine.js"></script>
+</body>
+</html>
