@@ -11,6 +11,7 @@ import argparse
 import collections
 import json
 import os
+import shutil
 import socket
 import sys
 import threading
@@ -29,12 +30,34 @@ import daq as daqmod                      # noqa: E402
 from clocksync import ClockSync           # noqa: E402
 from syncmon import SyncMonitor           # noqa: E402
 import channels                           # noqa: E402
+import calibration as calmod              # noqa: E402
 from device import Device, guess_port, list_serial_ports   # noqa: E402
 from session import Session               # noqa: E402
 
 APP_VERSION = "1.1.0"
 STATIC = os.path.join(HERE, "static")
 DEFAULT_DATA = os.path.join(os.path.dirname(HERE), "data")
+SETTINGS_FILE = os.path.join(HERE, "host_settings.json")
+QUAT_MODES = {"game": "game rotation vector (accel + gyro, relative heading)",
+              "rv": "rotation vector (accel + gyro + magnetometer, absolute heading)"}
+
+
+def load_host_settings():
+    try:
+        with open(SETTINGS_FILE, encoding="utf-8") as f:
+            return json.load(f)
+    except Exception:
+        return {}
+
+
+def save_host_settings(update):
+    cur = load_host_settings()
+    cur.update(update)
+    try:
+        with open(SETTINGS_FILE, "w", encoding="utf-8") as f:
+            json.dump(cur, f, indent=2)
+    except OSError:
+        pass
 
 
 class App:
@@ -64,11 +87,19 @@ class App:
         self.session = None
         self.daq = None
         self.syncmon = None               # live SYNC matching view (kept after Stop)
+        # static calibration: current = last good one (copied into every recording), attempt = latest try
+        self.calib = {"running": False, "until": 0.0, "seconds": 0.0, "session": "", "error": "",
+                      "current": calmod.load_last(data_dir), "attempt": None}
         self.preview = None               # DAQ running while idle (nothing saved): live levels
         self.preview_err = ""
         self.preview_retry = 0.0
         self.preview_lock = threading.RLock()
         self.preview_on = True            # GUI "Preview" toggle
+        # IMU orientation output: "game" (game rotation vector, no magnetometer) or "rv" (rotation
+        # vector, with magnetometer). Kept in host_settings.json and re-sent if the board resets.
+        self.quat_mode = load_host_settings().get("quat_mode", "game")
+        if self.quat_mode not in QUAT_MODES:
+            self.quat_mode = "game"
         self.daq_cfg = {"enabled": True, "device": "", "sync_chan": "ai0", "extra_chans": channels.DEFAULT_EXTRA,
                         "rate": 20000, "range": 5.0, "terminal": "DIFF", "require": False}
         self.daq_devices = daqmod.list_devices()
@@ -148,6 +179,12 @@ class App:
                      "board")
             if fields.get("rec") == "1" and self.session is None:
                 threading.Thread(target=self._stop_stray, daemon=True).start()
+            have = fields.get("quat")
+            if have is None:
+                self.log("warn", "this firmware has no orientation-mode switch (game rotation vector only); "
+                                 "upload imu_daq v1.3 to use the rotation vector", "board")
+            elif have != self.quat_mode and fields.get("rec") != "1":
+                self.dev.send(f"mode {self.quat_mode}")
         elif tag == "STATUS":
             self.fw_status = fields
         elif tag == "POD":
@@ -183,6 +220,12 @@ class App:
         elif tag == "RATE":
             self.dev.hello.update(fields)
             self.log("info", f"rate set: {text}", "board")
+        elif tag == "MODE":
+            self.dev.hello["quat"] = fields.get("quat", "")
+            for f in self.fw_pods.values():
+                f.pop("head_acc_deg", None)
+                f.pop("q_status", None)
+            self.log("info", f"orientation: {QUAT_MODES.get(fields.get('quat'), fields.get('quat'))}", "board")
         elif tag == "ACK":
             pass
         elif tag == "#":
@@ -291,6 +334,16 @@ class App:
         self.hello_at = None
         self.log("info", "disconnected")
 
+    def set_quat_mode(self, mode):
+        if mode not in QUAT_MODES:
+            raise RuntimeError("mode must be game or rv")
+        if self.state in ("recording", "starting", "stopping"):
+            raise RuntimeError("stop the recording first")
+        self.quat_mode = mode
+        save_host_settings({"quat_mode": mode})
+        if self.dev.connected:
+            self.dev.send(f"mode {mode}")
+
     def send_simple(self, cmd):
         if self.state != "idle":
             raise RuntimeError("only possible while idle")
@@ -387,9 +440,23 @@ class App:
             frame_us = int(hello.get("frame_us", 10000))
             meta = dict(meta)
             meta.update({"app_version": APP_VERSION, "firmware": hello, "port": self.dev.port,
-                         "pc_start_unix_s": time.time(), "daq_config": dict(self.daq_cfg)})
-            sess = Session(self.data_dir, meta, self.dev.pod_names)
+                         "pc_start_unix_s": time.time(), "daq_config": dict(self.daq_cfg),
+                         "orientation_mode": hello.get("quat", "game"),
+                         "orientation_mode_name": QUAT_MODES.get(hello.get("quat", "game"), "")})
+            sensors = "acc" in str(hello.get("sensors", ""))
+            sess = Session(self.data_dir, meta, self.dev.pod_names, sensors=sensors)
             save_spine_cal(sess.dir, getattr(self, "spine_cal", None))
+            if not str(meta.get("task", "")).startswith("emg_"):   # the EMG normalization this trial relies on
+                norm = os.path.join(os.path.dirname(sess.dir), "emg_norm.json")
+                if os.path.isfile(norm):
+                    try:
+                        shutil.copy2(norm, os.path.join(sess.dir, "emg_norm.json"))
+                    except OSError:
+                        pass
+            cur = self.calib.get("current")
+            if cur and meta.get("kind") != "static_calibration":
+                calmod.save(sess.dir, cur)                      # the calibration this trial relies on
+                sess.write_meta({"calibration_session": cur.get("session"), "calibration_when": cur.get("when")})
             with self.lock:
                 for p in self.pod_live.values():
                     p["rec_frames"] = p["rec_fresh"] = 0
@@ -438,6 +505,51 @@ class App:
             raise
         finally:
             self.busy.release()
+
+    # ---------------- static calibration ----------------
+    def calibrate(self, seconds, meta):
+        """Record a short 'static_cal' trial while the participant holds still, then analyze it."""
+        seconds = max(2.0, min(30.0, float(seconds or 5)))
+        if self.calib.get("running"):
+            raise RuntimeError("a calibration is already running")
+        if self.state != "idle":
+            raise RuntimeError(f"cannot calibrate while {self.state}")
+        m = dict(meta or {})
+        m.update(label="static_cal", task="static_cal", kind="static_calibration", calibration_seconds=seconds)
+        r = self.start(m)
+        sess = self.session
+        self.calib.update(running=True, until=time.time() + seconds, seconds=seconds, session=sess.name, error="")
+        self.log("info", f"static calibration: hold still for {seconds:.0f} s", "user")
+        threading.Thread(target=self._calib_run, args=(sess, seconds, m.get("subject", "")),
+                         name="calibration", daemon=True).start()
+        return r
+
+    def _calib_run(self, sess, seconds, subject):
+        try:
+            end = time.time() + seconds
+            while time.time() < end and self.session is sess and not sess.closed:
+                time.sleep(0.05)
+            if self.session is not sess or sess.closed:
+                self.calib.update(error="stopped before the hold finished: calibration not saved")
+                self.log("warn", "static calibration stopped early: not saved")
+                return
+            self.stop()
+            res = calmod.analyze(sess.dir, sess.pod_names, subject, seconds)
+            calmod.save(sess.dir, res)
+            self.calib["attempt"] = res
+            if res.get("ok"):
+                self.calib["current"] = res
+                calmod.save(self.data_dir, res, "calibration_last.json")
+                parts = [f"{p} moved {v.get('moved_max_deg', 0):.1f}°" for p, v in res["imus"].items()]
+                self.log("info", "static calibration OK: " + ", ".join(parts))
+            else:
+                self.calib["error"] = "; ".join(res.get("problems", [])) or "calibration failed"
+                self.log("warn", "static calibration not accepted: " + self.calib["error"])
+        except Exception as e:
+            self.calib["error"] = f"calibration failed: {e}"
+            self.log("error", self.calib["error"])
+        finally:
+            self.calib["running"] = False
 
     def stop(self):
         if not self.busy.acquire(timeout=5):
@@ -540,6 +652,9 @@ class App:
                     "fresh_recent": round(100.0 * sum(fr) / len(fr), 1) if fr else 0.0,
                     "silent_s": round(now_perf - p["last_fresh"], 2) if p["last_fresh"] else None,
                     "live": fw.get("live", "1") == "1",
+                    "quat": fw.get("quat"),
+                    "q_status": int(fw["q_status"]) if fw.get("q_status") not in (None, "") else None,
+                    "head_acc_deg": float(fw["head_acc_deg"]) if fw.get("head_acc_deg") not in (None, "", "-1.0") else None,
                     "stalls": p["stalls"], "restarts": p["restarts"],
                     "rec_fresh": round(100.0 * p["rec_fresh"] / p["rec_frames"], 1) if p["rec_frames"] else None,
                 })
@@ -554,6 +669,7 @@ class App:
             out = {
                 "app_version": APP_VERSION, "state": self.state, "port": self.dev.port if self.dev.connected else None,
                 "want_port": self.want_port, "hello": self.dev.hello, "rate_hz": round(rate, 2),
+                "quat_mode": self.quat_mode,
                 "board": self.fw_status, "pods": pods, "rec": rec, "clock": self.clock.snapshot(),
                 "daq": {"cfg": self.daq_cfg, "devices": self.daq_devices, "live": d.live() if d else None,
                         "preview": self.preview.live() if self.preview else None,
@@ -571,6 +687,10 @@ class App:
         else:
             out["sync"] = None
         out["clockplot"] = self.clock.plot_data()
+        c = self.calib
+        out["calib"] = {"running": c["running"], "seconds": c["seconds"], "session": c["session"], "error": c["error"],
+                        "remaining_s": round(max(0.0, c["until"] - time.time()), 1) if c["running"] else 0.0,
+                        "current": c["current"], "attempt": c["attempt"]}
         src = d if d is not None else self.preview
         try:
             out["emg"] = src.emg_view() if src is not None else None
@@ -578,21 +698,30 @@ class App:
             out["emg"] = None
         return out
 
-    def sessions(self, limit=30):
+    def sessions(self, limit=300):
+        # recordings live in <date>/<subject>/<trial>/ (or, older ones, directly in the data folder)
+        found = []
+        root = self.data_dir
+        for dirpath, dirnames, filenames in os.walk(root):
+            depth = os.path.relpath(dirpath, root).count(os.sep) + (dirpath != root)
+            if "summary.json" in filenames:
+                try:
+                    found.append((os.path.getmtime(os.path.join(dirpath, "session.json")
+                                                   if "session.json" in filenames else dirpath), dirpath))
+                except OSError:
+                    pass
+                dirnames[:] = []
+            elif depth >= 3:
+                dirnames[:] = []
+        found.sort(reverse=True)
         out = []
-        try:
-            names = sorted(os.listdir(self.data_dir), reverse=True)[:limit]
-        except FileNotFoundError:
-            names = []
-        for n in names:
-            p = os.path.join(self.data_dir, n, "summary.json")
-            if not os.path.exists(p):
-                continue
+        for _, folder in found[:limit]:
+            n = os.path.basename(folder)
+            p = os.path.join(folder, "summary.json")
             try:
                 with open(p) as f:
                     s = json.load(f)
                 ds = s.get("daq_sync")
-                folder = os.path.join(self.data_dir, n)
                 files = []
                 for e in sorted(os.scandir(folder), key=lambda e: e.name):
                     if e.is_file():
@@ -606,6 +735,9 @@ class App:
                 out.append({"name": n, "dir": folder, "files": files,
                             "bytes": sum(f["bytes"] for f in files), "started": s.get("started"),
                             "subject": meta.get("subject", ""), "trial": meta.get("label", ""),
+                            "rel": os.path.relpath(folder, root), "date": meta.get("date", ""),
+                            "subject_id": meta.get("subject_id", ""), "task": meta.get("task", ""), "task_name": meta.get("task_name", ""),
+                            "trial_n": meta.get("trial", ""),
                             "notes": meta.get("notes", ""),
                             "frames": s.get("frames_received"), "missing": s.get("missing_frames"),
                             "duration_s": s.get("duration_s"),
@@ -656,6 +788,23 @@ class Handler(BaseHTTPRequestHandler):
                 return self._file("index.html")
             if path in ("/spine", "/spine.html"):
                 return self._file("spine.html")
+            if path in ("/review", "/review.html"):
+                return self._file("review.html")
+            if path in ("/emg", "/emg.html"):
+                return self._file("emg.html")
+            if path in ("/api/emgcal/trials", "/api/emgcal/load"):   # EMG normalization page (read-only)
+                from urllib.parse import parse_qs
+                import emgnorm
+                q = {k: v[0] for k, v in parse_qs(urlparse(self.path).query).items()}
+                if not q.get("subject"):
+                    return self._json({"ok": False, "error": "no subject"}, 400)
+                if path.endswith("/load"):
+                    return self._json({"ok": True, "norm": emgnorm.load(APP.data_dir, q.get("date"), q["subject"])})
+                kw = {"win_s": min(2.0, max(0.05, float(q.get("win", 0.5)))), "hold": min(0.95, max(0.1, float(q.get("hold", 0.6)))),
+                      "use_filter": q.get("filter", "1") != "0"}
+                sd, tr = emgnorm.trials(APP.data_dir, q.get("date"), q["subject"], **kw)
+                return self._json({"ok": True, "dir": sd, "rel": os.path.relpath(sd, APP.data_dir), "trials": tr,
+                                   "norm": emgnorm.load(APP.data_dir, q.get("date"), q["subject"])})
             if path.startswith("/static/"):
                 return self._file(path[len("/static/"):])
             if path == "/api/state":
@@ -664,8 +813,23 @@ class Handler(BaseHTTPRequestHandler):
                 return self._json({"ports": list_serial_ports(), "guess": guess_port()})
             if path == "/api/daq/devices":
                 return self._json(APP.refresh_daq())
+            if path == "/api/next_trial":
+                from urllib.parse import parse_qs
+                from session import next_trial, subject_id, date_id
+                q = {k: v[0] for k, v in parse_qs(urlparse(self.path).query).items()}
+                return self._json({"ok": True, "trial": next_trial(APP.data_dir, q.get("date"), q.get("subject"), q.get("task", "")),
+                                   "subject_id": subject_id(q.get("subject")), "date": date_id(q.get("date"))})
             if path == "/api/sessions":
                 return self._json({"sessions": APP.sessions()})
+            if path == "/api/review":            # one finished recording, for the Review page (read-only)
+                from urllib.parse import parse_qs
+                import review
+                rel = (parse_qs(urlparse(self.path).query).get("rel") or [""])[0]
+                root = os.path.abspath(APP.data_dir)
+                full = os.path.abspath(os.path.join(root, rel))
+                if not rel or not full.startswith(root + os.sep) or not os.path.isfile(os.path.join(full, "summary.json")):
+                    return self._json({"ok": False, "error": "recording not found"}, 404)
+                return self._json({"ok": True, **review.load(full, root)})
             if path == "/api/stream":
                 return self._stream()
             self._json({"error": "not found"}, 404)
@@ -736,10 +900,16 @@ class Handler(BaseHTTPRequestHandler):
             if path == "/api/restart":
                 APP.send_simple("restart")
                 return self._json({"ok": True})
+            if path == "/api/quatmode":
+                APP.set_quat_mode(str(body.get("mode", "")))
+                return self._json({"ok": True, "mode": APP.quat_mode})
             if path == "/api/rate":
                 ms = int(body.get("ms", 10))
                 APP.send_simple(f"rate {ms}")
                 return self._json({"ok": True})
+            if path == "/api/calibrate":
+                r = APP.calibrate(body.get("seconds", 5), {k: body.get(k, "") for k in ("subject", "notes")})
+                return self._json({"ok": True, **r})
             if path == "/api/preview":
                 APP.set_preview(body.get("on", True))
                 return self._json({"ok": True, "on": APP.preview_on})
@@ -754,6 +924,13 @@ class Handler(BaseHTTPRequestHandler):
                     save_spine_cal(sess.dir, body)
                     sess.event(APP.unix(), "spine_cal", json.dumps(body.get("map")), "", "")
                 return self._json({"ok": True})
+            if path == "/api/emgcal/save":
+                import emgnorm
+                if not body.get("subject") or not body.get("channels"):
+                    return self._json({"ok": False, "error": "subject and channels are required"}, 400)
+                p, saved = emgnorm.save(APP.data_dir, body.get("date"), body["subject"], body)
+                APP.log("info", f"EMG normalization saved: {os.path.relpath(p, APP.data_dir)}", "emg")
+                return self._json({"ok": True, "path": os.path.relpath(p, APP.data_dir), "norm": saved})
             if path == "/api/open":
                 # open a recording folder, or one file in it, with the Windows default program
                 d = body.get("file") or body.get("dir") or APP.data_dir

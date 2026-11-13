@@ -1,0 +1,178 @@
+{
+  "stl_sha256": "62b6b043ab90b7d782e617ad82ba32e88928a5e90b1f8a4387201d1e60a56b68",
+  "mesh_status": "Error.NoError",
+  "mesh_bounds_mm": [
+    [
+      0.0,
+      0.0,
+      0.0
+    ],
+    [
+      179.60000610351562,
+      84.0,
+      41.869998931884766
+    ]
+  ],
+  "source_vs_STL_symmetric_difference_mm3": 0.022222939921908734,
+  "board": {
+    "X": 25.4,
+    "Y": 22.86,
+    "T": 1.57,
+    "R": 2.54,
+    "H": 4.530000100000015,
+    "holes": [
+      [
+        2.54,
+        2.54
+      ],
+      [
+        2.54,
+        20.32
+      ],
+      [
+        22.86,
+        2.54
+      ],
+      [
+        22.86,
+        20.32
+      ]
+    ],
+    "drill": 2.5,
+    "header_rows_y": [
+      2.54,
+      20.32
+    ],
+    "header_x": [
+      6.35,
+      19.05
+    ],
+    "stemma_y": 11.43,
+    "stemma_len": 4.950000000000042,
+    "chip": [
+      12.70340957920933,
+      12.235066174044311
+    ],
+    "chip_size": [
+      5.199999999999999,
+      3.8000000000000007,
+      1.18
+    ],
+    "underside": 1.569999999999997
+  },
+  "pocket_mm": [
+    25.900000000000002,
+    23.0
+  ],
+  "nominal_side_clearance_mm": [
+    0.2500000000000018,
+    0.07000000000000028
+  ],
+  "seated_intersection_mm3": -9.367926898616596e-15,
+  "rotated_180_intersection_mm3": -5.423992418401857e-15,
+  "all_pockets_seated_intersections_mm3": [
+    {
+      "pocket": 1,
+      "volume": -9.367926898616596e-15
+    },
+    {
+      "pocket": 2,
+      "volume": 6.815362618879661e-15
+    },
+    {
+      "pocket": 3,
+      "volume": 3.3239605729332156e-15
+    },
+    {
+      "pocket": 4,
+      "volume": -3.3957212042246e-16
+    },
+    {
+      "pocket": 5,
+      "volume": 1.1651785222430155e-15
+    },
+    {
+      "pocket": 6,
+      "volume": 2.8561679930871886e-15
+    },
+    {
+      "pocket": 7,
+      "volume": 7.046785572596692e-15
+    },
+    {
+      "pocket": 8,
+      "volume": 2.9993775475453677e-15
+    }
+  ],
+  "insertion_rigid_intersections": [
+    {
+      "lift_mm": 0,
+      "rigid_overlap_mm3": -9.367926898616596e-15
+    },
+    {
+      "lift_mm": 0.1,
+      "rigid_overlap_mm3": 3.4884511036756938e-06
+    },
+    {
+      "lift_mm": 0.5,
+      "rigid_overlap_mm3": 0.9949295315656251
+    },
+    {
+      "lift_mm": 1.0,
+      "rigid_overlap_mm3": 0.9949295315656249
+    },
+    {
+      "lift_mm": 1.5,
+      "rigid_overlap_mm3": 0.9949295315656255
+    },
+    {
+      "lift_mm": 2.0,
+      "rigid_overlap_mm3": 0.00928412134567299
+    },
+    {
+      "lift_mm": 2.5,
+      "rigid_overlap_mm3": 0.0
+    },
+    {
+      "lift_mm": 3.0,
+      "rigid_overlap_mm3": 0.0
+    }
+  ],
+  "board_bottom_z_mm": 39.0,
+  "board_highest_z_mm": 43.53000010000002,
+  "top_reference_z_mm": 40.0,
+  "pin_diameter_mm": 2.3,
+  "barb_diameter_mm": 2.9,
+  "axial_retention_gap_mm": 0.1,
+  "negative_wall_datum_shift_mm": [
+    -0.25000000000000144,
+    -0.06999999999999992
+  ],
+  "negative_wall_datum_intersection_mm3": 1.3361544497213629,
+  "cross_check": [
+    "  OK  outline X              STEP   25.400   BRD   25.400",
+    "  OK  outline Y              STEP   22.860   BRD   22.860",
+    "  OK  corner radius          STEP    2.540   BRD    2.540",
+    "  OK  hole drill             STEP    2.500   BRD    2.500",
+    "  OK  hole x @(2.54,2.54)    STEP    2.540   BRD    2.540",
+    "  OK  hole y @(2.54,2.54)    STEP    2.540   BRD    2.540",
+    "  OK  hole x @(2.54,20.32)   STEP    2.540   BRD    2.540",
+    "  OK  hole y @(2.54,20.32)   STEP   20.320   BRD   20.320",
+    "  OK  hole x @(22.86,2.54)   STEP   22.860   BRD   22.860",
+    "  OK  hole y @(22.86,2.54)   STEP    2.540   BRD    2.540",
+    "  OK  hole x @(22.86,20.32)  STEP   22.860   BRD   22.860",
+    "  OK  hole y @(22.86,20.32)  STEP   20.320   BRD   20.320",
+    "  OK  header row 1 y         STEP    2.540   BRD    2.540",
+    "  OK  header row 2 y         STEP   20.320   BRD   20.320",
+    "  OK  header first pin x     STEP    6.350   BRD    6.350",
+    "  OK  header last pin x      STEP   19.050   BRD   19.050",
+    "  OK  STEMMA QT centre y     STEP   11.430   BRD   11.430",
+    "  OK  chip centre x          STEP   12.703   BRD   12.700",
+    "  OK  chip centre y          STEP   12.235   BRD   12.255"
+  ],
+  "limitations": [
+    "Rigid geometry only; no material deformation/FEA or physical insertion test",
+    "No mating cable plugs or user-installed headers in official board STEP",
+    "STL interpreted as mm; source generator confirms units"
+  ]
+}

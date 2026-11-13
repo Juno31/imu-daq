@@ -25,7 +25,12 @@ except Exception as e:          # pragma: no cover - depends on the PC
 
 TERMINALS = {"DIFF": "DIFF", "RSE": "RSE", "NRSE": "NRSE", "PSEUDO_DIFF": "PSEUDO_DIFF"}
 HI_V, LO_V = 2.0, 1.0
-RING_S = 2.0                    # seconds of every channel kept in memory for the live views           # Schmitt thresholds for a 3.3 V logic pulse
+RING_S = 2.0                    # seconds of every channel kept in memory for the live views
+# An unconnected (floating) input cannot drive the DAQ's sampling capacitor, so it repeats the channel
+# scanned before it: the SYNC pulses show up on it at 30-98 % of their height. A connected, low-impedance
+# source (EMG amplifier output) picks up < 0.001 % (measured on the USB-6363). Correlation with SYNC above
+# this value therefore means "nothing connected to this input".
+FLOAT_CORR = 0.5           # Schmitt thresholds for a 3.3 V logic pulse
 
 
 def list_devices():
@@ -192,7 +197,9 @@ class DaqRecorder:
             end = self.n_samples
             n = int(min(seconds * self.rate, self.ring.shape[1], end))
             idx = np.arange(end - n, end) % self.ring.shape[1]
-            x = self.ring[1:, idx].copy()
+            allx = self.ring[:, idx].copy()
+        sync, x = allx[0], allx[1:]
+        pulses = n > 10 and float(sync.std()) > 0.3          # SYNC is pulsing (recording), so we can tell
         out = []
         b = max(1, n // points)
         m = n // b * b
@@ -204,9 +211,12 @@ class DaqRecorder:
                 continue
             r = row[n - m:].reshape(-1, b)
             tail = row[-nr:]
+            corr = float(np.corrcoef(row, sync)[0, 1]) if pulses and row.std() > 0 else None
             out.append(dict(lab, lo=np.round(r.min(axis=1), 5).tolist(), hi=np.round(r.max(axis=1), 5).tolist(),
                             rms_mv=round(float(tail.std()) * 1e3, 4),
-                            clip=bool(np.abs(row).max() > 0.98 * self.vrange)))
+                            clip=bool(np.abs(row).max() > 0.98 * self.vrange),
+                            sync_corr=None if corr is None else round(corr, 3),
+                            floating=None if corr is None else bool(corr > FLOAT_CORR)))
         return {"seconds": m / self.rate, "range_v": self.vrange, "chans": out}
 
     def live(self):

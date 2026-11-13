@@ -1,0 +1,114 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Recording Review</title>
+<link rel="stylesheet" href="/static/app.css">
+<link rel="stylesheet" href="/static/review.css">
+<script type="importmap">
+{ "imports": {
+  "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
+  "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"
+} }
+</script>
+</head>
+<body>
+<header class="topbar">
+  <div class="brand"><span class="logo">◆</span> Review</div>
+  <span class="hint" id="rvTitle">Pick a recording on the left</span>
+  <div class="spacer"></div>
+  <a class="chip linkchip" href="/" title="Recording, sync and device settings">← Acquisition</a>
+  <a class="chip linkchip" href="/emg" target="_blank" title="Baseline offset and MVC / RVC">EMG norm ↗</a>
+  <a class="chip linkchip" href="/spine" target="_blank" title="Live spine view">Spine view ↗</a>
+</header>
+
+<div class="rv-shell">
+  <!-- recordings -->
+  <aside class="card rv-list">
+    <div class="fileshead"><h2>Recordings</h2><span class="hint" id="rvCount"></span><div class="spacer"></div>
+      <button class="btn small ghost" id="rvRefresh" title="Reload the list">↻</button></div>
+    <input class="filesearch" id="rvSearch" placeholder="Filter by subject, task, trial or date" autocomplete="off">
+    <label class="rv-check"><input type="checkbox" id="rvShowCal"> Show static calibrations</label>
+    <div class="rv-sessions" id="rvSessions"></div>
+  </aside>
+
+  <main class="rv-main">
+    <div class="rv-empty card" id="rvEmpty">
+      <b>No recording open</b>
+      <p>Choose a recording on the left to see its IMU and EMG signals and replay the spine model.</p>
+    </div>
+
+    <div class="rv-body hidden" id="rvBody">
+      <!-- recording info -->
+      <section class="card rv-info">
+        <div class="rv-infohead">
+          <div><h2 id="rvName">—</h2><div class="hint mono" id="rvRel"></div></div>
+          <div class="spacer"></div>
+          <button class="btn small ghost" id="rvOpenFolder" title="Open this recording's folder in Explorer">Open folder</button>
+        </div>
+        <dl class="rv-stats" id="rvStats"></dl>
+        <p class="cap" id="rvNotes"></p>
+      </section>
+
+      <!-- transport -->
+      <section class="card rv-transport">
+        <button class="rv-play" id="rvPlay" title="Play / pause (Space)" aria-label="Play">▶</button>
+        <div class="seg" id="rvSpeed" title="Playback speed">
+          <button data-v="0.25">¼×</button><button data-v="0.5">½×</button><button data-v="1" class="on">1×</button><button data-v="2">2×</button>
+        </div>
+        <span class="rv-time mono" id="rvTime">0.000 s</span>
+        <div class="rv-overview" id="rvOverview" title="Whole recording: click to jump, the box is the visible window">
+          <canvas id="rvOvCv"></canvas><div class="rv-ovwin" id="rvOvWin"></div><div class="rv-ovcur" id="rvOvCur"></div>
+        </div>
+        <span class="rv-keys hint"><kbd>Space</kbd> play · <kbd>←</kbd><kbd>→</kbd> step · wheel zoom · drag pan · double-click reset</span>
+      </section>
+
+      <div class="rv-grid">
+        <!-- spine replay -->
+        <section class="card rv-spine">
+          <div class="fileshead"><h2>Spine model</h2><span class="hint" id="rvCalSrc"></span><div class="spacer"></div>
+            <div class="seg" id="rvView"><button data-v="side" class="on">Side</button><button data-v="front">Front</button><button data-v="back">Back</button><button data-v="iso">3/4</button></div>
+          </div>
+          <div class="rv-stage" id="rvStage">
+            <div class="rv-three" id="rvThree"></div>
+            <div class="overlay" id="rvLoad3d">Loading 3D…</div>
+            <div class="calgate hidden" id="rvGate" role="status">
+              <div class="cg-icon">◎</div>
+              <b id="rvGateTitle">No calibration in this recording</b>
+              <p id="rvGateText"></p>
+              <button class="btn small" id="rvGateAnyway">Show anyway</button>
+            </div>
+          </div>
+          <div class="rv-angles" id="rvAngles"></div>
+          <p class="cap">T7 relative to T12 at the cursor: flexion +forward, lateral bend +left, axial rotation +left.</p>
+        </section>
+
+        <!-- signals -->
+        <div class="rv-plots" id="rvPlots">
+          <section class="card rv-plotcard" id="rvSpinePlot">
+            <div class="fileshead"><h2>Spine angles</h2><span class="hint">T7 relative to T12</span><div class="spacer"></div>
+              <span class="legend"><span><i style="background:var(--roll)"></i>Flexion</span><span><i style="background:var(--pitch)"></i>Lat. bend</span><span><i style="background:var(--yaw)"></i>Axial rot.</span></span></div>
+            <div class="rv-tracks" id="rvSpineTracks"></div>
+          </section>
+          <section class="card rv-plotcard">
+            <div class="fileshead"><h2>IMU</h2><span class="hint" id="rvImuHint"></span><div class="spacer"></div>
+              <div class="seg" id="rvImuMode"><button data-v="ang" class="on">Angles</button><button data-v="acc">Acc</button><button data-v="gyr">Gyro</button></div></div>
+            <div class="rv-tracks" id="rvImuTracks"></div>
+          </section>
+          <section class="card rv-plotcard">
+            <div class="fileshead"><h2>EMG</h2><span class="hint" id="rvEmgHint"></span><div class="spacer"></div>
+              <div class="seg" id="rvEmgMode" title="Raw envelope (min/max) or 100 ms RMS"><button data-v="raw" class="on">Raw</button><button data-v="rms">RMS</button><button data-v="norm" id="rvEmgNorm" title="RMS as % of the saved MVC / RVC (EMG normalization page)">%MVC</button></div>
+              <div class="seg" id="rvEmgScale" title="Vertical scale"><button data-v="each" class="on">Per channel</button><button data-v="same">Shared</button></div></div>
+            <div class="rv-tracks" id="rvEmgTracks"></div>
+          </section>
+        </div>
+      </div>
+    </div>
+  </main>
+</div>
+
+<div class="toasts" id="toasts" role="status" aria-live="polite"></div>
+<script type="module" src="/static/review.js"></script>
+</body>
+</html>

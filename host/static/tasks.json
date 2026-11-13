@@ -1,0 +1,11 @@
+[
+  {"key": "walking", "name": "Walking", "method": "실내 10 m 직선 경로를 자가선택 보행속도로 걷기 (지면반력은 지면반력기 접촉 구간에서 수집)", "start": "Quiet standing"},
+  {"key": "sit2stand", "name": "5-Sit-to-Stand", "method": "높이 약 45 cm의 안정된 의자에서 손으로 밀지 않고 일어서기 (허리받침 X)", "start": "Quiet sitting"},
+  {"key": "pickup", "name": "Light Pick-Up", "method": "발끝 기준 전방 약 30 cm 바닥의 탁구공 1개(약 2.7 g)를 우세손으로 집어 들고 바로 서기 (count)", "start": "Quiet standing"},
+  {"key": "flexion", "name": "Upper Body Flexion", "method": "상체 굴곡 (count)", "start": "Quiet standing"},
+  {"key": "lateral", "name": "Lateral Bending", "method": "좌·우 측면 굽힘 (count)", "start": "Quiet standing"},
+  {"key": "rotation", "name": "Axial Rotation", "method": "좌·우 회전 (count)", "start": "Quiet standing"},
+  {"key": "lifting", "name": "Light Lifting", "method": "Box lifting task with pre-determined weight (count)", "start": "Quiet standing"},
+  {"key": "frt", "name": "Functional Reach Test (FRT)", "method": "Maximal hands forward reaching task (time: TBD)", "start": "Quiet standing"},
+  {"key": "singleleg", "name": "Single-leg Stance", "method": "Single leg standing (time: TBD)", "start": "Single leg standing"}
+]

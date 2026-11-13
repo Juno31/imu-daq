@@ -1,0 +1,1088 @@
+{
+  "source": "sparkfun_bno086\\Eagle_v10_extracted\\SparkFun_VR_IMU_Breakout_BNO086_QWIIC.brd",
+  "units": "mm",
+  "coordinate_system": "Original Eagle board XY; top view; no image-derived scaling",
+  "outline": [
+    {
+      "x1": "0",
+      "y1": "0",
+      "x2": "0",
+      "y2": "25.4",
+      "width": "0.2032",
+      "layer": "20"
+    },
+    {
+      "x1": "0",
+      "y1": "25.4",
+      "x2": "30.48",
+      "y2": "25.4",
+      "width": "0.2032",
+      "layer": "20"
+    },
+    {
+      "x1": "30.48",
+      "y1": "25.4",
+      "x2": "30.48",
+      "y2": "0",
+      "width": "0.2032",
+      "layer": "20"
+    },
+    {
+      "x1": "30.48",
+      "y1": "0",
+      "x2": "0",
+      "y2": "0",
+      "width": "0.2032",
+      "layer": "20"
+    }
+  ],
+  "mounting_features": [
+    {
+      "element": {
+        "name": "JP3",
+        "library": "SparkFun-Hardware",
+        "package": "STAND-OFF",
+        "value": "STAND-OFF",
+        "x": "2.54",
+        "y": "22.86",
+        "smashed": "yes"
+      },
+      "local_holes": [
+        {
+          "x": "0",
+          "y": "0",
+          "drill": "3.302"
+        }
+      ],
+      "local_pads": []
+    },
+    {
+      "element": {
+        "name": "JP4",
+        "library": "SparkFun-Hardware",
+        "package": "STAND-OFF",
+        "value": "STAND-OFF",
+        "x": "27.94",
+        "y": "22.86",
+        "smashed": "yes"
+      },
+      "local_holes": [
+        {
+          "x": "0",
+          "y": "0",
+          "drill": "3.302"
+        }
+      ],
+      "local_pads": []
+    }
+  ],
+  "component_origins": [
+    {
+      "name": "JP3",
+      "library": "SparkFun-Hardware",
+      "package": "STAND-OFF",
+      "value": "STAND-OFF",
+      "x": "2.54",
+      "y": "22.86",
+      "smashed": "yes"
+    },
+    {
+      "name": "JP4",
+      "library": "SparkFun-Hardware",
+      "package": "STAND-OFF",
+      "value": "STAND-OFF",
+      "x": "27.94",
+      "y": "22.86",
+      "smashed": "yes"
+    },
+    {
+      "name": "JP2",
+      "library": "SparkFun-Aesthetics",
+      "package": "FIDUCIAL-MICRO",
+      "value": "FIDUCIALUFIDUCIAL",
+      "x": "29.591",
+      "y": "0.889",
+      "smashed": "yes"
+    },
+    {
+      "name": "JP6",
+      "library": "SparkFun-Aesthetics",
+      "package": "FIDUCIAL-MICRO",
+      "value": "FIDUCIALUFIDUCIAL",
+      "x": "0.762",
+      "y": "24.638",
+      "smashed": "yes"
+    },
+    {
+      "name": "FRAME1",
+      "library": "SparkFun-Aesthetics",
+      "package": "CREATIVE_COMMONS",
+      "value": "FRAME-LETTER",
+      "x": "-12.7",
+      "y": "-7.62",
+      "smashed": "yes"
+    },
+    {
+      "name": "C4",
+      "library": "SparkFun-Capacitors",
+      "package": "0603",
+      "value": "0.1uF",
+      "x": "14.224",
+      "y": "7.62",
+      "smashed": "yes",
+      "rot": "R90"
+    },
+    {
+      "name": "LOGO1",
+      "library": "SparkFun-Aesthetics",
+      "package": "OSHW-LOGO-MINI",
+      "value": "OSHW-LOGOMINI",
+      "x": "27.94",
+      "y": "2.54",
+      "smashed": "yes",
+      "rot": "MR0"
+    },
+    {
+      "name": "U2",
+      "library": "bno086",
+      "package": "LGA-28",
+      "value": "BNO086",
+      "x": "15.24",
+      "y": "12.7",
+      "smashed": "yes",
+      "rot": "R90"
+    },
+    {
+      "name": "C1",
+      "library": "SparkFun-Capacitors",
+      "package": "0603",
+      "value": "0.1uF",
+      "x": "12.319",
+      "y": "7.62",
+      "smashed": "yes",
+      "rot": "R270"
+    },
+    {
+      "name": "R1",
+      "library": "SparkFun-Resistors",
+      "package": "0603",
+      "value": "10k",
+      "x": "16.129",
+      "y": "7.62",
+      "smashed": "yes",
+      "rot": "R270"
+    },
+    {
+      "name": "ADR",
+      "library": "SparkFun-Jumpers",
+      "package": "SMT-JUMPER_2_NO_SILK",
+      "package3d_urn": "urn:adsk.eagle:package:39279/1",
+      "value": "",
+      "x": "24.145240625",
+      "y": "9.2837",
+      "smashed": "yes",
+      "rot": "MR0"
+    },
+    {
+      "name": "R3",
+      "library": "SparkFun-Resistors",
+      "package": "0603",
+      "value": "10k",
+      "x": "21.844",
+      "y": "7.62",
+      "smashed": "yes",
+      "rot": "R270"
+    },
+    {
+      "name": "R6",
+      "library": "SparkFun-Resistors",
+      "package": "0603",
+      "value": "10k",
+      "x": "10.16",
+      "y": "12.7",
+      "smashed": "yes",
+      "rot": "R90"
+    },
+    {
+      "name": "R7",
+      "library": "SparkFun-Resistors",
+      "package": "0603",
+      "value": "10k",
+      "x": "10.414",
+      "y": "7.62",
+      "smashed": "yes",
+      "rot": "R90"
+    },
+    {
+      "name": "R8",
+      "library": "SparkFun-Resistors",
+      "package": "0603",
+      "value": "10k",
+      "x": "8.509",
+      "y": "7.62",
+      "smashed": "yes",
+      "rot": "R90"
+    },
+    {
+      "name": "PS0",
+      "library": "SparkFun-Jumpers",
+      "package": "SMT-JUMPER_2_NO_SILK",
+      "package3d_urn": "urn:adsk.eagle:package:39279/1",
+      "value": "",
+      "x": "6.35",
+      "y": "6.35",
+      "smashed": "yes",
+      "rot": "MR180"
+    },
+    {
+      "name": "PS1",
+      "library": "SparkFun-Jumpers",
+      "package": "SMT-JUMPER_2_NO_SILK",
+      "package3d_urn": "urn:adsk.eagle:package:39279/1",
+      "value": "",
+      "x": "6.35",
+      "y": "8.89",
+      "smashed": "yes",
+      "rot": "MR180"
+    },
+    {
+      "name": "R9",
+      "library": "SparkFun-Resistors",
+      "package": "0603",
+      "value": "4.7k",
+      "x": "19.939",
+      "y": "7.62",
+      "smashed": "yes",
+      "rot": "R270"
+    },
+    {
+      "name": "R10",
+      "library": "SparkFun-Resistors",
+      "package": "0603",
+      "value": "4.7k",
+      "x": "18.034",
+      "y": "7.62",
+      "smashed": "yes",
+      "rot": "R270"
+    },
+    {
+      "name": "C2",
+      "library": "SparkFun-Capacitors",
+      "package": "0603",
+      "value": "0.1uF",
+      "x": "10.16",
+      "y": "16.51",
+      "smashed": "yes",
+      "rot": "R90"
+    },
+    {
+      "name": "R12",
+      "library": "SparkFun-Resistors",
+      "package": "0603",
+      "value": "2.2k",
+      "x": "26.67",
+      "y": "7.62",
+      "smashed": "yes"
+    },
+    {
+      "name": "R13",
+      "library": "SparkFun-Resistors",
+      "package": "0603",
+      "value": "2.2k",
+      "x": "26.67",
+      "y": "2.54",
+      "smashed": "yes"
+    },
+    {
+      "name": "I2C",
+      "library": "SparkFun-Jumpers",
+      "package": "SMT-JUMPER_3_2-NC_TRACE_SILK",
+      "package3d_urn": "urn:adsk.eagle:package:39289/1",
+      "value": "",
+      "x": "26.67",
+      "y": "5.08",
+      "smashed": "yes",
+      "rot": "R270"
+    },
+    {
+      "name": "J6",
+      "library": "SparkFun-Connectors",
+      "package": "1X08_NO_SILK",
+      "value": "SPI",
+      "x": "6.35",
+      "y": "24.13",
+      "smashed": "yes"
+    },
+    {
+      "name": "J7",
+      "library": "SparkFun-Connectors",
+      "package": "1X02_NO_SILK",
+      "value": "",
+      "x": "21.59",
+      "y": "1.27",
+      "smashed": "yes"
+    },
+    {
+      "name": "J1",
+      "library": "SparkFun-Connectors",
+      "package": "1X06_NO_SILK",
+      "value": "",
+      "x": "8.89",
+      "y": "19.05",
+      "smashed": "yes"
+    },
+    {
+      "name": "J5",
+      "library": "SparkFun-Connectors",
+      "package": "1X01_NO_SILK",
+      "value": "",
+      "x": "1.27",
+      "y": "7.62",
+      "smashed": "yes"
+    },
+    {
+      "name": "J8",
+      "library": "SparkFun-Connectors",
+      "package": "1X02_NO_SILK",
+      "value": "",
+      "x": "8.89",
+      "y": "1.27",
+      "smashed": "yes",
+      "rot": "R180"
+    },
+    {
+      "name": "Y1",
+      "library": "SparkFun-Clocks",
+      "package": "CRYSTAL-SMD-3.2X1.5MM",
+      "value": "32.768kHz",
+      "x": "15.24",
+      "y": "16.51",
+      "smashed": "yes",
+      "rot": "R180"
+    },
+    {
+      "name": "C3",
+      "library": "SparkFun-Capacitors",
+      "package": "0603",
+      "value": "22pF",
+      "x": "17.78",
+      "y": "16.51",
+      "smashed": "yes",
+      "rot": "R270"
+    },
+    {
+      "name": "C5",
+      "library": "SparkFun-Capacitors",
+      "package": "0603",
+      "value": "22pF",
+      "x": "12.7",
+      "y": "16.51",
+      "smashed": "yes",
+      "rot": "R90"
+    },
+    {
+      "name": "LOGO4",
+      "library": "SparkFun-Aesthetics",
+      "package": "SFE_LOGO_FLAME_.2",
+      "value": "SFE_LOGO_FLAME.2_INCH",
+      "x": "20.817840625",
+      "y": "12.6492",
+      "smashed": "yes"
+    },
+    {
+      "name": "LOGO5",
+      "library": "SparkFun-Aesthetics",
+      "package": "SFE_LOGO_NAME_FLAME_.1",
+      "value": "SFE_LOGO_NAME_FLAME.1_INCH",
+      "x": "14.5821375",
+      "y": "8.780778125",
+      "smashed": "yes",
+      "rot": "MR0"
+    },
+    {
+      "name": "PWR",
+      "library": "SparkFun-LED",
+      "package": "LED-0603",
+      "value": "RED",
+      "x": "27.559",
+      "y": "18.288",
+      "smashed": "yes",
+      "rot": "R270"
+    },
+    {
+      "name": "R2",
+      "library": "SparkFun-Resistors",
+      "package": "0603",
+      "value": "4.7k",
+      "x": "29.083",
+      "y": "18.288",
+      "smashed": "yes",
+      "rot": "R270"
+    },
+    {
+      "name": "LOGO2",
+      "library": "SparkFun-Aesthetics",
+      "package": "REVISION",
+      "value": "REVISION",
+      "x": "-1.27",
+      "y": "-10.16",
+      "smashed": "yes"
+    },
+    {
+      "name": "JP1",
+      "library": "SparkFun-Aesthetics",
+      "package": "FIDUCIAL-MICRO",
+      "value": "FIDUCIALUFIDUCIAL",
+      "x": "29.591",
+      "y": "0.889",
+      "smashed": "yes",
+      "rot": "MR0"
+    },
+    {
+      "name": "JP5",
+      "library": "SparkFun-Aesthetics",
+      "package": "FIDUCIAL-MICRO",
+      "value": "FIDUCIALUFIDUCIAL",
+      "x": "0.762",
+      "y": "24.638",
+      "smashed": "yes",
+      "rot": "MR0"
+    },
+    {
+      "name": "U$24",
+      "library": "output",
+      "package": "BNO0861",
+      "value": "",
+      "x": "2.547621875",
+      "y": "3.58901875",
+      "smashed": "yes",
+      "rot": "R90"
+    },
+    {
+      "name": "U$31",
+      "library": "output",
+      "package": "IMU862",
+      "value": "",
+      "x": "3.7846",
+      "y": "3.571240625",
+      "smashed": "yes",
+      "rot": "R90"
+    },
+    {
+      "name": "U$32",
+      "library": "output",
+      "package": "#GND#864",
+      "value": "",
+      "x": "6.370321875",
+      "y": "21.63571875",
+      "smashed": "yes",
+      "rot": "R90"
+    },
+    {
+      "name": "U$36",
+      "library": "output",
+      "package": "#3V3#865",
+      "value": "",
+      "x": "8.9179375",
+      "y": "21.73478125",
+      "smashed": "yes",
+      "rot": "R90"
+    },
+    {
+      "name": "U$37",
+      "library": "output",
+      "package": "#SCK#866",
+      "value": "",
+      "x": "11.44778125",
+      "y": "21.99131875",
+      "smashed": "yes",
+      "rot": "R90"
+    },
+    {
+      "name": "U$12",
+      "library": "output",
+      "package": "#SO#867",
+      "value": "",
+      "x": "13.980159375",
+      "y": "22.095459375",
+      "smashed": "yes",
+      "rot": "R90"
+    },
+    {
+      "name": "U$13",
+      "library": "output",
+      "package": "#SI#868",
+      "value": "",
+      "x": "16.51508125",
+      "y": "22.39771875",
+      "smashed": "yes",
+      "rot": "R90"
+    },
+    {
+      "name": "U$17",
+      "library": "output",
+      "package": "##CS##870",
+      "value": "",
+      "x": "19.047459375",
+      "y": "22.1615",
+      "smashed": "yes",
+      "rot": "R90"
+    },
+    {
+      "name": "U$38",
+      "library": "output",
+      "package": "##WAK##871",
+      "value": "",
+      "x": "21.6128625",
+      "y": "22.0091",
+      "smashed": "yes",
+      "rot": "R90"
+    },
+    {
+      "name": "U$19",
+      "library": "output",
+      "package": "##RST##872",
+      "value": "",
+      "x": "24.140159375",
+      "y": "21.757640625",
+      "smashed": "yes",
+      "rot": "R90"
+    },
+    {
+      "name": "U$42",
+      "library": "output",
+      "package": "#PWR#873",
+      "value": "",
+      "x": "26.380440625",
+      "y": "18.18131875",
+      "smashed": "yes",
+      "rot": "R90"
+    },
+    {
+      "name": "U$1",
+      "library": "output",
+      "package": "#I2C#874",
+      "value": "",
+      "x": "28.2575",
+      "y": "5.11301875",
+      "smashed": "yes",
+      "rot": "R90"
+    },
+    {
+      "name": "U$23",
+      "library": "output",
+      "package": "#PS0#874",
+      "value": "",
+      "x": "6.37031875",
+      "y": "3.558540625",
+      "smashed": "yes",
+      "rot": "R90"
+    },
+    {
+      "name": "U$43",
+      "library": "output",
+      "package": "#PS1#874",
+      "value": "",
+      "x": "8.89",
+      "y": "3.47471875",
+      "smashed": "yes",
+      "rot": "R90"
+    },
+    {
+      "name": "U$45",
+      "library": "output",
+      "package": "#GND#864",
+      "value": "",
+      "x": "11.4401625",
+      "y": "3.9497",
+      "smashed": "yes",
+      "rot": "R90"
+    },
+    {
+      "name": "U$46",
+      "library": "output",
+      "package": "#3V3#874",
+      "value": "",
+      "x": "13.98778125",
+      "y": "3.705859375",
+      "smashed": "yes",
+      "rot": "R90"
+    },
+    {
+      "name": "U$47",
+      "library": "output",
+      "package": "#SDA#874",
+      "value": "",
+      "x": "16.494759375",
+      "y": "3.718559375",
+      "smashed": "yes",
+      "rot": "R90"
+    },
+    {
+      "name": "U$48",
+      "library": "output",
+      "package": "#SCL#875",
+      "value": "",
+      "x": "19.04491875",
+      "y": "3.57631875",
+      "smashed": "yes",
+      "rot": "R90"
+    },
+    {
+      "name": "U$50",
+      "library": "output",
+      "package": "##RST##876",
+      "value": "",
+      "x": "21.567140625",
+      "y": "3.6576",
+      "smashed": "yes",
+      "rot": "R90"
+    },
+    {
+      "name": "U$51",
+      "library": "output",
+      "package": "##INT##877",
+      "value": "",
+      "x": "24.140159375",
+      "y": "3.53821875",
+      "smashed": "yes",
+      "rot": "R90"
+    },
+    {
+      "name": "U$3",
+      "library": "output",
+      "package": "X878",
+      "value": "",
+      "x": "4.51358125",
+      "y": "17.1323",
+      "smashed": "yes"
+    },
+    {
+      "name": "U$6",
+      "library": "output",
+      "package": "Y879",
+      "value": "",
+      "x": "1.856740625",
+      "y": "20.30221875",
+      "smashed": "yes"
+    },
+    {
+      "name": "U$7",
+      "library": "output",
+      "package": "Z880",
+      "value": "",
+      "x": "5.02411875",
+      "y": "19.67991875",
+      "smashed": "yes"
+    },
+    {
+      "name": "U$10",
+      "library": "output",
+      "package": "Y879",
+      "value": "",
+      "x": "1.7043375",
+      "y": "20.274278125",
+      "smashed": "yes",
+      "rot": "MR0"
+    },
+    {
+      "name": "U$15",
+      "library": "output",
+      "package": "Z880",
+      "value": "",
+      "x": "4.96824375",
+      "y": "19.66975625",
+      "smashed": "yes",
+      "rot": "MR0"
+    },
+    {
+      "name": "U$25",
+      "library": "output",
+      "package": "X878",
+      "value": "",
+      "x": "4.358640625",
+      "y": "17.12721875",
+      "smashed": "yes",
+      "rot": "MR0"
+    },
+    {
+      "name": "U$29",
+      "library": "SparkFun-Aesthetics",
+      "package": "QWIIC_4MM",
+      "value": "",
+      "x": "1.089659375",
+      "y": "3.533140625",
+      "smashed": "yes",
+      "rot": "R90"
+    },
+    {
+      "name": "U$52",
+      "library": "SparkFun-Aesthetics",
+      "package": "QWIIC_6MM",
+      "value": "",
+      "x": "23.327359375",
+      "y": "13.352778125",
+      "smashed": "yes",
+      "rot": "MR0"
+    },
+    {
+      "name": "U$54",
+      "library": "output",
+      "package": "BNO086_IMU881",
+      "value": "",
+      "x": "12.00658125",
+      "y": "13.385796875",
+      "smashed": "yes",
+      "rot": "MR0"
+    },
+    {
+      "name": "U$44",
+      "library": "output",
+      "package": "UART881",
+      "value": "",
+      "x": "25.8064",
+      "y": "18.01368125",
+      "smashed": "yes",
+      "rot": "MR0"
+    },
+    {
+      "name": "U$39",
+      "library": "output",
+      "package": "#3V3#882",
+      "value": "",
+      "x": "8.88238125",
+      "y": "21.727159375",
+      "smashed": "yes",
+      "rot": "MR90"
+    },
+    {
+      "name": "U$11",
+      "library": "output",
+      "package": "#SCK#882",
+      "value": "",
+      "x": "11.440159375",
+      "y": "21.96591875",
+      "smashed": "yes",
+      "rot": "MR90"
+    },
+    {
+      "name": "U$55",
+      "library": "output",
+      "package": "#SO#883",
+      "value": "",
+      "x": "13.985240625",
+      "y": "22.23261875",
+      "smashed": "yes",
+      "rot": "MR90"
+    },
+    {
+      "name": "U$56",
+      "library": "output",
+      "package": "#SI#884",
+      "value": "",
+      "x": "16.494759375",
+      "y": "22.489159375",
+      "smashed": "yes",
+      "rot": "MR90"
+    },
+    {
+      "name": "U$18",
+      "library": "output",
+      "package": "##CS##885",
+      "value": "",
+      "x": "19.052540625",
+      "y": "22.2504",
+      "smashed": "yes",
+      "rot": "MR90"
+    },
+    {
+      "name": "U$53",
+      "library": "output",
+      "package": "##WAK##886",
+      "value": "",
+      "x": "21.6433375",
+      "y": "21.828759375",
+      "smashed": "yes",
+      "rot": "MR90"
+    },
+    {
+      "name": "U$20",
+      "library": "output",
+      "package": "##RST##887",
+      "value": "",
+      "x": "24.119840625",
+      "y": "21.879559375",
+      "smashed": "yes",
+      "rot": "MR90"
+    },
+    {
+      "name": "U$49",
+      "library": "output",
+      "package": "#BOOT#888",
+      "value": "",
+      "x": "1.242059375",
+      "y": "10.449559375",
+      "smashed": "yes",
+      "rot": "MR90"
+    },
+    {
+      "name": "U$2",
+      "library": "output",
+      "package": "BLK889",
+      "value": "",
+      "x": "8.900159375",
+      "y": "17.11451875",
+      "smashed": "yes",
+      "rot": "MR0"
+    },
+    {
+      "name": "U$41",
+      "library": "output",
+      "package": "GRN890",
+      "value": "",
+      "x": "21.6154",
+      "y": "17.12721875",
+      "smashed": "yes",
+      "rot": "MR0"
+    },
+    {
+      "name": "U$40",
+      "library": "output",
+      "package": "3V3891",
+      "value": "",
+      "x": "13.96238125",
+      "y": "16.37791875",
+      "smashed": "yes",
+      "rot": "MR90"
+    },
+    {
+      "name": "U$21",
+      "library": "output",
+      "package": "RXI891",
+      "value": "",
+      "x": "16.499840625",
+      "y": "16.537940625",
+      "smashed": "yes",
+      "rot": "MR90"
+    },
+    {
+      "name": "U$22",
+      "library": "output",
+      "package": "TXO892",
+      "value": "",
+      "x": "19.052540625",
+      "y": "16.220440625",
+      "smashed": "yes",
+      "rot": "MR90"
+    },
+    {
+      "name": "U$30",
+      "library": "output",
+      "package": "#ADR#894",
+      "value": "",
+      "x": "26.890978125",
+      "y": "9.375140625",
+      "smashed": "yes",
+      "rot": "MR0"
+    },
+    {
+      "name": "U$35",
+      "library": "output",
+      "package": "#PS1#895",
+      "value": "",
+      "x": "3.91668125",
+      "y": "8.887459375",
+      "smashed": "yes",
+      "rot": "MR0"
+    },
+    {
+      "name": "U$57",
+      "library": "output",
+      "package": "#PS0#895",
+      "value": "",
+      "x": "3.794759375",
+      "y": "6.31698125",
+      "smashed": "yes",
+      "rot": "MR0"
+    },
+    {
+      "name": "U$33",
+      "library": "output",
+      "package": "#PS1#1",
+      "value": "",
+      "x": "8.85951875",
+      "y": "3.3909",
+      "smashed": "yes",
+      "rot": "MR90"
+    },
+    {
+      "name": "U$34",
+      "library": "output",
+      "package": "#PS0#2",
+      "value": "",
+      "x": "6.334759375",
+      "y": "3.469640625",
+      "smashed": "yes",
+      "rot": "MR90"
+    },
+    {
+      "name": "U$27",
+      "library": "output",
+      "package": "#3V3#874",
+      "value": "",
+      "x": "13.96238125",
+      "y": "3.637278125",
+      "smashed": "yes",
+      "rot": "MR90"
+    },
+    {
+      "name": "U$9",
+      "library": "output",
+      "package": "#GND#2",
+      "value": "",
+      "x": "11.4046",
+      "y": "3.660140625",
+      "smashed": "yes",
+      "rot": "MR90"
+    },
+    {
+      "name": "U$14",
+      "library": "output",
+      "package": "#SDA#3",
+      "value": "",
+      "x": "16.51",
+      "y": "3.642359375",
+      "smashed": "yes",
+      "rot": "MR90"
+    },
+    {
+      "name": "U$8",
+      "library": "output",
+      "package": "#SCL#4",
+      "value": "",
+      "x": "19.0246",
+      "y": "3.52298125",
+      "smashed": "yes",
+      "rot": "MR90"
+    },
+    {
+      "name": "U$5",
+      "library": "output",
+      "package": "##RST##5",
+      "value": "",
+      "x": "21.549359375",
+      "y": "3.609340625",
+      "smashed": "yes",
+      "rot": "MR90"
+    },
+    {
+      "name": "U$4",
+      "library": "output",
+      "package": "##INT##6",
+      "value": "",
+      "x": "24.102059375",
+      "y": "3.4544",
+      "smashed": "yes",
+      "rot": "MR90"
+    },
+    {
+      "name": "U$16",
+      "library": "output",
+      "package": "#GND#2",
+      "value": "",
+      "x": "6.37031875",
+      "y": "21.7271625",
+      "smashed": "yes",
+      "rot": "MR90"
+    },
+    {
+      "name": "U$59",
+      "library": "SparkFun-Aesthetics",
+      "package": "ORDERING_INSTRUCTIONS",
+      "value": "",
+      "x": "45.72",
+      "y": "54.61",
+      "smashed": "yes"
+    },
+    {
+      "name": "J4",
+      "library": "SparkFun-Connectors",
+      "package": "JST04_1MM_RA",
+      "value": "SMD",
+      "x": "25.4",
+      "y": "12.7",
+      "smashed": "yes",
+      "rot": "R90"
+    },
+    {
+      "name": "J2",
+      "library": "SparkFun-Connectors",
+      "package": "JST04_1MM_RA",
+      "value": "SMD",
+      "x": "5.08",
+      "y": "12.7",
+      "smashed": "yes",
+      "rot": "R270"
+    },
+    {
+      "name": "J3",
+      "library": "SparkFun-Connectors",
+      "package": "1X04_NO_SILK",
+      "value": "PTH",
+      "x": "11.43",
+      "y": "1.27",
+      "smashed": "yes"
+    },
+    {
+      "name": "LED",
+      "library": "SparkFun-Jumpers",
+      "package": "SMT-JUMPER_2_NC_TRACE_SILK",
+      "package3d_urn": "urn:adsk.eagle:package:39281/1",
+      "value": "",
+      "x": "27.409140625",
+      "y": "15.5448",
+      "smashed": "yes",
+      "rot": "MR180"
+    },
+    {
+      "name": "U$26",
+      "library": "output",
+      "package": "#LED#0",
+      "value": "",
+      "x": "24.81071875",
+      "y": "15.504159375",
+      "smashed": "yes",
+      "rot": "MR0"
+    },
+    {
+      "name": "U$28",
+      "library": "output",
+      "package": "OPEN#0X4B0",
+      "value": "",
+      "x": "25.242521875",
+      "y": "6.278878125",
+      "smashed": "yes",
+      "rot": "MR0"
+    },
+    {
+      "name": "U$58",
+      "library": "output",
+      "package": "CLOSED#0X4A0",
+      "value": "",
+      "x": "25.63368125",
+      "y": "7.5438",
+      "smashed": "yes",
+      "rot": "MR0"
+    },
+    {
+      "name": "U$61",
+      "library": "output",
+      "package": "DEFAULT0",
+      "value": "",
+      "x": "19.0601625",
+      "y": "6.31698125",
+      "smashed": "yes",
+      "rot": "MR0"
+    }
+  ]
+}

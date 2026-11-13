@@ -1,0 +1,212 @@
+{
+  "retrieved": "2026-11-13",
+  "pages": {
+    "s3": "https://wiki.seeedstudio.com/xiao_esp32s3_getting_started/",
+    "c3": "https://wiki.seeedstudio.com/XIAO_ESP32C3_Getting_Started/",
+    "ada": "https://learn.adafruit.com/adafruit-9-dof-orientation-imu-fusion-breakout-bno085/downloads",
+    "spark": "https://docs.sparkfun.com/SparkFun_VR_IMU_Breakout_BNO086_QWIIC/single_page/",
+    "myo": "https://www.sparkfun.com/myoware-2-muscle-sensor.html",
+    "teensy": "https://www.pjrc.com/store/teensy41.html"
+  },
+  "files": [
+    {
+      "file": "sparkfun_bno086/dimensions_v10.png",
+      "url": "https://docs.sparkfun.com/SparkFun_VR_IMU_Breakout_BNO086_QWIIC/assets/img/SparkFun_VR_IMU_Breakout_BNO086_Qwiic_Board_Dimension_v10.png",
+      "source": "https://docs.sparkfun.com/SparkFun_VR_IMU_Breakout_BNO086_QWIIC/single_page/",
+      "bytes": 51357,
+      "sha256": "a1676b998722eb93e4077c674f5756c7015fc689cf819da8391dd985dd582a19",
+      "retrieved": "2026-11-13"
+    },
+    {
+      "file": "sparkfun_bno086/Eagle_v10.zip",
+      "url": "https://docs.sparkfun.com/SparkFun_VR_IMU_Breakout_BNO086_QWIIC/assets/board_files/SparkFun_VR_IMU_Breakout_BNO086_QWIIC_v10.zip",
+      "source": "https://docs.sparkfun.com/SparkFun_VR_IMU_Breakout_BNO086_QWIIC/single_page/",
+      "bytes": 236243,
+      "sha256": "955fd48613b035f8b57d9d817cf973f56ed7ca4acbca958c1a3355fc6c6a565e",
+      "retrieved": "2026-11-13"
+    },
+    {
+      "file": "myoware2/board_dimensions.png",
+      "url": "https://cdn.sparkfun.com/assets/learn_tutorials/1/9/5/6/MyoWare_v2_Muscle_Sensor_Board_Dimensions.png",
+      "source": "https://www.sparkfun.com/myoware-2-muscle-sensor.html",
+      "bytes": 39870,
+      "sha256": "153a011f4141821d94aaab91fa858051abbf66a2be3e71f320df2f5f78e6dfbb",
+      "retrieved": "2026-11-13"
+    },
+    {
+      "file": "xiao_esp32c3/bottom_dimensions_v1.2.zip",
+      "url": "https://files.seeedstudio.com/wiki/Seeed-Studio-XIAO-ESP32/XIAO_ESP32C3_v1.2_Dimensioning.zip",
+      "source": "https://wiki.seeedstudio.com/XIAO_ESP32C3_Getting_Started/",
+      "bytes": 106090,
+      "sha256": "a75fe366c4fa160db8d50891da84820062011e9fd06343ae047ab67763035bd7",
+      "retrieved": "2026-11-13"
+    },
+    {
+      "file": "xiao_esp32c3/dimensions.zip",
+      "url": "https://files.seeedstudio.com/wiki/XIAO_WiFi/Resources/XIAO-ESP32C3-DXF.zip",
+      "source": "https://wiki.seeedstudio.com/XIAO_ESP32C3_Getting_Started/",
+      "bytes": 115093,
+      "sha256": "eb3c9986857353440ee2e53f1d5a01745c7e0330371563fcde1c9d2df023f9fe",
+      "retrieved": "2026-11-13"
+    },
+    {
+      "file": "teensy41/dimensions_teensy41.png",
+      "url": "https://www.pjrc.com/teensy/dimensions_teensy41.png",
+      "source": "https://www.pjrc.com/store/teensy41.html",
+      "bytes": 32871,
+      "sha256": "e16e769a9ba0831fe8cfe74d678bb34c867a316d60a76eeee5cf0875fc23856f",
+      "retrieved": "2026-11-13"
+    },
+    {
+      "file": "adafruit_bno085/fab_print.png",
+      "url": "https://cdn-learn.adafruit.com/assets/assets/000/094/837/large1024/sensors_image.png?1600462366",
+      "source": "https://learn.adafruit.com/adafruit-9-dof-orientation-imu-fusion-breakout-bno085/downloads",
+      "bytes": 27970,
+      "sha256": "5966b5f19cd3af7ee430b42f3423d1fd1c12a1614de32bcdd51629e8b7089daa",
+      "retrieved": "2026-11-13"
+    },
+    {
+      "file": "xiao_esp32c3/KiCad_v1.3.zip",
+      "url": "https://files.seeedstudio.com/wiki/XIAO_WiFi/Resources/XIAO_ESP32C3_v1.3_KiCad_260116.zip",
+      "source": "https://wiki.seeedstudio.com/XIAO_ESP32C3_Getting_Started/",
+      "bytes": 339671,
+      "sha256": "477bc61cec652eaeefa887cb1f97abb1514e8a61ea9659240b88be7213c3b6ff",
+      "retrieved": "2026-11-13"
+    },
+    {
+      "file": "teensy41/dimensions_teensy41_photo2.jpg",
+      "url": "https://www.pjrc.com/teensy/dimensions_teensy41_photo2.jpg",
+      "source": "https://www.pjrc.com/store/teensy41.html",
+      "bytes": 42417,
+      "sha256": "9d89f3f3ce0479a1df938919d82675425810034f88e49d8b3176ed75824dac0e",
+      "retrieved": "2026-11-13"
+    },
+    {
+      "file": "teensy41/dimensions_teensy41_photo1.jpg",
+      "url": "https://www.pjrc.com/teensy/dimensions_teensy41_photo1.jpg",
+      "source": "https://www.pjrc.com/store/teensy41.html",
+      "bytes": 38183,
+      "sha256": "14646ab9e7fa0715c3444cbefca59eb3d137ab949356a40ea09bafff8280b657",
+      "retrieved": "2026-11-13"
+    },
+    {
+      "file": "xiao_esp32s3/reference_mismatch/KiCad_link_v1.4_contains_Sense_v1.5.zip",
+      "url": "https://files.seeedstudio.com/wiki/SeeedStudio-XIAO-ESP32S3/new-res/202003751_XIAO%20ESP32S3_v1.4_SCH&PCB_260226.zip",
+      "source": "https://wiki.seeedstudio.com/xiao_esp32s3_getting_started/",
+      "bytes": 836170,
+      "sha256": "a82247725c8a8bcd8cac81a7acbd126396217e5b680f6dfe28958851e02d5cdb",
+      "retrieved": "2026-11-13"
+    },
+    {
+      "file": "xiao_esp32s3/dimensions_v1.1.dxf",
+      "url": "https://files.seeedstudio.com/wiki/SeeedStudio-XIAO-ESP32S3/res/XIAO_ESP32S3_v1.1_Dimensioning.dxf",
+      "source": "https://wiki.seeedstudio.com/xiao_esp32s3_getting_started/",
+      "bytes": 1713469,
+      "sha256": "5fd32e3ba7a4bd85b8cc0f5d9413e26dd947e84e27b2d0f03350a7d367903f23",
+      "retrieved": "2026-11-13"
+    },
+    {
+      "file": "xiao_esp32s3/official_3d_model.zip",
+      "url": "https://files.seeedstudio.com/wiki/SeeedStudio-XIAO-ESP32S3/res/seeed-studio-xiao-esp32s3-3d_model.zip",
+      "source": "https://wiki.seeedstudio.com/xiao_esp32s3_getting_started/",
+      "bytes": 4382912,
+      "sha256": "0d552ed2cc7359ea132601f4f7fe2c9d816e2dfe4f58f6463e83f84a901d3650",
+      "retrieved": "2026-11-13"
+    },
+    {
+      "file": "adafruit_bno085/manufacturer_README.md",
+      "url": "https://raw.githubusercontent.com/adafruit/Adafruit-BNO08x-PCB/master/README.md",
+      "source": "https://github.com/adafruit/Adafruit-BNO08x-PCB",
+      "bytes": 799,
+      "sha256": "ff89b0a7eac7b98a3609fc885e8b25927ed93192e04f826a5483d1963a58a43f",
+      "retrieved": "2026-11-13"
+    },
+    {
+      "file": "adafruit_bno085/Adafruit_BNO08x.brd",
+      "url": "https://raw.githubusercontent.com/adafruit/Adafruit-BNO08x-PCB/master/Adafruit_BNO08x.brd",
+      "source": "https://github.com/adafruit/Adafruit-BNO08x-PCB",
+      "bytes": 289009,
+      "sha256": "ee62fe200964f49c09ce0fc0ec7f07cc4bebda074a07c79749befbf5aa2712d6",
+      "retrieved": "2026-11-13"
+    },
+    {
+      "file": "adafruit_bno085/4754_BNO085_STEMMA_QT.stl",
+      "url": "https://raw.githubusercontent.com/adafruit/Adafruit_CAD_Parts/main/4754%20BNO085%20STEMMA%20QT/4754%20BNO085%20STEMMA%20QT.stl",
+      "source": "https://learn.adafruit.com/adafruit-9-dof-orientation-imu-fusion-breakout-bno085/downloads",
+      "bytes": 724084,
+      "sha256": "cd0ebf05c413b908acb0a405aa2197ae9329f91d76f3cba7117a1b5d2cb4bc20",
+      "retrieved": "2026-11-13"
+    },
+    {
+      "file": "adafruit_bno085/Adafruit_BNO08x.sch",
+      "url": "https://raw.githubusercontent.com/adafruit/Adafruit-BNO08x-PCB/master/Adafruit_BNO08x.sch",
+      "source": "https://github.com/adafruit/Adafruit-BNO08x-PCB",
+      "bytes": 434757,
+      "sha256": "19255b0330332928295b952e19a2f9e15e0021878469c140c0dd8745263015d1",
+      "retrieved": "2026-11-13"
+    },
+    {
+      "file": "adafruit_bno085/4754_BNO085_STEMMA_QT.step",
+      "url": "https://raw.githubusercontent.com/adafruit/Adafruit_CAD_Parts/main/4754%20BNO085%20STEMMA%20QT/4754%20BNO085%20STEMMA%20QT.step",
+      "source": "https://learn.adafruit.com/adafruit-9-dof-orientation-imu-fusion-breakout-bno085/downloads",
+      "bytes": 1585999,
+      "sha256": "115ae06a3215c4eb6bb0eb5f4aeeaa39f13fe0a76d8be2ef1416dc8a85b804d1",
+      "retrieved": "2026-11-13"
+    },
+    {
+      "file": "adafruit_bno085/4754_BNO085_STEMMA_QT.f3d",
+      "url": "https://raw.githubusercontent.com/adafruit/Adafruit_CAD_Parts/main/4754%20BNO085%20STEMMA%20QT/4754%20BNO085%20STEMMA%20QT.f3d",
+      "source": "https://learn.adafruit.com/adafruit-9-dof-orientation-imu-fusion-breakout-bno085/downloads",
+      "bytes": 1140046,
+      "sha256": "e43653b74ca7cf60879caed3e6ef99004dd6e7f159db22280c04441af5847292",
+      "retrieved": "2026-11-13"
+    },
+    {
+      "file": "adafruit_bno085/license.txt",
+      "url": "https://raw.githubusercontent.com/adafruit/Adafruit-BNO08x-PCB/master/license.txt",
+      "source": "https://github.com/adafruit/Adafruit-BNO08x-PCB",
+      "bytes": 22239,
+      "sha256": "075dad5e5fc96c27014fabc269f4f5732909cffd178a486f546d982b6cf86b74",
+      "retrieved": "2026-11-13"
+    },
+    {
+      "file": "sparkfun_bno086/LICENSE.md",
+      "url": "https://raw.githubusercontent.com/sparkfun/SparkFun_VR_IMU_Breakout_BNO086_QWIIC/main/LICENSE.md",
+      "source": "https://github.com/sparkfun/SparkFun_VR_IMU_Breakout_BNO086_QWIIC",
+      "bytes": 2883,
+      "sha256": "60350b68666a0d4903a7197114c723fc6d398d72218b785cc074013e39db374d",
+      "retrieved": "2026-11-13"
+    },
+    {
+      "file": "myoware2/manufacturer_advanced_guide.pdf",
+      "url": "https://myoware.com/wp-content/uploads/2022/03/MyoWare_v2_AdvancedGuide-Updated.pdf",
+      "source": "https://myoware.com/support/",
+      "bytes": 9408678,
+      "sha256": "d57f6dfd560a8724808a9a39fbb2b77b0f48843e4533c56a01ded3005eacde07",
+      "retrieved": "2026-11-13"
+    }
+  ],
+  "unavailable": [
+    {
+      "board": "XIAO ESP32C3",
+      "type": "3D model",
+      "url": "https://grabcad.com/library/seeed-studio-xiao-esp32-c3-1",
+      "reason": "Manufacturer-linked host returned HTTP 403; not downloaded"
+    },
+    {
+      "board": "SparkFun BNO086",
+      "type": "STEP",
+      "reason": "Not found in official resources or recursive hardware repository listing"
+    },
+    {
+      "board": "MyoWare 2 DEV-27924",
+      "type": "PCB CAD / STEP",
+      "reason": "Not found on official product/support resources"
+    },
+    {
+      "board": "Teensy 4.1 DEV-16996",
+      "type": "manufacturer STEP",
+      "reason": "PJRC refers to user-contributed models; excluded from manufacturer-only CAD collection"
+    }
+  ]
+}

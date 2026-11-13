@@ -1,0 +1,471 @@
+{
+  "source": "adafruit_bno085\\Adafruit_BNO08x.brd",
+  "units": "mm",
+  "coordinate_system": "Original Eagle board XY; top view; no image-derived scaling",
+  "outline": [
+    {
+      "x1": "0",
+      "y1": "20.32",
+      "x2": "0",
+      "y2": "2.54",
+      "width": "0",
+      "layer": "20"
+    },
+    {
+      "x1": "0",
+      "y1": "2.54",
+      "x2": "2.54",
+      "y2": "0",
+      "width": "0",
+      "layer": "20",
+      "curve": "90"
+    },
+    {
+      "x1": "2.54",
+      "y1": "0",
+      "x2": "22.86",
+      "y2": "0",
+      "width": "0",
+      "layer": "20"
+    },
+    {
+      "x1": "22.86",
+      "y1": "0",
+      "x2": "25.4",
+      "y2": "2.54",
+      "width": "0",
+      "layer": "20",
+      "curve": "90"
+    },
+    {
+      "x1": "25.4",
+      "y1": "2.54",
+      "x2": "25.4",
+      "y2": "20.32",
+      "width": "0",
+      "layer": "20"
+    },
+    {
+      "x1": "25.4",
+      "y1": "20.32",
+      "x2": "22.86",
+      "y2": "22.86",
+      "width": "0",
+      "layer": "20",
+      "curve": "90"
+    },
+    {
+      "x1": "22.86",
+      "y1": "22.86",
+      "x2": "2.54",
+      "y2": "22.86",
+      "width": "0",
+      "layer": "20"
+    },
+    {
+      "x1": "2.54",
+      "y1": "22.86",
+      "x2": "0",
+      "y2": "20.32",
+      "width": "0",
+      "layer": "20",
+      "curve": "90"
+    }
+  ],
+  "mounting_features": [
+    {
+      "element": {
+        "name": "U$1",
+        "library": "microbuilder",
+        "package": "MOUNTINGHOLE_2.5_PLATED",
+        "value": "MOUNTINGHOLE2.5",
+        "x": "2.54",
+        "y": "20.32",
+        "smashed": "yes"
+      },
+      "local_holes": [],
+      "local_pads": [
+        {
+          "name": "P$1",
+          "x": "0",
+          "y": "0",
+          "drill": "2.5",
+          "diameter": "3.2"
+        }
+      ]
+    },
+    {
+      "element": {
+        "name": "U$17",
+        "library": "microbuilder",
+        "package": "MOUNTINGHOLE_2.5_PLATED",
+        "value": "MOUNTINGHOLE2.5",
+        "x": "22.86",
+        "y": "20.32",
+        "smashed": "yes"
+      },
+      "local_holes": [],
+      "local_pads": [
+        {
+          "name": "P$1",
+          "x": "0",
+          "y": "0",
+          "drill": "2.5",
+          "diameter": "3.2"
+        }
+      ]
+    },
+    {
+      "element": {
+        "name": "U$19",
+        "library": "microbuilder",
+        "package": "MOUNTINGHOLE_2.5_PLATED",
+        "value": "MOUNTINGHOLE2.5",
+        "x": "2.54",
+        "y": "2.54",
+        "smashed": "yes"
+      },
+      "local_holes": [],
+      "local_pads": [
+        {
+          "name": "P$1",
+          "x": "0",
+          "y": "0",
+          "drill": "2.5",
+          "diameter": "3.2"
+        }
+      ]
+    },
+    {
+      "element": {
+        "name": "U$21",
+        "library": "microbuilder",
+        "package": "MOUNTINGHOLE_2.5_PLATED",
+        "value": "MOUNTINGHOLE2.5",
+        "x": "22.86",
+        "y": "2.54",
+        "smashed": "yes"
+      },
+      "local_holes": [],
+      "local_pads": [
+        {
+          "name": "P$1",
+          "x": "0",
+          "y": "0",
+          "drill": "2.5",
+          "diameter": "3.2"
+        }
+      ]
+    }
+  ],
+  "component_origins": [
+    {
+      "name": "C2",
+      "library": "microbuilder",
+      "package": "0805-NO",
+      "value": "10uF",
+      "x": "3.048",
+      "y": "6.5405",
+      "smashed": "yes",
+      "rot": "R270"
+    },
+    {
+      "name": "U2",
+      "library": "microbuilder",
+      "package": "SOT23-5",
+      "value": "AP2112K-3.3",
+      "x": "6.0325",
+      "y": "6.223",
+      "smashed": "yes",
+      "rot": "R270"
+    },
+    {
+      "name": "C3",
+      "library": "microbuilder",
+      "package": "0805-NO",
+      "value": "10uF",
+      "x": "6.9215",
+      "y": "9.779",
+      "smashed": "yes",
+      "rot": "R90"
+    },
+    {
+      "name": "C1",
+      "library": "microbuilder",
+      "package": "0603-NO",
+      "value": "0.1uF",
+      "x": "7.493",
+      "y": "13.716",
+      "smashed": "yes",
+      "rot": "R180"
+    },
+    {
+      "name": "R3",
+      "library": "microbuilder",
+      "package": "RESPACK_4X0603",
+      "value": "10K",
+      "x": "18.2245",
+      "y": "15.8115",
+      "smashed": "yes"
+    },
+    {
+      "name": "Q2",
+      "library": "microbuilder",
+      "package": "SOT363",
+      "value": "BSS138",
+      "x": "21.59",
+      "y": "16.002",
+      "smashed": "yes"
+    },
+    {
+      "name": "JP1",
+      "library": "microbuilder",
+      "package": "1X06_ROUND_70",
+      "value": "",
+      "x": "12.7",
+      "y": "2.54",
+      "smashed": "yes"
+    },
+    {
+      "name": "U$1",
+      "library": "microbuilder",
+      "package": "MOUNTINGHOLE_2.5_PLATED",
+      "value": "MOUNTINGHOLE2.5",
+      "x": "2.54",
+      "y": "20.32",
+      "smashed": "yes"
+    },
+    {
+      "name": "U$17",
+      "library": "microbuilder",
+      "package": "MOUNTINGHOLE_2.5_PLATED",
+      "value": "MOUNTINGHOLE2.5",
+      "x": "22.86",
+      "y": "20.32",
+      "smashed": "yes"
+    },
+    {
+      "name": "CONN3",
+      "library": "microbuilder",
+      "package": "JST_SH4",
+      "value": "STEMMA_I2C_QT",
+      "x": "22.86",
+      "y": "11.43",
+      "smashed": "yes",
+      "rot": "R90"
+    },
+    {
+      "name": "CONN4",
+      "library": "microbuilder",
+      "package": "JST_SH4",
+      "value": "STEMMA_I2C_QT",
+      "x": "2.54",
+      "y": "11.43",
+      "smashed": "yes",
+      "rot": "R270"
+    },
+    {
+      "name": "FID3",
+      "library": "microbuilder",
+      "package": "FIDUCIAL_1MM",
+      "value": "FIDUCIAL_1MM",
+      "x": "1.0795",
+      "y": "17.653",
+      "smashed": "yes"
+    },
+    {
+      "name": "FID4",
+      "library": "microbuilder",
+      "package": "FIDUCIAL_1MM",
+      "value": "FIDUCIAL_1MM",
+      "x": "19.431",
+      "y": "7.493",
+      "smashed": "yes"
+    },
+    {
+      "name": "U$19",
+      "library": "microbuilder",
+      "package": "MOUNTINGHOLE_2.5_PLATED",
+      "value": "MOUNTINGHOLE2.5",
+      "x": "2.54",
+      "y": "2.54",
+      "smashed": "yes"
+    },
+    {
+      "name": "U$21",
+      "library": "microbuilder",
+      "package": "MOUNTINGHOLE_2.5_PLATED",
+      "value": "MOUNTINGHOLE2.5",
+      "x": "22.86",
+      "y": "2.54",
+      "smashed": "yes"
+    },
+    {
+      "name": "U$25",
+      "library": "microbuilder",
+      "package": "PCBFEAT-REV-040",
+      "value": "",
+      "x": "1.4478",
+      "y": "17.3736",
+      "smashed": "yes",
+      "rot": "MR0"
+    },
+    {
+      "name": "U$30",
+      "library": "silks",
+      "package": "STEMMAQT",
+      "value": "",
+      "x": "22.606",
+      "y": "6.985",
+      "smashed": "yes",
+      "rot": "MR90"
+    },
+    {
+      "name": "U$31",
+      "library": "silks",
+      "package": "STEMMAQT",
+      "value": "",
+      "x": "2.794",
+      "y": "15.875",
+      "smashed": "yes",
+      "rot": "MR270"
+    },
+    {
+      "name": "D1",
+      "library": "microbuilder",
+      "package": "CHIPLED_0603_NOOUTLINE",
+      "value": "GREEN",
+      "x": "1.524",
+      "y": "15.494",
+      "smashed": "yes",
+      "rot": "R90"
+    },
+    {
+      "name": "U1",
+      "library": "microbuilder",
+      "package": "BNO080",
+      "value": "BNO080",
+      "x": "12.7",
+      "y": "12.2555",
+      "smashed": "yes"
+    },
+    {
+      "name": "R2",
+      "library": "microbuilder",
+      "package": "RESPACK_4X0603",
+      "value": "10K",
+      "x": "6.0325",
+      "y": "16.256",
+      "smashed": "yes",
+      "rot": "R180"
+    },
+    {
+      "name": "C4",
+      "library": "microbuilder",
+      "package": "0603-NO",
+      "value": "0.1uF",
+      "x": "7.6835",
+      "y": "12.3825",
+      "smashed": "yes"
+    },
+    {
+      "name": "C5",
+      "library": "microbuilder",
+      "package": "0603-NO",
+      "value": "0.1uF",
+      "x": "24.1935",
+      "y": "16.5735",
+      "smashed": "yes",
+      "rot": "R270"
+    },
+    {
+      "name": "C6",
+      "library": "microbuilder",
+      "package": "0603-NO",
+      "value": "22pF",
+      "x": "8.763",
+      "y": "16.129",
+      "smashed": "yes",
+      "rot": "R90"
+    },
+    {
+      "name": "C7",
+      "library": "microbuilder",
+      "package": "0603-NO",
+      "value": "22pF",
+      "x": "14.097",
+      "y": "15.875",
+      "smashed": "yes",
+      "rot": "R270"
+    },
+    {
+      "name": "X1",
+      "library": "adafruit2",
+      "package": "XTAL3215",
+      "value": "32.768",
+      "x": "11.43",
+      "y": "16.3195",
+      "smashed": "yes",
+      "rot": "R180"
+    },
+    {
+      "name": "SJ1",
+      "library": "microbuilder",
+      "package": "SOLDERJUMPER_ARROW_NOPASTE",
+      "value": "PS1",
+      "x": "10.9855",
+      "y": "16.764",
+      "smashed": "yes",
+      "rot": "MR180"
+    },
+    {
+      "name": "SJ2",
+      "library": "microbuilder",
+      "package": "SOLDERJUMPER_ARROW_NOPASTE",
+      "value": "PS0",
+      "x": "7.62",
+      "y": "16.764",
+      "smashed": "yes",
+      "rot": "MR0"
+    },
+    {
+      "name": "JP2",
+      "library": "microbuilder",
+      "package": "1X06_ROUND_70",
+      "value": "",
+      "x": "12.7",
+      "y": "20.32",
+      "smashed": "yes"
+    },
+    {
+      "name": "U3",
+      "library": "microbuilder",
+      "package": "TSSOP16",
+      "value": "74AHC4050",
+      "x": "12.192",
+      "y": "7.366",
+      "smashed": "yes",
+      "rot": "R270"
+    },
+    {
+      "name": "R4",
+      "library": "microbuilder",
+      "package": "RESPACK_4X0603",
+      "value": "10K",
+      "x": "17.9705",
+      "y": "11.6205",
+      "smashed": "yes",
+      "rot": "R90"
+    },
+    {
+      "name": "U$22",
+      "library": "microbuilder",
+      "package": "ADAFRUIT_3.5MM",
+      "value": "",
+      "x": "24.13",
+      "y": "4.445",
+      "smashed": "yes",
+      "rot": "R90"
+    }
+  ]
+}

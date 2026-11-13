@@ -101,6 +101,14 @@ SparkFun BNO086: default 0x4B; ADR jumper closed → 0x4A.
 
 Edit `host/channels.py` to change the map.
 
+**Unconnected EMG inputs copy SYNC.** The USB-6363 measures its channels one after another with one
+converter. An input with nothing connected cannot drive it, so it repeats the channel scanned just
+before it: during recording, the SYNC pulses appear on every open EMG input at 30–98 % of their height
+(about 0.9 V RMS). Measured on this DAQ: a connected, low-impedance source (like an EMG amplifier output)
+picks up only ~13 µV (0.0004 %), so real EMG is not affected. The GUI marks such channels **NOT CONNECTED**
+(EMG light, EMG traces, calibration result) whenever a channel correlates with SYNC (r > 0.5). Connect the
+amplifier outputs, or remove unused channels in Settings → EMG / extra channels.
+
 ## How it works
 
 **Firmware** (`firmware/imu_daq/imu_daq.ino`):
@@ -110,6 +118,17 @@ Edit `host/channels.py` to change the map.
   one SYNC pulse, **3 ms for frame 0**, 1 ms for all others.
 - IMUs report ~10 % faster than the frame rate (≈ 100 % new data); a silent IMU is restarted after 0.5 s.
 - USB output never blocks; frames queue (512) if the PC is briefly slow.
+- **v1.2 sensors per IMU:** quaternion (game rotation vector), accelerometer [m/s², incl. gravity],
+  gyroscope [rad/s] and magnetometer [µT]. Each frame carries the newest value of each, plus a flag for
+  whether it is new. Measured with 2 IMUs on one I2C bus:
+
+  | Frame rate | quaternion | accelerometer | gyroscope | magnetometer |
+  |---|---|---|---|---|
+  | **100 Hz** (recommended) | 100 Hz | ~95 Hz | 100 Hz | ~66 Hz |
+  | 200 Hz | ~69 Hz | ~78 Hz | ~95 Hz | ~43 Hz (I2C bus is full) |
+
+  Use 100 Hz when you need all sensors. `mag_acc` (0–3) is the magnetometer calibration state: move each
+  IMU in a figure-8 until it reaches 2–3.
 
 **Host** (`host/`):
 
@@ -148,7 +167,7 @@ The DAQ default rate is **20 kHz**: edge timing SD ≈ 14 µs (vs 29 µs at 10 k
 | File | Content |
 |---|---|
 | `imu_synced.csv` | **main file**: IMU frames + `pc_unix_s` + `daq_time_s` |
-| `imu.csv` | raw frames: frame, t_us, per IMU ok, fresh, w, x, y, z |
+| `imu.csv` | raw frames: frame, t_us, per IMU ok, fresh, w, x, y, z; then per IMU acc_new, gyr_new, mag_new, ax, ay, az [m/s²], gx, gy, gz [rad/s], mx, my, mz [µT], mag_acc |
 | `daq_raw.f32`, `daq_meta.json` | DAQ samples float32, sample-major (n × channels); channels, labels, rate |
 | `daq_pulses.csv` | every SYNC pulse (rise, width) |
 | `events.csv` | start/stop, markers, IMU stalls/restarts, warnings |

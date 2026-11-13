@@ -3,3 +3,8 @@ numpy>=1.24
 pandas>=2.0
 pyserial>=3.5
 nidaqmx>=1.0        # Python API; the NI-DAQmx driver itself is installed separately (see README)
+
+# Hardware: calibration jig generator (hardware/jig/imu_jig.py)
+cadquery>=2.4       # reads the BNO085 STEP model (master reference)
+manifold3d>=2.4     # builds the jig geometry and exports STLs
+matplotlib>=3.7     # preview images

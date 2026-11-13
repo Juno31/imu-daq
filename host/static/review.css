@@ -1,0 +1,99 @@
+/* Review page (review.html): recordings list | info, transport, spine replay + signal tracks */
+.linkchip { text-decoration: none; color: var(--text); }
+.rv-shell { display: grid; grid-template-columns: 300px minmax(0, 1fr); gap: 14px; padding: 14px 16px 20px; align-items: start; }
+.rv-list { position: sticky; top: 64px; max-height: calc(100vh - 80px); display: flex; flex-direction: column; gap: 8px; padding: 12px; min-width: 0; }
+.rv-check { flex-direction: row; align-items: center; gap: 6px; margin: 0; font-size: 12px; }
+.rv-check input { width: auto; }
+.rv-sessions { overflow-y: auto; display: flex; flex-direction: column; gap: 5px; min-height: 0; }
+.rv-sess { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 2px 8px; text-align: left; font: inherit; color: inherit; cursor: pointer;
+  padding: 8px 10px; border-radius: 9px; background: var(--surface-2); border: 1px solid var(--border); }
+.rv-sess:hover { border-color: var(--border-strong); }
+.rv-sess.on { border-color: var(--accent); background: var(--accent-soft); }
+.rv-sess .who { font-weight: 600; font-size: 13px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.rv-sess .tag { align-self: center; }
+.rv-sess .meta { grid-column: 1 / -1; font-size: 11.5px; color: var(--text-2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+.rv-main { min-width: 0; }
+.rv-empty { padding: 40px 24px; text-align: center; color: var(--text-2); }
+.rv-empty p { margin: 6px 0 0; font-size: 13px; }
+.rv-body { display: flex; flex-direction: column; gap: 12px; }
+
+.rv-info { padding: 12px 16px; }
+.rv-infohead { display: flex; align-items: flex-start; gap: 10px; }
+.rv-infohead h2 { margin: 0; font-size: 16px; }
+.rv-stats { display: grid; grid-template-columns: repeat(8, minmax(0, 1fr)); gap: 6px; margin: 10px 0 0; }
+.rv-stats div { background: var(--surface-2); border-radius: 8px; padding: 5px 9px; min-width: 0; }
+.rv-stats dt { font-size: 10.5px; color: var(--text-3); }
+.rv-stats dd { margin: 0; font: 600 13px/1.3 var(--mono); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.rv-stats dd.good { color: var(--ok); } .rv-stats dd.bad { color: var(--bad); }
+.rv-info .cap:empty { display: none; }
+
+.rv-transport { position: sticky; top: 56px; z-index: 5; display: flex; align-items: center; gap: 12px; padding: 10px 14px; flex-wrap: wrap; }
+.rv-play { width: 38px; height: 38px; border-radius: 50%; border: 0; background: var(--accent); color: #fff; font-size: 14px; cursor: pointer; flex: none; }
+.rv-play.on { background: var(--text-2); }
+.rv-time { font-size: 20px; font-weight: 600; min-width: 9ch; text-align: right; }
+.rv-overview { position: relative; flex: 1; min-width: 200px; height: 34px; border-radius: 8px; background: var(--surface-2);
+  border: 1px solid var(--border); overflow: hidden; cursor: pointer; touch-action: none; }
+.rv-overview canvas { width: 100%; height: 100%; display: block; }
+.rv-ovwin { position: absolute; top: 0; bottom: 0; background: color-mix(in srgb, var(--accent) 16%, transparent);
+  border: 1px solid var(--accent); border-radius: 4px; pointer-events: none; }
+.rv-ovcur { position: absolute; top: 0; bottom: 0; width: 2px; margin-left: -1px; background: var(--bad); pointer-events: none; }
+.rv-keys { white-space: nowrap; }
+.rv-keys kbd { font-size: 10px; padding: 0 4px; }
+
+.rv-grid { display: grid; grid-template-columns: minmax(300px, 380px) minmax(0, 1fr); gap: 12px; align-items: start; }
+.rv-spine { position: sticky; top: 124px; padding: 12px; display: flex; flex-direction: column; gap: 8px; }
+.rv-spine .fileshead { flex-wrap: wrap; row-gap: 6px; }
+.rv-spine .fileshead .hint { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; flex: 1 1 100%; order: 3; }
+.rv-spine .seg button { padding: 2px 8px; font-size: 11.5px; }
+.rv-stage { position: relative; height: min(56vh, 520px); border-radius: 10px; background: var(--surface-2); overflow: hidden; }
+.rv-three { position: absolute; inset: 0; }
+.rv-three canvas { transition: filter .3s, opacity .3s; }
+.rv-stage.uncal .rv-three canvas { filter: blur(7px) saturate(.6); opacity: .55; pointer-events: none; }
+.rv-stage .overlay { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); color: var(--text-2); font-size: 12px; }
+.rv-angles { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px; }
+.rv-angles .a { background: var(--surface-2); border-radius: 8px; padding: 6px 8px; border-top: 3px solid; text-align: center; }
+.rv-angles .a.flex { border-color: var(--roll); } .rv-angles .a.lat { border-color: var(--pitch); } .rv-angles .a.axi { border-color: var(--yaw); }
+.rv-angles b { display: block; font: 600 18px/1.2 var(--mono); }
+.rv-angles small { font-size: 11px; color: var(--text-3); }
+
+/* calibration gate (same look as the Spine view) */
+.calgate { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); z-index: 2;
+  width: calc(100% - 32px); max-width: 320px; display: flex; flex-direction: column; align-items: center; gap: 8px; text-align: center;
+  padding: 18px 16px 14px; border-radius: 14px; background: color-mix(in srgb, var(--surface) 88%, transparent);
+  border: 1px solid var(--border-strong); box-shadow: 0 10px 40px rgba(0, 0, 0, .3); backdrop-filter: blur(4px); }
+.cg-icon { width: 40px; height: 40px; border-radius: 50%; display: grid; place-items: center; font-size: 20px; background: var(--warn-soft); color: var(--warn); }
+.calgate b { font-size: 14.5px; }
+.calgate p { margin: 0; font-size: 12.5px; color: var(--text-2); line-height: 1.45; }
+
+.rv-plots { display: flex; flex-direction: column; gap: 12px; min-width: 0; }
+.rv-plotcard { padding: 12px 14px; display: flex; flex-direction: column; gap: 8px; min-width: 0; }
+.rv-plotcard .fileshead { flex-wrap: wrap; row-gap: 6px; }
+.rv-plotcard .seg button { padding: 2px 9px; font-size: 11.5px; }
+.rv-plotcard .legend { margin: 0; }
+.rv-tracks { display: flex; flex-direction: column; gap: 4px; }
+.rv-track { display: grid; grid-template-columns: 150px minmax(0, 1fr); gap: 8px; align-items: stretch; }
+.rv-tl { display: flex; flex-direction: column; justify-content: center; min-width: 0; padding: 2px 0; }
+.rv-tl b { font: 600 12.5px var(--mono); }
+.rv-tl small { font-size: 11px; color: var(--text-3); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.rv-val { font-size: 11.5px; color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.rv-cvwrap { position: relative; height: 110px; background: var(--surface-2); border-radius: 6px; overflow: hidden; cursor: crosshair; touch-action: none; }
+.rv-track.emg .rv-cvwrap { height: 56px; }
+.rv-track.axis .rv-cvwrap { height: 16px; background: transparent; cursor: default; }
+.rv-track.axis .rv-tl { visibility: hidden; }
+.rv-cvwrap canvas { width: 100%; height: 100%; display: block; }
+.rv-cur { position: absolute; top: 0; bottom: 0; left: 0; width: 2px; margin-left: -1px; background: var(--bad); pointer-events: none; }
+.rv-track.axis .rv-cur { display: none !important; }
+
+@media (max-width: 1400px) { .rv-stats { grid-template-columns: repeat(4, minmax(0, 1fr)); } }
+@media (max-width: 1200px) {
+  .rv-grid { grid-template-columns: 1fr; }
+  .rv-spine { position: static; }
+  .rv-stage { height: 380px; }
+}
+@media (max-width: 900px) {
+  .rv-shell { grid-template-columns: 1fr; }
+  .rv-list { position: static; max-height: 320px; }
+  .rv-track { grid-template-columns: 1fr; }
+  .rv-keys { display: none; }
+}

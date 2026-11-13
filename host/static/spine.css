@@ -26,7 +26,9 @@
 .calmsg.ok { background: var(--ok-soft); color: var(--ok); }
 .calmsg.warn { background: var(--warn-soft); color: var(--warn); }
 .calmsg.busy { background: var(--accent-soft); color: var(--accent); }
-.row { display: flex; align-items: center; gap: 8px; font-size: 13px; color: var(--text-2); margin-top: 8px; }
+.row { display: flex; flex-direction: row; flex-wrap: wrap; align-items: center; gap: 8px; font-size: 13px; color: var(--text-2); margin: 8px 0 0; }
+.row input[type=number] { width: 80px; flex: none; }
+.row input[type=checkbox] { width: auto; margin: 0; }
 .row input[type=range] { flex: 1; }
 .btnrow { display: flex; gap: 6px; margin-top: 10px; flex-wrap: wrap; }
 .btnrow .btn { flex: 1; padding: 6px 4px; }
@@ -48,3 +50,37 @@ h2 .sub { font-weight: 400; color: var(--text-3); font-size: 12px; }
   .spine-layout { grid-template-columns: 1fr; height: auto; }
   .stage { height: 60vh; }
 }
+
+/* embedded in the main GUI (/spine?embed): just the 3D stage */
+.embed body { background: var(--surface); }
+.embed .topbar, .embed .spine-layout > .side { display: none !important; }
+.embed .spine-layout { display: block; height: 100vh; padding: 0; }
+.embed .stage { height: 100vh; min-height: 0; border: 0; border-radius: 0; box-shadow: none; background: transparent; }
+.embed .overlay { font-size: 12px; max-width: 90%; }
+.embed, .embed body { overflow: hidden; height: 100%; margin: 0; }   /* no scrollbar inside the embedded panel */
+
+/* ---------- not calibrated: static model, blurred, with a gate card ---------- */
+.three canvas { transition: filter .3s, opacity .3s; }
+.uncal .three canvas { filter: blur(7px) saturate(.6); opacity: .55; pointer-events: none; }
+.uncal .spine-layout > .side:last-child .card { filter: blur(3px); opacity: .45; pointer-events: none; user-select: none; }
+.calgate { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); z-index: 2;
+  width: min(320px, calc(100% - 32px)); display: flex; flex-direction: column; align-items: center; gap: 8px; text-align: center;
+  padding: 20px 18px 16px; border-radius: 14px; background: color-mix(in srgb, var(--surface) 88%, transparent);
+  border: 1px solid var(--border-strong); box-shadow: 0 10px 40px rgba(0, 0, 0, .3); backdrop-filter: blur(4px); }
+.calgate.hidden { display: none; }
+.cg-icon { width: 40px; height: 40px; border-radius: 50%; display: grid; place-items: center; font-size: 20px;
+  background: var(--warn-soft); color: var(--warn); }
+.calgate b { font-size: 15px; }
+.calgate p { margin: 0; font-size: 12.5px; color: var(--text-2); line-height: 1.45; }
+.cg-steps { list-style: none; margin: 4px 0 0; padding: 0; width: 100%; display: flex; flex-direction: column; gap: 6px; }
+.cg-steps li { display: flex; align-items: center; gap: 8px; padding: 7px 10px; border-radius: 8px; font-size: 13px;
+  background: var(--surface-2); border: 1px solid var(--border); color: var(--text-3); }
+.cg-steps li span { width: 18px; height: 18px; border-radius: 5px; display: grid; place-items: center; font: 700 11px var(--mono);
+  border: 1px solid var(--border-strong); }
+.cg-steps li kbd { margin-left: auto; }
+.cg-steps li.todo { color: var(--text); border-color: color-mix(in srgb, var(--accent) 50%, var(--border)); }
+.cg-steps li.todo span { background: var(--accent); border-color: var(--accent); color: #fff; }
+.cg-steps li.done { color: var(--ok); }
+.cg-steps li.done span { background: var(--ok-soft); border-color: transparent; color: var(--ok); }
+.calgate .cg-where { font-size: 11.5px; color: var(--text-3); }
+.embed .calgate { width: calc(100% - 24px); padding: 16px 12px 12px; }

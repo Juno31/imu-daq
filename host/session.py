@@ -1,6 +1,8 @@
 """One recording = one folder:
 
-    <data>/<YYYYmmdd_HHMMSS>_<label>/
+    <data>/<YYMMDD>/<subNN>/<subNN>_<task>_trialNN/      (trials with a task, and static calibrations:
+                                                         <subNN>_static_cal; a repeat gets _2, _3 ...)
+    <data>/<YYYYmmdd_HHMMSS>_<subject>_<label>/          (older recordings / no task)
         session.json      settings, firmware/board info, operator notes
         imu.csv           every recorded frame as sent by the board (t_us unwrapped)
         events.csv        start/stop, markers, IMU stalls/restarts, warnings (PC unix time + board time)
@@ -24,19 +26,88 @@ def _safe(s):
     return s.strip("_")[:40]
 
 
+def subject_id(s):
+    """'1', 'S01', 's1', 'sub1', 'Sub01' -> 'sub01'; anything else -> a safe lower-case name."""
+    s = (s or "").strip()
+    m = re.fullmatch(r"(?i)(?:s|sub|subj|subject)?[\s_-]*0*(\d+)", s)
+    if m:
+        return f"sub{int(m.group(1)):02d}"
+    return _safe(s).lower() or "nosubject"
+
+
+def date_id(s, unix=None):
+    """Test date as YYMMDD (accepts 261113, 20261113, 2026-11-13); empty -> today."""
+    d = re.sub(r"\D", "", s or "")
+    if len(d) == 8:
+        d = d[2:]
+    return d if len(d) == 6 else time.strftime("%y%m%d", time.localtime(unix or time.time()))
+
+
+def trial_base(meta):
+    """(folder relative to the data root, without a repeat suffix) for a structured recording, else None."""
+    task = _safe(meta.get("task")).lower()
+    if not task:
+        return None
+    subj = subject_id(meta.get("subject"))
+    if task == "static_cal":
+        name = f"{subj}_static_cal"
+    else:
+        try:
+            n = int(str(meta.get("trial") or "1").strip())
+        except ValueError:
+            n = 1
+        name = f"{subj}_{task}_trial{n:02d}"
+    return os.path.join(date_id(meta.get("date")), subj), name
+
+
+def next_trial(root, date, subject, task):
+    """Next free trial number for this date / subject / task."""
+    subj = subject_id(subject)
+    folder = os.path.join(root, date_id(date), subj)
+    pat = re.compile(rf"{re.escape(subj)}_{re.escape(_safe(task).lower())}_trial(\d+)(?:_\d+)?$")
+    n = 0
+    try:
+        for e in os.listdir(folder):
+            m = pat.match(e)
+            if m:
+                n = max(n, int(m.group(1)))
+    except FileNotFoundError:
+        pass
+    return n + 1
+
+
 class Session:
-    def __init__(self, root, meta, pod_names):
+    SENSOR_COLS = ["acc_new", "gyr_new", "mag_new", "ax", "ay", "az", "gx", "gy", "gz", "mx", "my", "mz", "mag_acc"]
+    SENSOR_INT = {0, 1, 2, 12}          # flag / accuracy columns inside a 13-value sensor block
+
+    def __init__(self, root, meta, pod_names, sensors=False):
         self.started_unix = time.time()
-        stamp = time.strftime("%Y%m%d_%H%M%S", time.localtime(self.started_unix))
-        parts = [stamp] + [p for p in (_safe(meta.get("subject")), _safe(meta.get("label"))) if p]
-        self.name = "_".join(parts)
-        self.dir = os.path.join(root, self.name)
+        meta = dict(meta)
+        tb = trial_base(meta)
+        if tb:
+            sub, base = tb
+            name, k = base, 2
+            while os.path.exists(os.path.join(root, sub, name)):      # never overwrite: repeat -> _2, _3 ...
+                name, k = f"{base}_{k}", k + 1
+            self.name = name
+            self.dir = os.path.join(root, sub, name)
+            meta.update(date=date_id(meta.get("date"), self.started_unix), subject_id=subject_id(meta.get("subject")),
+                        label=name[len(subject_id(meta.get("subject"))) + 1:])
+        else:
+            stamp = time.strftime("%Y%m%d_%H%M%S", time.localtime(self.started_unix))
+            parts = [stamp] + [p for p in (_safe(meta.get("subject")), _safe(meta.get("label"))) if p]
+            self.name = "_".join(parts)
+            self.dir = os.path.join(root, self.name)
         os.makedirs(self.dir, exist_ok=True)
         self.meta = dict(meta)
         self.pod_names = list(pod_names)
         cols = ["frame", "t_us"]
         for p in self.pod_names:
             cols += [f"{p}_ok", f"{p}_fresh", f"{p}_w", f"{p}_x", f"{p}_y", f"{p}_z"]
+        self.sensors = bool(sensors)    # firmware >= 1.2: accelerometer, gyroscope, magnetometer
+        if self.sensors:
+            for p in self.pod_names:
+                cols += [f"{p}_{c}" for c in self.SENSOR_COLS]
         self.columns = cols
         self._imu = open(os.path.join(self.dir, "imu.csv"), "w", newline="")
         self._imu.write(",".join(cols) + "\n")
@@ -72,8 +143,20 @@ class Session:
             self.first_frame = num
         self.last_frame = num
         self.frames += 1
-        self._imu.write(f"{num},{t_us}," + ",".join(
-            (str(int(v)) if (k % 6) < 2 else f"{v:.5f}") for k, v in enumerate(vals)) + "\n")
+        nq = 6 * len(self.pod_names)
+        if not self.sensors:
+            vals = vals[:nq]
+        elif len(vals) < len(self.columns) - 2:          # a v1.1 line in a v1.2 session: pad
+            vals = list(vals) + [float("nan")] * (len(self.columns) - 2 - len(vals))
+        out = []
+        for k, v in enumerate(vals):
+            if k < nq:
+                out.append(str(int(v)) if (k % 6) < 2 else f"{v:.5f}")
+            else:
+                j = (k - nq) % 13
+                out.append(str(int(v)) if j in self.SENSOR_INT and v == v else
+                           ("" if v != v else f"{v:.4f}" if j < 9 else f"{v:.2f}"))
+        self._imu.write(f"{num},{t_us}," + ",".join(out) + "\n")
         now = time.time()
         if now - self.last_flush > 1.0:
             self.flush()
@@ -142,6 +225,19 @@ class Session:
                 pods[p] = {"found": bool(ok.max() > 0), "fresh_pct": round(100.0 * fr.mean(), 2),
                            "longest_gap_frames": int(best)}
             summary["pods"] = pods
+            # per-sensor update rates: share of frames with a new sample x frame rate
+            if self.sensors and len(df) > 1:
+                dur = (t[-1] - t[0]) / 1e6
+                rates = {}
+                for p in self.pod_names:
+                    r = {"quat_hz": round(float(df[f"{p}_fresh"].sum()) / dur, 2) if dur > 0 else None}
+                    for s_ in ("acc", "gyr", "mag"):
+                        col = df[f"{p}_{s_}_new"]
+                        r[f"{s_}_hz"] = round(float(col.sum()) / dur, 2) if dur > 0 else None
+                        r[f"{s_}_new_pct"] = round(100.0 * float(col.mean()), 2)
+                    r["mag_accuracy_last"] = int(df[f"{p}_mag_acc"].iloc[-1])
+                    rates[p] = r
+                summary["sensor_rates"] = rates
             # PC time for every frame from the ping fit over this session
             cs = clock_fit([(b / 1e6, (s + r) / 2, r - s) for b, s, r in self.ping_samples]) \
                 if self.ping_samples else None

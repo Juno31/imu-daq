@@ -155,11 +155,37 @@ function persist() {
   fetch("/api/spine_cal", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(cal) }).catch(() => {});
 }
 
+// Spine rendering needs both parts of the static calibration: neutral (q0 of the mapped sensors) and
+// the forward-bend body axes (B). Until then the model stays in a static pose behind a blurred gate.
+function neutralOk() {
+  if (!cal.q0) return false;
+  const m = mapping(), names = [m.T7, m.T12].filter(Boolean);
+  return names.length === 2 ? names.every((n) => cal.q0[n]) : Object.keys(cal.q0).length >= 2;
+}
+function isCalibrated() { return neutralOk() && !!cal.B; }
+
+function updateGate() {
+  const still = neutralOk(), bend = still && !!cal.B, ok = still && bend;
+  document.documentElement.classList.toggle("uncal", !ok);
+  $("calGate").classList.toggle("hidden", ok);
+  if (ok) return;
+  $("calGateTitle").textContent = still ? "Forward bend not done" : "Static calibration not done";
+  $("calGateText").textContent = still
+    ? "The neutral posture is set, but the body's left–right axis is missing: flexion, side bend and rotation would be mixed."
+    : "The spine model is shown once the participant's neutral posture and body axes are known.";
+  $("cgStill").className = still ? "done" : "todo";
+  $("cgBend").className = bend ? "done" : still ? "todo" : "";
+  const embed = document.documentElement.classList.contains("embed");
+  $("calGateWhere").textContent = embed ? "Step 3 · Static calibration, in the middle column"
+    : "Step 3 on the Acquisition page, or Calibration on the left";
+}
+
 function updateCalUi() {
   $("stepN").classList.toggle("done", !!cal.q0);
   $("stepF").classList.toggle("done", !!cal.B);
   const chip = $("calChip");
   chip.textContent = cal.q0 && cal.B ? "calibrated " + new Date(cal.when).toLocaleTimeString() : cal.q0 ? "neutral only" : "not calibrated";
+  updateGate();
 }
 
 // ---------------- UI ----------------
@@ -171,11 +197,54 @@ function fillMap() {
     sel.value = podNames.includes(cur) ? cur : podNames[def] || podNames[0] || "";
   }
 }
-for (const id of ["mapT7", "mapT12"]) $(id).addEventListener("change", () => save("spineMap", mapping()));
+for (const id of ["mapT7", "mapT12"]) $(id).addEventListener("change", () => { save("spineMap", mapping()); updateGate(); });
 $("btnNeutral").onclick = () => startCapture("neutral", 3);
 $("btnFlex").onclick = () => startCapture("flex", 6);
-$("lumbarShare").oninput = () => { $("lumbarShareV").textContent = $("lumbarShare").value + "%"; save("lumbarShare", $("lumbarShare").value); };
-{ const v = load("lumbarShare"); if (v != null) { $("lumbarShare").value = v; $("lumbarShareV").textContent = v + "%"; } }
+for (const id of ["showRibs", "showTrail"]) {          // shared with the main page's spine panel
+  const v = load(id); if (v != null) $(id).checked = !!v;
+  $(id).addEventListener("change", () => save(id, $(id).checked));
+}
+// options from the main page (embedded copy) and from other tabs
+function applyOpts(o) {
+  if (o.view && three) setView(o.view);
+  if (o.ribs != null) $("showRibs").checked = !!o.ribs;
+  if (o.trail != null) $("showTrail").checked = !!o.trail;
+  if ("height" in o) {
+    if (o.height == null) delete cal.height_cm; else cal.height_cm = o.height;
+    $("heightCm").value = cal.height_cm || ""; applyScale();
+  }
+}
+window.addEventListener("message", (e) => {
+  if (e.origin === location.origin && e.data && e.data.type === "spineopt") applyOpts(e.data);
+});
+
+// Participant height -> uniform model scale (Gait2392 generic subject is 1.80 m tall)
+const MODEL_HEIGHT_CM = 180;
+function modelScale() {
+  const h = +cal.height_cm;
+  return h >= 100 && h <= 230 ? h / MODEL_HEIGHT_CM : 1;
+}
+function applyScale() {
+  const s = modelScale();
+  $("scaleV").textContent = "×" + s.toFixed(2);
+  if (three) { three.root.scale.setScalar(s); setView(three.view || "iso"); }
+}
+if (cal.height_cm) $("heightCm").value = cal.height_cm;
+$("heightCm").addEventListener("change", () => {
+  const h = +$("heightCm").value;
+  if ($("heightCm").value === "") delete cal.height_cm;
+  else if (h >= 100 && h <= 230) cal.height_cm = h;
+  else { $("heightCm").value = cal.height_cm || ""; return; }
+  persist(); applyScale();
+});
+// the embedded copy in the main GUI follows changes made on the Spine page
+window.addEventListener("storage", (e) => {
+  if (e.key === "showRibs" || e.key === "showTrail") { $(e.key).checked = !!load(e.key); return; }
+  if (e.key !== "spineCal") return;
+  const c = load("spineCal"); if (!c) return;
+  Object.assign(cal, c); if (!("height_cm" in c)) delete cal.height_cm;
+  $("heightCm").value = cal.height_cm || ""; updateCalUi(); applyScale();
+});
 
 function angleBox(el, a) {
   const names = [["flex", "Flexion", "+fwd"], ["lat", "Lat. bend", "+left"], ["axi", "Axial rot.", "+left"]];
@@ -191,7 +260,7 @@ function connect() {
     if (m.s) {
       status = m.s;
       const pods = status.hello && status.hello.pods ? status.hello.pods.split(",").map((s) => s.split(":")[0]) : [];
-      if (pods.join() !== podNames.join()) { podNames = pods; fillMap(); }
+      if (pods.join() !== podNames.join()) { podNames = pods; fillMap(); updateGate(); }
       $("connDot").className = "dot " + (status.state && status.state !== "disconnected" ? "ok" : "");
       $("connText").textContent = status.port ? status.port : "No board";
       const b = $("stateBadge"); b.textContent = status.state === "recording" ? "REC" : (status.state || "—").toUpperCase();
@@ -221,6 +290,9 @@ function connect() {
 // Bone meshes: OpenSim 4.5 Gait2392 geometry (sacrum, hip bones, L5-C1 vertebrae with discs, ribs,
 // skull), prepared by models/build_model.py into static/models/spine_opensim.json. Frame = OpenSim
 // pelvis frame (X anterior, Y up, Z right), cm. Each segment rotates about the disc below it.
+// Two sensors only (T7, T12), no pelvis sensor: a fixed 70% of T12's rotation is spread over L5-T12,
+// the rest is pelvis tilt. Replaced by measured segments once all 7 IMUs are mapped.
+const LUMBAR_SHARE = 0.7;
 const ORDER = ["pelvis", "L5", "L4", "L3", "L2", "L1", "T12", "T11", "T10", "T9", "T8", "T7", "T6", "T5", "T4", "T3", "T2", "T1"];
 const idx = Object.fromEntries(ORDER.map((n, i) => [n, i]));
 let three = null;
@@ -287,8 +359,9 @@ async function initThree() {
   const trailN = 400, trailPos = new Float32Array(trailN * 3);
   const trailGeo = new THREE.BufferGeometry(); trailGeo.setAttribute("position", new THREE.BufferAttribute(trailPos, 3));
   const trail = new THREE.Line(trailGeo, new THREE.LineBasicMaterial({ color: 0xea7a1a })); trail.frustumCulled = false; scene.add(trail);
-  three = { renderer, scene, camera, controls, nodes, ribs, trail, trailPos, trailN, trailCount: 0, host };
-  setView("iso");
+  three = { renderer, scene, camera, controls, nodes, ribs, trail, trailPos, trailN, trailCount: 0, host, root, view: "iso" };
+  three.view = load("spineView") || "iso";
+  applyScale();
   new ResizeObserver(resize).observe(host); resize();
   $("overlay").classList.add("hidden");
 }
@@ -297,21 +370,27 @@ function resize() {
   const { renderer, camera, host } = three;
   const w = host.clientWidth, h = host.clientHeight;
   renderer.setSize(w, h, false); renderer.domElement.style.width = w + "px"; renderer.domElement.style.height = h + "px";
-  camera.aspect = w / Math.max(1, h); camera.updateProjectionMatrix();
+  camera.aspect = w / Math.max(1, h);
+  // embedded in a tall, narrow panel: widen the vertical field of view so the model's width still fits
+  const narrow = document.documentElement.classList.contains("embed") && camera.aspect < 0.5;
+  camera.fov = narrow ? 2 * Math.atan(Math.tan(16 * Math.PI / 180) * 0.5 / camera.aspect) * 180 / Math.PI : 32;
+  camera.updateProjectionMatrix();
 }
 
 function setView(v) {      // subject faces +X; right side is +Z
-  const T = [-6, 32, 0];
-  const p = { side: [-6, 38, 190], front: [190, 38, 0], back: [-200, 38, 0], iso: [-140, 85, 135] }[v];
+  const s = modelScale();                     // keep the scaled model framed the same way
+  const T = [-6, 32, 0].map((c) => c * s);
+  const p = { side: [-6, 38, 190], front: [190, 38, 0], back: [-200, 38, 0], iso: [-140, 85, 135] }[v].map((c) => c * s);
+  three.view = v;
   three.camera.position.set(...p); three.controls.target.set(...T); three.controls.update();
 }
-document.querySelectorAll("[data-view]").forEach((b) => (b.onclick = () => three && setView(b.dataset.view)));
+document.querySelectorAll("[data-view]").forEach((b) => (b.onclick = () => { if (three) { setView(b.dataset.view); save("spineView", b.dataset.view); } }));
 
 const wp = new THREE.Vector3();
 function updateModel() {
-  const mp = mapping();
-  const qT7 = segment(mp.T7), qT12 = segment(mp.T12);
-  const share = +$("lumbarShare").value / 100;
+  const mp = mapping(), live3d = isCalibrated();       // not calibrated: static neutral model, no angles
+  const qT7 = live3d ? segment(mp.T7) : null, qT12 = live3d ? segment(mp.T12) : null;
+  const share = LUMBAR_SHARE;
   const J = ORDER.map(() => [1, 0, 0, 0]);       // joint rotation of each segment w.r.t. the one below
   if (qT7 && qT12) {
     const pel = qpow(qT12, 1 - share), lumb = qpow(qmul(qconj(pel), qT12), 1 / (idx.T12 - idx.pelvis));

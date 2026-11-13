@@ -32,10 +32,23 @@ table{width:100%;border-collapse:collapse;background:var(--card);border-radius:1
 th,td{text-align:left;padding:8px 12px;border-bottom:1px solid var(--line);font-size:13px}
 th{color:var(--sub);font-weight:600}
 @media(max-width:700px){.row2{grid-template-columns:1fr}}
+.tabs{display:flex;gap:6px;margin:0 0 18px;border-bottom:1px solid var(--line);flex-wrap:wrap}
+.tabs button{font:inherit;background:none;border:0;border-bottom:3px solid transparent;color:var(--sub);padding:8px 12px;cursor:pointer}
+.tabs button[aria-selected="true"]{color:var(--text);border-color:var(--mcu);font-weight:600}
+.panel[hidden]{display:none}
+.sch{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:8px;overflow-x:auto}
+.sch svg{display:block;min-width:760px;width:100%;height:auto}
+.sch text{fill:var(--text);font:12px "Segoe UI",system-ui,sans-serif}.sch text.t2{fill:var(--sub);font-size:11px}
+.note{color:var(--sub);font-size:12.5px;margin:8px 0 0}
 </style>
 </head>
 <body><main>
 <h1>IMU DAQ architecture</h1>
+<nav class="tabs" role="tablist">
+  <button role="tab" id="tab-imu" aria-controls="p-imu" aria-selected="true">IMU DAQ (current)</button>
+  <button role="tab" id="tab-all" aria-controls="p-all" aria-selected="false">Spine study: 7 IMU + 4 EMG + ECG</button>
+</nav>
+<div class="panel" id="p-imu" role="tabpanel" aria-labelledby="tab-imu">
 <p class="lead">Firmware on the XIAO, a Python server on the PC, and a browser GUI. The board's frame timer is the master clock.</p>
 
 <section class="box mcu">
@@ -128,4 +141,189 @@ th{color:var(--sub);font-weight:600}
     <tr><td>DAQ → EMG / other inputs</td><td>same sample clock</td><td>exact</td></tr>
   </table>
 </section>
-</main></body></html>
+</div>
+<div class="panel" id="p-all" role="tabpanel" aria-labelledby="tab-all" hidden>
+<p class="lead">SID Lab spine study (frozen design): 7 BNO086 pods C7–S1 on two TCA9548A muxes and a Teensy 4.1 logger, 4 paraspinal EMG + 1 ECG on MyoWare 2,
+an NI USB-6003, two 10 m Cat6 tethers, and a laptop on battery. The Teensy frame timer is the master clock; its SYNC edge is recorded on AI4.</p>
+
+<div class="sch">
+<svg viewBox="0 0 1000 720" role="img" aria-label="Wiring schematic of the spine study: 7 IMU pods on Mux A and Mux B to a Teensy 4.1, 4 EMG and 1 ECG MyoWare sensors, Cat6 tethers to an NI USB-6003, laptop">
+  <defs>
+    <marker id="ah" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" fill="var(--sub)"/></marker>
+    <marker id="ahs" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" fill="var(--sync)"/></marker>
+    <marker id="ahd" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" fill="var(--daq)"/></marker>
+  </defs>
+
+  <!-- hub halves (dashed outlines) -->
+  <g fill="none" stroke="var(--line)" stroke-width="2" stroke-dasharray="7 5">
+    <rect x="160" y="18" width="420" height="372" rx="14"/>
+    <rect x="160" y="410" width="420" height="250" rx="14"/>
+  </g>
+  <text x="172" y="36" class="t2">HUB · LOGIC HALF (behind right hip)</text>
+  <text x="172" y="428" class="t2">HUB · EMG HALF (side of right hip)</text>
+
+  <!-- wires -->
+  <g fill="none" stroke-width="2">
+    <g stroke="var(--mcu)">
+      <path d="M130 64H190M130 104H190M130 144H190M130 184H190"/>
+      <path d="M130 234H190M130 274H190M130 314H190"/>
+      <path d="M330 120H390M330 280H390"/>
+      <path d="M260 362V340" stroke-dasharray="4 3" stroke="var(--line)"/>
+    </g>
+    <path d="M590 92H560" stroke="var(--sub)" marker-end="url(#ah)"/>
+    <path d="M490 330V352" stroke="var(--sync)" stroke-dasharray="6 3"/>
+    <path d="M550 370H640V552H690" stroke="var(--sync)" stroke-width="3" marker-end="url(#ahs)"/>
+    <g stroke="var(--daq)">
+      <path d="M130 470H190M130 520H190M130 570H190M130 620H190"/>
+      <path d="M130 690H600V384H550" marker-end="url(#ahd)"/>
+      <path d="M380 492H440M380 542H440M380 592H440M380 628H440"/>
+      <path d="M550 600H660V470H690" stroke-width="3" marker-end="url(#ahd)"/>
+    </g>
+    <path d="M330 400V440" stroke="var(--pc)" stroke-dasharray="3 3"/>
+    <path d="M830 410V215" stroke="var(--sub)" marker-end="url(#ah)"/>
+  </g>
+
+  <g stroke-width="2">
+    <g fill="var(--mcu-s)" stroke="var(--mcu)">
+      <rect x="20" y="50" width="110" height="28" rx="7"/><rect x="20" y="90" width="110" height="28" rx="7"/>
+      <rect x="20" y="130" width="110" height="28" rx="7"/><rect x="20" y="170" width="110" height="28" rx="7"/>
+      <rect x="20" y="220" width="110" height="28" rx="7"/><rect x="20" y="260" width="110" height="28" rx="7"/>
+      <rect x="20" y="300" width="110" height="28" rx="7"/>
+    </g>
+    <rect x="190" y="50" width="140" height="150" rx="10" fill="var(--card)" stroke="var(--mcu)"/>
+    <rect x="190" y="215" width="140" height="125" rx="10" fill="var(--card)" stroke="var(--mcu)"/>
+    <rect x="210" y="362" width="100" height="22" rx="6" fill="var(--card)" stroke="var(--line)" stroke-dasharray="4 3"/>
+    <rect x="390" y="50" width="170" height="280" rx="10" fill="var(--card)" stroke="var(--mcu)"/>
+    <rect x="430" y="352" width="120" height="32" rx="6" fill="var(--card)" stroke="var(--sync)"/>
+    <rect x="590" y="70" width="80" height="44" rx="8" fill="var(--card)" stroke="var(--sub)"/>
+
+    <g fill="var(--card)" stroke="var(--daq)">
+      <rect x="20" y="455" width="110" height="30" rx="7"/><rect x="20" y="505" width="110" height="30" rx="7"/>
+      <rect x="20" y="555" width="110" height="30" rx="7"/><rect x="20" y="605" width="110" height="30" rx="7"/>
+      <rect x="20" y="675" width="110" height="30" rx="7"/>
+    </g>
+    <g fill="var(--daq-s)" stroke="var(--daq)">
+      <rect x="190" y="440" width="190" height="200" rx="10"/>
+      <rect x="440" y="470" width="110" height="170" rx="10"/>
+    </g>
+    <rect x="690" y="30" width="290" height="185" rx="12" fill="var(--pc-s)" stroke="var(--pc)"/>
+    <rect x="690" y="410" width="290" height="200" rx="12" fill="var(--daq-s)" stroke="var(--daq)"/>
+  </g>
+
+  <g>
+    <text x="28" y="69">1 C7 <tspan class="t2">BNO086</tspan></text><text x="28" y="109">2 T3 <tspan class="t2">BNO086</tspan></text>
+    <text x="28" y="149">3 T6 <tspan class="t2">BNO086</tspan></text><text x="28" y="189">4 T9 <tspan class="t2">BNO086</tspan></text>
+    <text x="28" y="239">5 T12 <tspan class="t2">BNO086</tspan></text><text x="28" y="279">6 L3 <tspan class="t2">BNO086</tspan></text>
+    <text x="28" y="319">7 S1 <tspan class="t2">BNO086</tspan></text>
+    <text x="20" y="352" class="t2">all 0x4B · one per mux port</text><text x="20" y="366" class="t2">Qwiic 50 cm / 20 cm</text>
+
+    <text x="200" y="72" font-weight="600">Mux A · TCA9548A</text><text x="200" y="88" class="t2">0x70 · BOB-16784</text>
+    <text x="200" y="110" class="t2">ports 0–3 → pods 1–4</text><text x="200" y="128" class="t2">ports 4–7 spare</text>
+    <text x="200" y="237" font-weight="600">Mux B · TCA9548A</text><text x="200" y="253" class="t2">0x70 · BOB-16784</text>
+    <text x="200" y="275" class="t2">ports 0–2 → pods 5–7</text><text x="200" y="293" class="t2">ports 3–7 spare</text>
+    <text x="216" y="378" class="t2">button: optional</text>
+    <text x="336" y="114" class="t2">Wire</text><text x="336" y="274" class="t2">Wire1</text>
+
+    <text x="400" y="72" font-weight="600">Teensy 4.1</text><text x="400" y="88" class="t2">5 × 7 cm perfboard</text>
+    <text x="400" y="114">18/19 SDA/SCL → A</text><text x="400" y="132" class="t2">Wire, 400 kHz</text>
+    <text x="400" y="274">17/16 SDA1/SCL1 → B</text><text x="400" y="292" class="t2">Wire1, 400 kHz</text>
+    <text x="400" y="164" class="t2">teensy4_i2c (non-blocking)</text>
+    <text x="400" y="182" class="t2">200 frames/s · BNO GRV 250 Hz</text>
+    <text x="400" y="200" class="t2">→ microSD log</text>
+    <text x="400" y="226" fill="var(--sync)">pin 2 SYNC toggle</text><text x="400" y="244" class="t2">every frame</text>
+    <text x="400" y="318" class="t2">3V3 / GND → Wago (EMG half)</text>
+    <text x="440" y="373" fill="var(--sync)">RJ45 B <tspan class="t2">terminal</tspan></text>
+    <text x="598" y="90" font-weight="600">Power</text><text x="598" y="106" class="t2">bank USB</text>
+    <text x="338" y="404" class="t2" fill="var(--pc)">only 3V3 / GND cross</text>
+
+    <text x="28" y="474">EMG1 L long. <tspan class="t2">L1</tspan></text><text x="28" y="524">EMG2 R long. <tspan class="t2">L1</tspan></text>
+    <text x="28" y="574">EMG3 L multif. <tspan class="t2">L5</tspan></text><text x="28" y="624">EMG4 R multif. <tspan class="t2">L5</tspan></text>
+    <text x="28" y="694">ECG <tspan class="t2">chest</tspan></text>
+    <text x="20" y="652" class="t2">gel electrodes, CAB-12970</text>
+
+    <text x="200" y="462" font-weight="600">4 × MyoWare 2 stack</text>
+    <text x="200" y="480" class="t2">Cable Shield + Sensor + Link Shield</text>
+    <text x="200" y="498" class="t2">switch RAW · gain ≈ 200</text>
+    <text x="200" y="530" class="t2">Link lead: ㄱ 3.5 mm TRS</text>
+    <text x="200" y="548" class="t2">tip = signal · ring = 3V3</text>
+    <text x="200" y="566" class="t2">sleeve = GND</text>
+    <text x="200" y="598" class="t2">2 × Wago 221-415</text><text x="200" y="616" class="t2">3V3 bus · GND bus</text>
+    <text x="448" y="492" font-weight="600">RJ45 A</text><text x="448" y="508" class="t2">spring terminal</text>
+    <text x="448" y="536" class="t2">1/2 EMG1</text><text x="448" y="554" class="t2">3/6 EMG2</text>
+    <text x="448" y="572" class="t2">4/5 EMG3</text><text x="448" y="590" class="t2">7/8 EMG4</text>
+    <text x="448" y="618" class="t2">signal + own GND</text>
+    <text x="140" y="706" class="t2" fill="var(--daq)">ECG MyoWare (belt front) → RJ45 B pin 3</text>
+
+    <text x="556" y="593" class="t2" fill="var(--daq)">Cat6 A 10 m</text>
+    <text x="556" y="363" class="t2" fill="var(--sync)">Cat6 B 10 m</text>
+
+    <text x="702" y="54" font-weight="600" fill="var(--pc)">Laptop · on battery · GUI</text>
+    <text x="702" y="78" class="t2">NI-DAQmx: AI0–5 at 2 kHz/ch → file</text>
+    <text x="702" y="96" class="t2">GUI Mark → DO P0.0 pulse → AI6</text>
+    <text x="702" y="114" class="t2">align: SYNC edges on AI4 = SD frame count</text>
+    <text x="702" y="132" class="t2">+ per-sensor read offsets + BNO timestamps</text>
+    <text x="702" y="150" class="t2">− 0.25 ms quantisation (simulated &lt; 1 ms)</text>
+    <text x="702" y="176" class="t2">EMG: 20–450 Hz, ECG template subtraction,</text>
+    <text x="702" y="194" class="t2">rectify, ~6 Hz envelope, MVC-normalised</text>
+    <text x="840" y="320" class="t2">USB</text>
+
+    <text x="702" y="434" font-weight="600" fill="var(--daq)">NI USB-6003 · RSE · ±10 V · 16-bit</text>
+    <text x="702" y="460">AI0–AI3 = EMG1–EMG4</text>
+    <text x="702" y="484" fill="var(--sync)">AI4 = SYNC <tspan class="t2">(Cable B pin 1)</tspan></text>
+    <text x="702" y="508">AI5 = ECG <tspan class="t2">(Cable B pin 3)</tspan></text>
+    <text x="702" y="532" fill="var(--ui)">AI6 = MARK <tspan class="t2">(jumper from P0.0, GUI)</tspan></text>
+    <text x="702" y="556" class="t2">AI GND ← Cable B pins 2/6/8 (8 = bias)</text>
+    <text x="702" y="580" class="t2">7 ch × 2 kHz = 14 kS/s · AI7 spare</text>
+  </g>
+</svg>
+</div>
+<p class="note">Solid blue: I2C (Qwiic) · grey: USB · dashed / thick red: SYNC + Cable B · orange: EMG / ECG analog + Cable A.
+Pods 1–4 (C7–T9) on Mux A ports 0–3 and pods 5–7 (T12–S1) on Mux B ports 0–2, confirmed by the lab.</p>
+
+<section class="clocks">
+  <h2 style="font-size:15px">Tether pinout (RJ45 → spring terminal)</h2>
+  <table>
+    <tr><th>Cable</th><th>RJ45 pins</th><th>Signal</th><th>DAQ input</th></tr>
+    <tr><td>A</td><td>1 / 2</td><td>EMG1 L longissimus (signal / own GND)</td><td>AI0 / AI GND</td></tr>
+    <tr><td>A</td><td>3 / 6</td><td>EMG2 R longissimus</td><td>AI1 / AI GND</td></tr>
+    <tr><td>A</td><td>4 / 5</td><td>EMG3 L multifidus</td><td>AI2 / AI GND</td></tr>
+    <tr><td>A</td><td>7 / 8</td><td>EMG4 R multifidus</td><td>AI3 / AI GND</td></tr>
+    <tr><td>B</td><td>1</td><td class="sync">SYNC (Teensy pin 2)</td><td>AI4</td></tr>
+    <tr><td>B</td><td>3</td><td>ECG</td><td>AI5</td></tr>
+    <tr><td>B</td><td>2 / 6 / 8</td><td>GND (8 = bias)</td><td>AI GND</td></tr>
+    <tr><td>— (at the DAQ)</td><td>jumper</td><td>MARK: GUI pulses digital out P0.0</td><td>AI6</td></tr>
+  </table>
+  <p class="note">Event marker: the GUI Mark key pulses USB-6003 digital output P0.0; a short jumper on the DAQ terminal block feeds it to AI6, so each marker is sampled on the same 2 kHz clock as EMG and SYNC (±0.5 ms). This replaces the hub Qwiic Button (frozen in the brief; confirm with the senior before removing its cutout in brace_v4.scad).</p>
+  <p class="note">Safety: the laptop runs on battery while recording (no mains loop). Never plug a powered Link Shield lead into a Cable Shield jack; never switch MyoWare modes while powered.</p>
+</section>
+
+<section class="clocks">
+  <h2 style="font-size:15px">Parts status (purchase list)</h2>
+  <table>
+    <tr><th>Block</th><th>Part</th><th>Qty</th><th>Use</th><th>Status</th></tr>
+    <tr><td>IMU</td><td>SparkFun BNO086 Qwiic SEN-22857</td><td>8</td><td>7 pods + 1 spare</td><td>arrived</td></tr>
+    <tr><td>IMU</td><td>Qwiic Button BOB-15932</td><td>2</td><td>spares (GUI marker on AI6 replaces the MARK button)</td><td>arrived</td></tr>
+    <tr><td>IMU</td><td>Qwiic Mux TCA9548A BOB-16784</td><td>2</td><td>Mux A, Mux B</td><td>expected 26.11.16</td></tr>
+    <tr><td>IMU</td><td>Qwiic cables 50 cm / 20 cm, cable kit</td><td>10 / 10 / 2</td><td>pod chain, hub</td><td>cables 26.11.16, kit arrived</td></tr>
+    <tr><td>Logger</td><td>Teensy 4.1 DEV-16996</td><td>1</td><td>logger, SYNC</td><td>expected 26.11.16</td></tr>
+    <tr><td>EMG</td><td>MyoWare 2 DEV-27924 + Cable Shield + Link Shield</td><td>8 each</td><td>4 EMG + 1 ECG + 3 spare</td><td>shields arrived, sensors 26.11.16</td></tr>
+    <tr><td>EMG</td><td>CAB-12970 electrode cable 61 cm</td><td>8</td><td>electrodes</td><td>arrived</td></tr>
+    <tr><td>EMG</td><td>3.5 mm TRS cable 30–50 cm, TRRS breakout 5764</td><td>10 / 8</td><td>Link Shield leads → terminals</td><td>cables 26.11.16, breakouts arrived</td></tr>
+    <tr><td>Hub</td><td>Wago 221-415</td><td>5</td><td>3V3 / GND buses</td><td>expected 26.11.16</td></tr>
+    <tr><td>Tether</td><td>Cat6 FTP 10 m + RJ45 spring adapters</td><td>2 / 4</td><td>Cable A, Cable B, both ends</td><td>arrived</td></tr>
+    <tr><td>Hub</td><td>microSD 32 GB, power bank (always-on), jumpers, resistors</td><td>—</td><td>logging, power, gain-check divider</td><td>arrived</td></tr>
+  </table>
+  <p class="note">Not in the list: the NI USB-6003 (assumed already in the lab). With 6 of 8 AI inputs used, 8 EMG channels would not fit on this DAQ.</p>
+</section>
+</div>
+</main>
+<script>
+(function(){const tabs=[...document.querySelectorAll('[role=tab]')];
+function show(id){tabs.forEach(t=>{const on=t.id===id;t.setAttribute('aria-selected',on);document.getElementById(t.getAttribute('aria-controls')).hidden=!on});
+ try{localStorage.setItem('archTab',id)}catch(e){} history.replaceState(null,'','#'+id.slice(4))}
+tabs.forEach(t=>t.addEventListener('click',()=>show(t.id)));
+let start=location.hash==='#all'?'tab-all':location.hash==='#imu'?'tab-imu':null;
+if(!start){try{start=localStorage.getItem('archTab')}catch(e){}}
+show(start&&document.getElementById(start)?start:'tab-imu');})();
+</script>
+</body></html>

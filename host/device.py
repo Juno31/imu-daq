@@ -157,7 +157,9 @@ class Device:
         c = line[0]
         if (c == "P" or c == "F") and len(line) > 2 and line[1] == ",":
             parts = line.split(",")
-            if (len(parts) - 3) % 6:
+            nv, npod = len(parts) - 3, len(self.pod_names)
+            # v1.1: 6 values per IMU; v1.2: 6 per IMU, then 13 per IMU (acc, gyro, mag)
+            if (npod and nv not in (6 * npod, 19 * npod)) or (not npod and nv % 6 and nv % 19):
                 self.bad_lines += 1
                 return
             num = int(parts[1])
@@ -184,7 +186,7 @@ class Device:
         elif c == "#":
             if line.startswith("# columns:") and not self.pod_names:
                 cols = line[len("# columns: "):].split(",")
-                self.pod_names = [cols[3 + 6 * k].rsplit("_", 1)[0] for k in range((len(cols) - 3) // 6)]
+                self.pod_names = [c[:-3] for c in cols[3:] if c.endswith("_ok")]
             self.on_message("#", line[1:].strip(), {}, perf)
         else:
             self.bad_lines += 1

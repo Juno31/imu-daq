@@ -46,10 +46,15 @@ function makePod(name) {
     name, node,
     light: node.querySelector(".light"), state: node.querySelector(".podstate"),
     addr: node.querySelector(".addr"), fresh: node.querySelector(".fresh"), stalls: node.querySelector(".stalls"),
+    headacc: node.querySelector(".headacc"),
     cube: node.querySelector(".cube"), plot: node.querySelector(".plot"),
     roll: node.querySelector(".roll b"), pitch: node.querySelector(".pitch b"), yaw: node.querySelector(".yaw b"),
     quat: node.querySelector(".quat"),
-    t: [], e: [], q: [1, 0, 0, 0], ref: LS.get("ref." + name, null), dirty: true,
+    sens: node.querySelector(".sens"),
+    sAcc: node.querySelector(".sacc b"), sGyr: node.querySelector(".sgyr b"), sMag: node.querySelector(".smag b"),
+    rAcc: node.querySelector(".sacc small"), rGyr: node.querySelector(".sgyr small"), rMag: node.querySelector(".smag small"),
+    t: [], e: [], s: [], q: [1, 0, 0, 0], x: null, magAcc: null, ref: LS.get("ref." + name, null), dirty: true,
+    cnt: { t0: null, acc: 0, gyr: 0, mag: 0 }, hz: null,
   };
   pods.set(name, p);
   return p;
@@ -60,17 +65,36 @@ function podFor(name) { return pods.get(name) || makePod(name); }
 function addFrames(rows) {
   if (!S || !S.hello || !S.hello.pods) return;
   const names = S.hello.pods.split(",").map((s) => s.split(":")[0]);
+  const n = names.length;
   for (const r of rows) {
     const t = r[0] / 1e6;
-    for (let k = 0; k < names.length; k++) {
+    const hasSens = r.length >= 3 + 19 * n;          // firmware 1.2: acc, gyro, mag after the quaternions
+    for (let k = 0; k < n; k++) {
       const o = 3 + 6 * k;
       if (r.length < o + 6) break;
       const p = podFor(names[k]);
       const q = [r[o + 2], r[o + 3], r[o + 4], r[o + 5]];
-      if (p.t.length && t < p.t[p.t.length - 1] - 1) { p.t = []; p.e = []; }   // board restarted
+      if (p.t.length && t < p.t[p.t.length - 1] - 1) { p.t = []; p.e = []; p.s = []; p.cnt.t0 = null; }   // board restarted
       p.q = q;
+      if (bend && r[o] && bend.samples[names[k]]) bend.samples[names[k]].push(q);
       p.t.push(t);
       p.e.push(euler(p.ref ? qmul(qconj(p.ref), q) : q));
+      if (hasSens) {
+        const b = 3 + 6 * n + 13 * k;
+        const x = r.slice(b + 3, b + 12);            // ax ay az [m/s^2], gx gy gz [rad/s], mx my mz [uT]
+        p.x = x; p.magAcc = r[b + 12];
+        p.s.push(x);
+        const c = p.cnt;                              // live update rate of each sensor (per ~1 s)
+        if (c.t0 === null) { c.t0 = t; c.acc = c.gyr = c.mag = 0; }
+        c.acc += r[b] ? 1 : 0; c.gyr += r[b + 1] ? 1 : 0; c.mag += r[b + 2] ? 1 : 0;
+        if (t - c.t0 >= 1) {
+          const d = t - c.t0;
+          p.hz = { acc: c.acc / d, gyr: c.gyr / d, mag: c.mag / d };
+          c.t0 = t; c.acc = c.gyr = c.mag = 0;
+        }
+      } else {
+        p.s.push(null); p.x = null; p.hz = null;
+      }
       p.dirty = true;
     }
   }
@@ -79,9 +103,20 @@ function addFrames(rows) {
     const cut = p.t[p.t.length - 1] - MAXKEEP;
     let i = 0;
     while (i < p.t.length && p.t[i] < cut) i++;
-    if (i > 200) { p.t.splice(0, i); p.e.splice(0, i); }
+    if (i > 200) { p.t.splice(0, i); p.e.splice(0, i); p.s.splice(0, i); }
   }
 }
+
+// ---------------- plot modes (angles / acc / gyro / mag) ----------------
+const RAD2DEG = 180 / Math.PI;
+const PLOT_MODES = {
+  ang: { label: "Roll / pitch / yaw", unit: "°" },
+  acc: { label: "Acceleration (incl. gravity)", unit: "m/s²", off: 0, scale: 1, min: 12 },
+  gyr: { label: "Angular velocity", unit: "°/s", off: 3, scale: RAD2DEG, min: 60 },
+  mag: { label: "Magnetic field", unit: "µT", off: 6, scale: 1, min: 60 },
+};
+let plotMode = LS.get("plotMode", "ang");
+if (!PLOT_MODES[plotMode]) plotMode = "ang";
 
 function zeroAll(on) {
   for (const p of pods.values()) {
@@ -104,6 +139,7 @@ function fitCanvas(c) {
 }
 
 function drawPlot(p) {
+  if (plotMode !== "ang") return drawSensorPlot(p, PLOT_MODES[plotMode]);
   const [ctx, W, H] = fitCanvas(p.plot);
   ctx.clearRect(0, 0, W, H);
   const padL = 34, padR = 8, padT = 6, padB = 18;
@@ -126,7 +162,7 @@ function drawPlot(p) {
   }
   if (!p.t.length) return;
   if (p.e.length !== p.t.length) {   // after zero: rebuild from quats is not possible -> restart history
-    p.t = p.t.slice(-1); p.e = [euler(p.ref ? qmul(qconj(p.ref), p.q) : p.q)];
+    p.t = p.t.slice(-1); p.s = p.s.slice(-1); p.e = [euler(p.ref ? qmul(qconj(p.ref), p.q) : p.q)];
   }
   const tEnd = p.t[p.t.length - 1], t0 = tEnd - windowSec;
   let i0 = p.t.length - 1;
@@ -149,6 +185,84 @@ function drawPlot(p) {
     ctx.stroke();
   }
   ctx.restore();
+}
+
+// x / y / z of one sensor over the time window, symmetric auto scale
+function drawSensorPlot(p, m) {
+  const [ctx, W, H] = fitCanvas(p.plot);
+  ctx.clearRect(0, 0, W, H);
+  const padL = 42, padR = 8, padT = 6, padB = 18;
+  const pw = W - padL - padR, ph = H - padT - padB;
+  ctx.font = "11px " + css("--mono");
+  const n = p.t.length;
+  if (!n || !p.s.some((v) => v)) {
+    ctx.fillStyle = css("--text-3"); ctx.textAlign = "center"; ctx.textBaseline = "middle";
+    ctx.fillText(n ? "No sensor data: upload firmware 1.2" : "Waiting for data…", W / 2, H / 2);
+    return;
+  }
+  const tEnd = p.t[n - 1], t0 = tEnd - windowSec;
+  let i0 = n - 1;
+  while (i0 > 0 && p.t[i0 - 1] >= t0) i0--;
+  let peak = 0;
+  for (let i = i0; i < n; i++) {
+    const v = p.s[i];
+    if (v) for (let j = 0; j < 3; j++) peak = Math.max(peak, Math.abs(v[m.off + j] * m.scale));
+  }
+  const lim0 = Math.max(m.min, peak * 1.1);
+  const st = niceStep(2 * lim0, 4), lim = Math.ceil(lim0 / st) * st;
+  const Y = (v) => padT + ph * (1 - (v + lim) / (2 * lim));
+  ctx.strokeStyle = css("--border"); ctx.fillStyle = css("--text-3"); ctx.lineWidth = 1;
+  ctx.textAlign = "right"; ctx.textBaseline = "middle";
+  for (let v = -lim; v <= lim + 1e-9; v += st) {
+    ctx.globalAlpha = Math.abs(v) < 1e-9 ? 1 : 0.6;
+    ctx.beginPath(); ctx.moveTo(padL, Math.round(Y(v)) + 0.5); ctx.lineTo(W - padR, Math.round(Y(v)) + 0.5); ctx.stroke();
+    ctx.globalAlpha = 1;
+    ctx.fillText(String(+v.toFixed(1)), padL - 6, Y(v));
+  }
+  ctx.textAlign = "center"; ctx.textBaseline = "top";
+  const step = windowSec <= 5 ? 1 : windowSec <= 10 ? 2 : 5;
+  for (let s = 0; s <= windowSec; s += step) ctx.fillText(s === 0 ? "now" : `-${s}s`, padL + pw * (1 - s / windowSec), H - padB + 4);
+  const cols = [css("--roll"), css("--pitch"), css("--yaw")];
+  ctx.save();
+  ctx.beginPath(); ctx.rect(padL, padT, pw, ph); ctx.clip();
+  ctx.lineWidth = 1.5; ctx.lineJoin = "round";
+  for (let j = 0; j < 3; j++) {
+    ctx.strokeStyle = cols[j];
+    ctx.beginPath();
+    let started = false;
+    for (let i = i0; i < n; i++) {
+      const v = p.s[i];
+      if (!v) { started = false; continue; }
+      const x = padL + pw * (1 - (tEnd - p.t[i]) / windowSec), y = Y(v[m.off + j] * m.scale);
+      if (started) ctx.lineTo(x, y); else { ctx.moveTo(x, y); started = true; }
+    }
+    ctx.stroke();
+  }
+  ctx.restore();
+  // legend + unit, top-left inside the plot
+  ctx.textAlign = "left"; ctx.textBaseline = "top"; ctx.font = "600 10.5px " + css("--mono");
+  let lx = padL + 6;
+  for (let j = 0; j < 3; j++) { ctx.fillStyle = cols[j]; ctx.fillText("xyz"[j], lx, padT + 3); lx += 12; }
+  ctx.fillStyle = css("--text-3"); ctx.font = "10.5px " + css("--mono");
+  ctx.fillText(m.unit, lx + 4, padT + 3);
+}
+
+function updateSensorText(p) {
+  if (!p.x) { p.sens.classList.add("hidden"); return; }
+  p.sens.classList.remove("hidden");
+  const x = p.x, mag3 = (a, b, c) => Math.hypot(a, b, c);
+  const a = mag3(x[0], x[1], x[2]), g = mag3(x[3], x[4], x[5]) * RAD2DEG, mg = mag3(x[6], x[7], x[8]);
+  p.sAcc.textContent = `${a.toFixed(2)} m/s²`;
+  p.sGyr.textContent = `${g.toFixed(1)} °/s`;
+  p.sMag.textContent = `${mg.toFixed(1)} µT`;
+  const hz = (v) => (p.hz ? `${Math.round(v)} Hz` : "— Hz");
+  p.rAcc.textContent = hz(p.hz && p.hz.acc);
+  p.rGyr.textContent = hz(p.hz && p.hz.gyr);
+  const cal = p.magAcc === null || p.magAcc === undefined ? "" : ` · cal ${p.magAcc}/3`;
+  p.rMag.textContent = `${hz(p.hz && p.hz.mag)}${cal}`;
+  p.sMag.parentElement.classList.toggle("warn", p.magAcc !== null && p.magAcc < 2);
+  p.sMag.parentElement.title = p.magAcc !== null && p.magAcc < 2
+    ? "Magnetometer not calibrated yet: move the IMU slowly in a figure-8 until cal reaches 2–3" : "Magnetometer";
 }
 
 // board-shaped box in sensor axes: x long, y short, z thin
@@ -472,8 +586,11 @@ function applyEmg(s) {
     v.data = ch;
     const r = ch.rms_mv === null ? "—" : `RMS ${ch.rms_mv < 1 ? ch.rms_mv.toFixed(3) : ch.rms_mv < 100 ? ch.rms_mv.toFixed(2) : ch.rms_mv.toFixed(0)} mV`;
     if (v.rms.textContent !== r) v.rms.textContent = r;
-    v.cl.classList.toggle("hidden", !ch.clip);
-    v.node.classList.toggle("clip", !!ch.clip);
+    v.cl.textContent = ch.floating ? "NOT CONNECTED" : "CLIPPING";
+    v.cl.title = ch.floating ? `This input copies the SYNC pulses (r = ${ch.sync_corr}): nothing is connected to it` : "";
+    v.cl.classList.toggle("hidden", !(ch.clip || ch.floating));
+    v.node.classList.toggle("clip", !!ch.clip && !ch.floating);
+    v.node.classList.toggle("floating", !!ch.floating);
   }
   emgDirty = true;
 }
@@ -549,7 +666,9 @@ function applyTiles(s) {
       bad.map((p) => `${p.name} ${p.ok ? "stalled" : "not found"}`).join(" · "));
     else if (weak.length) tile("stImu", "warn", `${okN} / ${pods.length} OK`,
       weak.map((p) => `${p.name} dropping (${p.fresh_recent.toFixed(0)}%)`).join(" · "));
-    else tile("stImu", "ok", `${okN} / ${pods.length} OK`, `${hz} · ${pods.map((p) => p.name).join(", ")}`, rec);
+    else if (quatOf(s) === "rv" && pods.some((p) => p.q_status !== null && p.q_status < 2))
+      tile("stImu", "warn", "Calibrate mag", "move each IMU in slow figure-8s", rec);
+    else tile("stImu", "ok", `${okN} / ${pods.length} OK`, `${hz} · ${QUAT_SHORT[quatOf(s)] || ""}`, rec);
   }
   // EMG = DAQ extra channels
   const extras = String(cfg.extra_chans || "").split(",").map((x) => x.trim()).filter((x) => x && x !== cfg.sync_chan);
@@ -561,7 +680,10 @@ function applyTiles(s) {
     const flat = ch.filter((c) => c.rms_mv !== null && c.rms_mv < 0.2), clip = ch.filter((c) => c.clip);
     const names = (a) => a.map((c) => c.name).join(", ");
     const top = Math.max(...ch.map((c) => c.rms_mv || 0));
-    if (clip.length) tile("stEmg", "bad", "Clipping", `${names(clip)} over ±${rng} V`, rec);
+    const floating = ch.filter((c) => c.floating);
+    if (floating.length === ch.length) tile("stEmg", "bad", "Not connected", "all inputs copy SYNC: connect the EMG amplifier", rec);
+    else if (floating.length) tile("stEmg", "bad", `${floating.length} not connected`, names(floating), rec);
+    else if (clip.length) tile("stEmg", "bad", "Clipping", `${names(clip)} over ±${rng} V`, rec);
     else if (flat.length === ch.length) tile("stEmg", "warn", "No signal", "all channels flat: amplifier on?", rec);
     else if (flat.length) tile("stEmg", "warn", `Check ${flat.length} ch`, `flat: ${names(flat)}`, rec);
     else tile("stEmg", "ok", `${ch.length} ch live`, `${ch[0].name}–${ch[ch.length - 1].name} · max RMS ${top.toFixed(2)} mV`, rec);
@@ -658,6 +780,7 @@ function frameLoop(ts) {
       p.pitch.textContent = e[1].toFixed(1) + "°";
       p.yaw.textContent = e[2].toFixed(1) + "°";
       p.quat.textContent = `q = [${p.q.map((v) => v.toFixed(4)).join(", ")}]` + (p.ref ? "  (display zeroed)" : "");
+      updateSensorText(p);
     }
     if (S && !imuOpen) setText("sumImu", imuSummary(S));
     else if (S && imuOpen) setText("sumImu", "");
@@ -673,7 +796,96 @@ const fmtTime = (s) => {
 };
 let recT0 = null;
 function tickTimer() {
-  if (recT0 !== null) $("timer").textContent = fmtTime((performance.now() - recT0) / 1000);
+  if (recT0 !== null) {
+    const sec = (performance.now() - recT0) / 1000;
+    $("timer").textContent = fmtTime(sec);
+    $("tpTc").textContent = fmtTc(sec);
+  }
+}
+const fmtTc = (s) => {                       // hh:mm:ss.mmm for the transport bar
+  const ms = Math.max(0, Math.round(s * 1000)), h = Math.floor(ms / 3600000), m = Math.floor(ms / 60000) % 60;
+  const sec = Math.floor(ms / 1000) % 60, r = ms % 1000;
+  return `${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}:${String(sec).padStart(2, "0")}.${String(r).padStart(3, "0")}`;
+};
+
+// ---------------- trial naming: <date>/<subNN>/<subNN>_<task>_trialNN ----------------
+let TASKS = [];
+const todayId = () => { const d = new Date(); return `${String(d.getFullYear()).slice(2)}${String(d.getMonth() + 1).padStart(2, "0")}${String(d.getDate()).padStart(2, "0")}`; };
+function dateId(v) { let d = String(v || "").replace(/\D/g, ""); if (d.length === 8) d = d.slice(2); return d.length === 6 ? d : todayId(); }
+function subjId(v) {                                   // same rule as the server: 1 / S01 / sub1 -> sub01
+  const t = String(v || "").trim(), m = t.match(/^(?:s|sub|subj|subject)?[\s_-]*0*(\d+)$/i);
+  if (m) return "sub" + String(+m[1]).padStart(2, "0");
+  return t.replace(/[^A-Za-z0-9_\-]+/g, "_").replace(/^_+|_+$/g, "").toLowerCase().slice(0, 40) || "";
+}
+function takeName() {
+  const sub = subjId($("subject").value), task = $("taskSel").value, n = Math.max(1, parseInt($("label").value, 10) || 1);
+  return sub && task ? `${sub}_${task}_trial${String(n).padStart(2, "0")}` : "";
+}
+function takePath() { const sub = subjId($("subject").value), t = takeName(); return t ? `${dateId($("testDate").value)}/${sub}/${t}` : ""; }
+function applyTaskInfo() {
+  const t = TASKS.find((x) => x.key === $("taskSel").value);
+  $("taskInfo").textContent = t ? `${t.method} · 시작 자세: ${t.start}` : "";
+  const path = takePath();
+  $("takePath").textContent = path ? "→ " + path : "Enter the subject and pick a task";
+  $("takePath").classList.toggle("warn", !path);
+  if (S) applyTransport(S);
+}
+let nextTrialTimer = null;
+function refreshNextTrial() {                           // first free trial number for this date / subject / task
+  clearTimeout(nextTrialTimer);
+  nextTrialTimer = setTimeout(async () => {
+    const sub = $("subject").value.trim(), task = $("taskSel").value;
+    if (!sub || !task) { applyTaskInfo(); return; }
+    try {
+      const q = new URLSearchParams({ date: dateId($("testDate").value), subject: sub, task });
+      const j = await (await fetch("/api/next_trial?" + q)).json();
+      if (j.ok && document.activeElement !== $("label")) { $("label").value = j.trial; saveForm(); }
+    } catch { }
+    applyTaskInfo();
+  }, 250);
+}
+async function loadTasks() {
+  try { TASKS = await (await fetch("/static/tasks.json", { cache: "no-store" })).json(); } catch { TASKS = []; }
+  const sel = $("taskSel"), want = LS.get("f.task", "");
+  sel.innerHTML = `<option value="">— select task —</option>` + TASKS.map((t, i) => `<option value="${t.key}">${i + 1}. ${t.name}</option>`).join("");
+  sel.value = TASKS.some((t) => t.key === want) ? want : "";
+  refreshNextTrial();
+}
+
+// ---------------- transport bar ----------------
+function applyTransport(s) {
+  const st = s.state, rec = s.rec, recording = st === "recording";
+  const mode = $("tpMode");
+  const word = { idle: "LIVE", recording: "REC", starting: "STARTING", stopping: "SAVING", connecting: "CONNECTING", disconnected: "OFFLINE" }[st] || String(st).toUpperCase();
+  mode.className = "tp-mode " + (recording ? "rec" : st === "idle" ? "idle" : st === "disconnected" ? "" : "busy");
+  mode.lastChild.textContent = word;
+  $("transport").classList.toggle("rec", recording);
+  setText("tpTakeName", rec ? rec.name : (takeName() || "—"));
+  if (rec) setText("tpFrames", String(rec.frames).padStart(6, "0"));
+  else if (st === "idle" && !recording) setText("tpFrames", "000000");
+  if (!recording && recT0 === null) setText("tpTc", "00:00:00.000");
+  setText("tpMissing", rec ? rec.missing : "—");
+  $("tpMissing").className = "mono" + (rec && rec.missing ? " bad" : "");
+  setText("tpMarkers", rec ? rec.markers : "—");
+  const btn = $("tpRec");
+  btn.classList.toggle("on", recording);
+  btn.disabled = !(st === "idle" || recording);
+  btn.title = recording ? "Stop recording (Space)" : "Start recording (Space)";
+  btn.setAttribute("aria-label", recording ? "Stop recording" : "Start recording");
+  $("tpMark").disabled = !(st === "idle" || recording);
+  // data: IMU rate · DAQ channels @ rate · approximate bytes written per second
+  const parts = [];
+  if (s.port && s.rate_hz) parts.push(`IMU ${Math.round(s.rate_hz)} Hz`);
+  let bps = 0;
+  const cfg = s.daq && s.daq.cfg;
+  if (cfg && cfg.enabled && s.daq.devices && (s.daq.devices.devices || []).length) {
+    const n = 1 + String(cfg.extra_chans || "").split(",").map((x) => x.trim()).filter((x) => x && x !== cfg.sync_chan).length;
+    parts.push(`DAQ ${n} ch @ ${(+cfg.rate / 1000).toFixed(0)} kHz`);
+    bps += n * +cfg.rate * 4;
+  }
+  if (s.rate_hz) bps += s.rate_hz * 60 * (s.pods ? s.pods.length : 1);   // rough CSV size per frame
+  if (bps) parts.push(bps >= 1e6 ? `≈${(bps / 1e6).toFixed(1)} MB/s` : `≈${Math.round(bps / 1e3)} KB/s`);
+  setText("tpData", parts.join(" · ") || "—");
 }
 
 function setCls(el, cls, on) { el.classList.toggle(cls, !!on); }
@@ -734,6 +946,7 @@ function applyStatus(s) {
   $("recMissing").className = rec && rec.missing ? "bad" : rec ? "good" : "";
   setText("recMarkers", rec ? rec.markers : "—");
   setText("recName", rec ? rec.name : (s.last_summary ? "last: " + s.last_summary.session : "—"));
+  applyTransport(s);
   const idle = st === "idle", recording = st === "recording";
   $("btnStart").disabled = !idle;
   $("btnStop").disabled = !recording;
@@ -741,6 +954,7 @@ function applyStatus(s) {
     "daqSync", "daqRate", "daqTerm", "daqRange", "daqExtra", "btnDaqRefresh"])
     $(id).disabled = !(idle || st === "disconnected" || st === "connecting") ||
       (["rateSel", "btnRestart"].includes(id) && !idle);
+  $("quatSel").disabled = !idle;
   // device card
   const h = s.hello || {};
   setText("fwInfo", h.fw ? `${h.fw} ${h.ver}` : "—");
@@ -750,6 +964,7 @@ function applyStatus(s) {
   $("fwDropped").className = +b.dropped_f ? "bad" : "";
   setText("fwResync", b.late_resyncs !== undefined ? b.late_resyncs : "—");
   if (h.report_ms && document.activeElement !== $("rateSel")) $("rateSel").value = h.report_ms;
+  applyQuatMode(s);
   // pods
   for (const pd of s.pods) {
     const p = podFor(pd.name);
@@ -766,11 +981,21 @@ function applyStatus(s) {
     const fresh = pd.rec_fresh !== null && st === "recording" ? pd.rec_fresh : pd.fresh_recent;
     p.fresh.textContent = pd.ok ? fresh.toFixed(1) + "%" : "—";
     p.stalls.textContent = pd.stalls;
+    const rv = quatOf(s) === "rv" && pd.ok;
+    p.headacc.classList.toggle("hidden", !rv);
+    if (rv) {
+      const cal = pd.q_status, acc = pd.head_acc_deg;
+      p.headacc.textContent = (acc !== null && acc !== undefined ? `heading ±${acc.toFixed(1)}°` : "heading —") +
+        (cal !== null && cal !== undefined ? ` · mag ${cal}/3` : "");
+      p.headacc.className = "pill headacc " + (cal === null || cal === undefined ? "" : cal >= 3 ? "ok" : cal === 2 ? "" : "warn");
+    }
     setCls(p.node, "dim", !pd.ok);
   }
   applySync(s);
   applyTiles(s);
   applyEmg(s);
+  applyCalib(s);
+  applyFlow(s);
   // summary banner after a recording
   if (prevState === "stopping" && st !== "stopping" && s.last_summary) { showSummary(s.last_summary); loadSessions(true); }
 }
@@ -864,12 +1089,282 @@ function addLog(items) {
   }
 }
 
+// ---------------- static calibration (step 3) ----------------
+let calSecs = +LS.get("calSecs", 5), calApplied = LS.get("calApplied", ""), calRenderKey = "";
+
+async function runCalibration() {
+  if (!S || S.state !== "idle") { toast(S ? `Not now: ${S.state}` : "Server not connected", true); return; }
+  saveForm();
+  const j = await api("/api/calibrate", { seconds: calSecs, subject: $("subject").value.trim(), date: dateId($("testDate").value), notes: $("notes").value });
+  if (j.ok) toast(`Calibration: hold still for ${calSecs} s`);
+}
+
+function calRow(cls, name, text, title) {
+  const r = document.createElement("div");
+  r.className = "r";
+  r.innerHTML = `<b></b><span></span>`;
+  r.firstChild.className = cls; r.firstChild.textContent = name;
+  r.lastChild.textContent = text; r.title = title || text;
+  return r;
+}
+
+// alert block (errors / warnings): icon + message, kept apart from the result table
+function calAlert(cls, text, title) {
+  const a = document.createElement("div");
+  a.className = "calalert " + cls;
+  a.innerHTML = `<i></i><span></span>`;
+  a.firstChild.textContent = cls === "bad" ? "✗" : cls === "ok" ? "✓" : "!";
+  a.lastChild.textContent = text; a.title = title || text;
+  return a;
+}
+
+function renderCalResult(box, c, cur, att) {
+  box.innerHTML = "";
+  const showAtt = att && (!cur || att.session !== cur.session);      // a newer attempt that was not accepted
+  if (c.error && !c.running) box.appendChild(calAlert("bad", c.error + " · repeat the calibration"));
+  const res = showAtt && !c.error ? att : cur;
+  if (!res) {
+    if (!c.error) box.appendChild(calRow("", "", "Not calibrated yet. Recordings work without it, but angles have no neutral reference."));
+    return;
+  }
+  // per-IMU table: status · name · moved · tilt · gyro bias · mag cal (columns only when there is data)
+  const imus = Object.entries(res.imus || {});
+  if (imus.length) {
+    const vals = imus.map(([, v]) => v);
+    const cols = [
+      { h: "Moved", t: "Largest orientation change during the hold (limit 3°)",
+        f: (v) => `${v.moved_max_deg.toFixed(1)}°`, bad: (v) => !v.ok && v.moved_max_deg > 3 },
+      { h: "Tilt", t: "Sensor z axis vs vertical", on: vals.some((v) => v.tilt_z_from_vertical_deg != null),
+        f: (v) => v.tilt_z_from_vertical_deg != null ? `${v.tilt_z_from_vertical_deg.toFixed(0)}°` : "—" },
+      { h: "Gyro bias", t: "Mean gyro reading while still", on: vals.some((v) => v.gyro_bias_dps),
+        f: (v) => v.gyro_bias_dps ? `${Math.hypot(...v.gyro_bias_dps).toFixed(2)} °/s` : "—" },
+      { h: "Mag cal", t: "BNO085 magnetometer calibration (0-3)", on: vals.some((v) => v.mag_accuracy != null),
+        f: (v) => v.mag_accuracy != null ? `${v.mag_accuracy}/3` : "—" },
+    ].filter((col) => col.on !== false);
+    const t = document.createElement("table");
+    t.className = "caltab";
+    const hr = t.createTHead().insertRow();
+    for (const h of ["", "IMU", ...cols.map((col) => col.h)]) { const th = document.createElement("th"); th.textContent = h; hr.appendChild(th); }
+    cols.forEach((col, i) => { hr.cells[i + 2].title = col.t; });
+    const tb = t.createTBody();
+    for (const [name, v] of imus) {
+      const tr = tb.insertRow();
+      tr.className = v.q0 && v.ok ? "ok" : "bad";
+      const ic = tr.insertCell(); ic.className = "ic"; ic.textContent = v.q0 && v.ok ? "✓" : "✗";
+      const nm = tr.insertCell(); nm.className = "nm"; nm.textContent = name;
+      if (!v.q0) { const td = tr.insertCell(); td.colSpan = cols.length; td.className = "bad"; td.textContent = "no orientation data"; continue; }
+      for (const col of cols) { const td = tr.insertCell(); td.textContent = col.f(v); if (col.bad && col.bad(v)) td.className = "bad"; }
+    }
+    box.appendChild(t);
+  }
+  const emg = Object.entries(res.emg || {}).filter(([, v]) => v && v.rms_mv != null);
+  if (emg.length) {
+    const top = emg.reduce((a, b) => (b[1].rms_mv > a[1].rms_mv ? b : a));
+    const lo = Math.min(...emg.map(([, v]) => v.rms_mv));
+    const high = top[1].rms_mv > 50;      // resting EMG should be well under 50 mV at the DAQ input
+    const fl = emg.filter(([, v]) => v.floating).map(([n]) => n);
+    box.appendChild(calRow(high ? "warn" : "ok", `${high ? "!" : "✓"} EMG rest`,
+      `RMS ${lo.toFixed(2)}–${top[1].rms_mv.toFixed(2)} mV · max ${top[0]}`,
+      emg.map(([n, v]) => `${n} ${v.rms_mv.toFixed(3)} mV`).join("\n") +
+      (high ? "\nUnconnected DAQ inputs pick up the SYNC pulses while recording (multiplexer crosstalk)." : "")));
+    if (fl.length) box.appendChild(calAlert("bad", `EMG not connected: ${fl.length === emg.length ? "all channels" : fl.join(", ")}`,
+      "These inputs copy the SYNC pulses, which only happens when nothing is connected to them. Connect the EMG amplifier outputs (or remove unused channels in Settings) and calibrate again."));
+    else if (high) box.appendChild(calAlert("warn", "EMG rest RMS too high: electrodes connected?"));
+  }
+  const m = document.createElement("div");
+  m.className = "meta";
+  m.textContent = `${(res.when || "").slice(11, 16)} · ${res.subject || "no subject"} · ${res.seconds || ""} s · saved as ${res.session}`;
+  m.title = m.textContent;
+  box.appendChild(m);
+}
+
+function applyCalToViews(cur) {
+  // IMU display: the neutral pose becomes the zero of the angle readouts (recorded data unchanged)
+  for (const p of pods.values()) {
+    const v = cur.imus && cur.imus[p.name];
+    if (!v || !v.q0) continue;
+    p.ref = v.q0.slice(); LS.set("ref." + p.name, p.ref); p.e = [];
+  }
+  // Spine view: same neutral quaternions (keeps its sensor map and flexion axis)
+  try {
+    const sc = JSON.parse(localStorage.getItem("spineCal") || "null") || { q0: null, B: null, map: null, when: null };
+    sc.q0 = {};
+    for (const [n, v] of Object.entries(cur.imus || {})) if (v.q0) sc.q0[n] = v.q0;
+    sc.B = null; LS.set("bendRes", null);       // the flexion axis belongs to the old neutral: redo the forward bend
+    const names = Object.keys(sc.q0);
+    if (!sc.map && names.length >= 2) sc.map = { T7: names[0], T12: names[1] };
+    sc.when = new Date().toISOString();
+    localStorage.setItem("spineCal", JSON.stringify(sc));
+    fetch("/api/spine_cal", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(sc) }).catch(() => {});
+    const fr = $("spineFrame");
+    if (fr && fr.dataset.on === "1") fr.src = "/spine?embed=1&t=" + Date.now();
+  } catch { }
+}
+
+function applyCalib(s) {
+  const c = s.calib || {}, cur = c.current, att = c.attempt;
+  const subj = $("subject").value.trim();
+  $("calProg").classList.toggle("hidden", !c.running);
+  if (c.running) {
+    const f = c.seconds ? 1 - c.remaining_s / c.seconds : 0;
+    $("calBar").style.width = `${Math.max(0, Math.min(100, f * 100)).toFixed(0)}%`;
+    setText("calLeft", c.remaining_s > 0 ? `Hold still… ${c.remaining_s.toFixed(1)} s` : "Analysing…");
+  }
+  $("btnCal").disabled = !!c.running || s.state !== "idle";
+  const pill = $("calPill");
+  const mismatch = cur && subj && cur.subject && cur.subject !== subj;
+  if (c.running) { pill.textContent = "HOLD STILL"; pill.className = "pill warn"; }
+  else if (cur && !mismatch) { pill.textContent = "DONE " + (cur.when || "").slice(11, 16); pill.className = "pill ok"; }
+  else if (mismatch) { pill.textContent = `FOR ${cur.subject}`; pill.className = "pill warn"; pill.title = "The saved calibration belongs to another subject: calibrate again"; }
+  else { pill.textContent = "NOT DONE"; pill.className = "pill"; }
+  const key = JSON.stringify([c.running, c.error, cur && cur.session, att && att.session]);
+  if (key !== calRenderKey) { calRenderKey = key; renderCalResult($("calRes"), c, cur, att); }
+  if (cur && cur.ok && cur.session !== calApplied && pods.size) {
+    calApplied = cur.session; LS.set("calApplied", calApplied);
+    applyCalToViews(cur);
+    if (S && S.calib && S.calib.current === cur) toast("Calibrated: angle display and Spine view use this neutral pose");
+  }
+}
+
+// ---------------- forward bend (step 3, second part) ----------------
+// The static hold gives each sensor's neutral orientation q0. The forward bend gives the body's
+// left-right (flexion) axis: the horizontal direction of the summed rotation vectors since neutral.
+// Body frame B: X = that axis (left), Z = up (gravity), Y = Z x X (posterior). Same math as the Spine view.
+const BEND_SECS = 6;
+let bend = null;                                     // {until, samples: {name: [q]}}
+function spineCal() { try { return JSON.parse(localStorage.getItem("spineCal") || "null"); } catch { return null; } }
+function rotvecQ(q) {
+  if (q[0] < 0) q = q.map((v) => -v);
+  const s = Math.hypot(q[1], q[2], q[3]);
+  if (s < 1e-9) return [0, 0, 0];
+  const th = 2 * Math.atan2(s, q[0]);
+  return [q[1] / s * th, q[2] / s * th, q[3] / s * th];
+}
+function qFromAxes(X, Y, Z) {                       // rotation whose matrix columns are X, Y, Z
+  const [m00, m10, m20] = X, [m01, m11, m21] = Y, [m02, m12, m22] = Z, tr = m00 + m11 + m22;
+  let w, x, y, z;
+  if (tr > 0) { const s = Math.sqrt(tr + 1) * 2; w = s / 4; x = (m21 - m12) / s; y = (m02 - m20) / s; z = (m10 - m01) / s; }
+  else if (m00 > m11 && m00 > m22) { const s = Math.sqrt(1 + m00 - m11 - m22) * 2; w = (m21 - m12) / s; x = s / 4; y = (m01 + m10) / s; z = (m02 + m20) / s; }
+  else if (m11 > m22) { const s = Math.sqrt(1 + m11 - m00 - m22) * 2; w = (m02 - m20) / s; x = (m01 + m10) / s; y = s / 4; z = (m12 + m21) / s; }
+  else { const s = Math.sqrt(1 + m22 - m00 - m11) * 2; w = (m10 - m01) / s; x = (m02 + m20) / s; y = (m12 + m21) / s; z = s / 4; }
+  const n = Math.hypot(w, x, y, z) || 1;
+  return [w / n, x / n, y / n, z / n];
+}
+
+function bendAllowed() { return !!S && ["idle", "recording"].includes(S.state) && !(S.calib && S.calib.running); }
+
+function runBend() {
+  const sc = spineCal();
+  if (!bendAllowed()) { toast(S ? `Not now: ${S.state}` : "Server not connected", true); return; }
+  if (bend) return;
+  if (!sc || !sc.q0 || Object.keys(sc.q0).length < 2) { toast("Do the static calibration first", true); return; }
+  const names = sc.map ? [sc.map.T7, sc.map.T12] : Object.keys(sc.q0).slice(0, 2);
+  if (!names.every((n) => sc.q0[n] && pods.has(n) && pods.get(n).q)) { toast("No live data from both IMUs", true); return; }
+  bend = { until: performance.now() + BEND_SECS * 1000, samples: Object.fromEntries(names.map((n) => [n, []])) };
+  $("bendProg").classList.remove("hidden");
+  $("btnBend").disabled = true;
+  applyBend();
+  tickBend();
+}
+
+function tickBend() {
+  if (!bend) return;
+  const left = (bend.until - performance.now()) / 1000;
+  $("bendBar").style.width = `${Math.max(0, Math.min(100, (1 - left / BEND_SECS) * 100)).toFixed(0)}%`;
+  if (left > 0) { setText("bendLeft", `Bend forward and back… ${left.toFixed(1)} s`); setTimeout(tickBend, 100); return; }
+  const b = bend; bend = null;
+  $("bendProg").classList.add("hidden");
+  finishBend(b);
+}
+
+function finishBend(b) {
+  const sc = spineCal(), D = 180 / Math.PI;
+  let ax = [0, 0, 0], peak = 0, n = 0;
+  for (const [name, list] of Object.entries(b.samples)) {
+    const q0 = sc.q0[name];
+    for (const q of list) {
+      n++;
+      const r = rotvecQ(qmul(q, qconj(q0)));            // world-frame rotation since neutral
+      const deg = Math.hypot(...r) * D;
+      peak = Math.max(peak, deg);
+      if (deg >= 10) ax = ax.map((v, i) => v + r[i]);   // ignore the standing phase and noise
+    }
+  }
+  const h = Math.hypot(ax[0], ax[1]);
+  let res;
+  if (n < 40) res = { ok: false, text: "Too few IMU samples: check the IMUs and repeat." };
+  else if (peak < 15 || h < 1e-6) res = { ok: false, text: `Only ${peak.toFixed(0)}° of bending seen: bend further (40° or more) and repeat.` };
+  else {
+    const tilt = Math.atan2(Math.abs(ax[2]), h) * D;
+    const X = [ax[0] / h, ax[1] / h, 0], Z = [0, 0, 1], Y = [Z[1] * X[2] - Z[2] * X[1], Z[2] * X[0] - Z[0] * X[2], Z[0] * X[1] - Z[1] * X[0]];
+    sc.B = qFromAxes(X, Y, Z);
+    sc.when = new Date().toISOString();
+    try { localStorage.setItem("spineCal", JSON.stringify(sc)); } catch { }
+    fetch("/api/spine_cal", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(sc) }).catch(() => {});
+    const fr = $("spineFrame");
+    if (fr && fr.dataset.on === "1") fr.src = "/spine?embed=1&t=" + Date.now();
+    res = { ok: true, warn: tilt > 25,
+      text: `peak bend ${peak.toFixed(0)}° · twist ${tilt.toFixed(0)}°` + (tilt > 25 ? " · too twisted: repeat straighter" : "") };
+    toast("Forward bend saved: spine angles now use the body axes");
+  }
+  if (!res.ok) toast(res.text, true);
+  res.when = new Date().toTimeString().slice(0, 5);
+  LS.set("bendRes", res);
+  applyBend();
+  if (S) applyFlow(S);
+}
+
+function bendDone() { const sc = spineCal(); return !!(sc && sc.q0 && sc.B); }
+
+function applyBend() {
+  const done = bendDone(), res = LS.get("bendRes", null), pill = $("bendPill");
+  if (bend) { pill.textContent = "BENDING"; pill.className = "pill warn"; }
+  else if (done) { pill.textContent = "DONE" + (res && res.ok && res.when ? " " + res.when : ""); pill.className = "pill " + (res && res.warn ? "warn" : "ok"); }
+  else { pill.textContent = "NOT DONE"; pill.className = "pill"; }
+  const sc = spineCal(), haveNeutral = !!(sc && sc.q0);
+  if (!bend) $("btnBend").disabled = !haveNeutral || !bendAllowed();
+  const box = $("bendRes"), key = JSON.stringify([done, res, haveNeutral]);
+  if (box.dataset.key === key) return;
+  box.dataset.key = key; box.innerHTML = "";
+  if (!haveNeutral) box.appendChild(calRow("", "", "Do the still hold above first."));
+  else if (res && !res.ok) box.appendChild(calAlert("bad", res.text));
+  else if (done && res) box.appendChild(res.warn ? calAlert("warn", res.text) : calRow("ok", "✓", res.text));
+  else if (done) box.appendChild(calRow("ok", "✓", "flexion axis set (in the Spine view)"));
+  else box.appendChild(calAlert("warn", "Needed after every still hold: without it, flexion, side bend and rotation are mixed."));
+}
+
+// ---------------- experiment flow: which step is next ----------------
+let flowPrevState = null;
+function applyFlow(s) {
+  applyBend();
+  const tiles = ["stDaq", "stImu", "stEmg", "stSync"].map((id) => $(id).className);
+  const done = {
+    1: tiles.every((c) => !/\b(bad|warn)\b/.test(c)) && !!s.port,
+    2: !!$("subject").value.trim(),
+    3: !!(s.calib && s.calib.current && (!$("subject").value.trim() || !s.calib.current.subject ||
+      s.calib.current.subject === $("subject").value.trim())) && bendDone(),
+  };
+  const active = !done[1] ? 1 : !done[2] ? 2 : !done[3] ? 3 : 4;
+  for (const n of [1, 2, 3, 4, 5]) {
+    const el = $("step" + n);
+    if (!el) continue;
+    el.classList.toggle("done", !!done[n]);
+    el.classList.toggle("active", n === active && s.state !== "recording" ? true : n === 4 && s.state === "recording" && !(s.calib && s.calib.running));
+  }
+  // after a normal trial is saved: next trial number (when the trial name is a number)
+  if (flowPrevState === "stopping" && s.state !== "stopping" && s.last_summary &&
+      !String(s.last_summary.session || "").includes("static_cal")) {
+    refreshNextTrial();
+  }
+  flowPrevState = s.state;
+}
+
 // ---------------- saved recordings panel ----------------
 const FILE_DESC = {
   "imu_synced.csv": "IMU + PC & DAQ time (main file)", "imu.csv": "raw IMU frames", "events.csv": "start/stop, markers, warnings",
   "summary.json": "quality report", "session.json": "subject, trial, settings", "clock_sync.csv": "PC clock pings",
   "daq_raw.f32": "DAQ samples (SYNC + EMG)", "daq_meta.json": "DAQ channels & rate", "daq_pulses.csv": "SYNC pulses",
-  "spine_cal.json": "spine calibration",
+  "spine_cal.json": "spine calibration", "calibration.json": "static calibration used (neutral pose)",
 };
 const FILE_ORDER = Object.keys(FILE_DESC);
 let SESS = [], openSess = new Set(LS.get("openSess", [])), newestSess = null;
@@ -891,13 +1386,21 @@ async function loadSessions(highlight) {
 
 function renderSessions() {
   const box = $("sessions"), q = $("filesSearch").value.trim().toLowerCase();
-  const list = SESS.filter((s) => !q || `${s.name} ${s.subject} ${s.trial} ${s.notes}`.toLowerCase().includes(q));
+  const list = SESS.filter((s) => !q || `${s.rel || s.name} ${s.subject} ${s.trial} ${s.task} ${s.notes}`.toLowerCase().includes(q));
   box.innerHTML = "";
   setText("filesCount", SESS.length ? `${SESS.length}` : "");
   const total = SESS.reduce((a, s) => a + (s.bytes || 0), 0);
   setText("filesFoot", SESS.length ? `${fmtBytes(total)} in the latest ${SESS.length} · click a recording for its files, click a file to open it` : "");
   if (!list.length) { box.innerHTML = `<div class="empty">${SESS.length ? "No match." : "No recordings yet."}</div>`; return; }
+  let lastGroup = "";
   for (const s of list) {
+    const grp = s.date && s.subject_id ? `${s.date} · ${s.subject_id}` : "older recordings";
+    if (grp !== lastGroup) {
+      lastGroup = grp;
+      const h = document.createElement("div");
+      h.className = "sessgroup"; h.textContent = grp;
+      box.appendChild(h);
+    }
     const el = document.createElement("div");
     el.className = "sess2" + (openSess.has(s.name) ? " open" : "") + (s.name === newestSess ? " new" : "");
     let tag = `<span class="pill tag">IMU only</span>`;
@@ -905,7 +1408,10 @@ function renderSessions() {
     else if (s.sync === false) tag = `<span class="pill bad tag">SYNC ✗</span>`;
     if (s.aborted) tag = `<span class="pill warn tag">ABORTED</span>`;
     el.innerHTML = `<div class="sh" title="Show files"><span class="who"></span>${tag}<span class="when"></span><span class="meta"></span></div><div class="fl"></div>`;
-    const who = [s.subject, s.trial].filter(Boolean).join(" · ") || s.name;
+    const tk = TASKS.find((x) => x.key === s.task);
+    const who = s.task === "static_cal" ? `Static calibration${s.name.match(/_\d+$/) ? " (" + s.name.match(/_(\d+)$/)[1] + ")" : ""}`
+      : s.task ? `${tk ? tk.name : s.task_name || s.task} · trial ${String(s.trial_n).padStart(2, "0")}${s.name.match(/trial\d+_(\d+)$/) ? " (repeat " + s.name.match(/_(\d+)$/)[1] + ")" : ""}`
+      : [s.subject, s.trial].filter(Boolean).join(" · ") || s.name;
     el.querySelector(".who").textContent = who;
     el.querySelector(".when").textContent = fmtWhen(s);
     const miss = s.missing ? `${s.missing} missing · ` : "";
@@ -947,12 +1453,57 @@ function renderSessions() {
 }
 
 // ---------------- actions ----------------
-let toastTimer = null;
-function toast(msg, bad) {
-  const t = $("toast");
-  t.textContent = msg; t.className = "toast" + (bad ? " bad" : "");
-  clearTimeout(toastTimer);
-  toastTimer = setTimeout(() => t.classList.add("hidden"), bad ? 5000 : 2500);
+// Alerts: stacked at the bottom right (newest at the bottom), each fades out after its time.
+// toast(msg)            info, 4 s
+// toast(msg, true)      error, 8 s
+// toast(msg, "warn")    warning, 6 s
+// Hovering an alert pauses its timer; the same message again bumps a counter instead of stacking.
+const TOAST_MS = { info: 4000, warn: 6000, bad: 8000 }, TOAST_MAX = 5;
+const TOAST_ICON = { info: "✓", warn: "!", bad: "✕" };
+function toast(msg, level) {
+  const kind = level === true || level === "bad" || level === "error" ? "bad" : level === "warn" ? "warn" : "info";
+  const box = $("toasts");
+  const same = [...box.children].find((el) => !el.classList.contains("out") && el.dataset.msg === msg && el.dataset.kind === kind);
+  if (same) {                                         // repeat: count it and restart its timer
+    const n = (+same.dataset.n || 1) + 1;
+    same.dataset.n = n;
+    const c = same.querySelector(".tn"); c.textContent = "×" + n; c.hidden = false;
+    same._restart();
+    return;
+  }
+  const el = document.createElement("div");
+  el.className = "tst " + kind;
+  el.dataset.msg = msg; el.dataset.kind = kind;
+  el.setAttribute("role", kind === "bad" ? "alert" : "status");
+  el.innerHTML = '<span class="ti"></span><span class="tm"></span><span class="tn" hidden></span>' +
+    '<button class="tx" title="Dismiss" aria-label="Dismiss">×</button><i class="tbar"></i>';
+  el.querySelector(".ti").textContent = TOAST_ICON[kind];
+  el.querySelector(".tm").textContent = msg;
+  const ms = TOAST_MS[kind], bar = el.querySelector(".tbar");
+  let timer = null, left = ms, t0 = 0;
+  const close = () => {
+    if (el.classList.contains("out")) return;
+    clearTimeout(timer); el.classList.add("out");
+    setTimeout(() => el.remove(), 220);
+  };
+  const run = () => {                                  // start / resume the countdown and its bar
+    t0 = performance.now(); clearTimeout(timer); timer = setTimeout(close, left);
+    bar.style.transition = "none"; bar.style.transform = `scaleX(${left / ms})`;
+    void bar.offsetWidth;
+    bar.style.transition = `transform ${left}ms linear`; bar.style.transform = "scaleX(0)";
+  };
+  const pause = () => {
+    clearTimeout(timer); left = Math.max(400, left - (performance.now() - t0));
+    bar.style.transition = "none"; bar.style.transform = `scaleX(${left / ms})`;
+  };
+  el._restart = () => { left = ms; run(); };
+  el.addEventListener("mouseenter", pause);
+  el.addEventListener("mouseleave", run);
+  el.querySelector(".tx").onclick = close;
+  box.appendChild(el);
+  const live = [...box.children].filter((x) => !x.classList.contains("out"));
+  for (const old of live.slice(0, Math.max(0, live.length - TOAST_MAX))) old.querySelector(".tx").click();
+  run();
 }
 
 async function api(path, body) {
@@ -964,12 +1515,47 @@ async function api(path, body) {
   } catch (e) { toast("Server not running: double-click “Start IMU DAQ.bat” on the Desktop", true); return { ok: false }; }
 }
 
-function saveForm() { for (const id of ["subject", "label", "notes"]) LS.set("f." + id, $(id).value); }
+function saveForm() { for (const id of ["subject", "label", "notes", "testDate", "heightCm"]) LS.set("f." + id, $(id).value); LS.set("f.task", $("taskSel").value); }
+
+// participant height -> spine model scale (height / 180 cm); stored with the spine calibration
+function heightVal() { const h = parseFloat($("heightCm").value); return h >= 100 && h <= 230 ? h : null; }
+function pushHeight() {
+  const h = heightVal();
+  if ($("heightCm").value !== "" && h == null) { toast("Height must be 100–230 cm", true); return; }
+  saveForm();
+  let sc;
+  try { sc = JSON.parse(localStorage.getItem("spineCal") || "null"); } catch { sc = null; }
+  sc = sc || { q0: null, B: null, map: null, when: null };
+  if ((sc.height_cm ?? null) === h) return;
+  if (h == null) delete sc.height_cm; else sc.height_cm = h;
+  try { localStorage.setItem("spineCal", JSON.stringify(sc)); } catch { }
+  fetch("/api/spine_cal", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(sc) }).catch(() => {});
+  const fr = $("spineFrame");                 // the embedded view does not get storage events from its own parent
+  if (fr && fr.dataset.on === "1" && fr.contentWindow) fr.contentWindow.postMessage({ type: "spineopt", height: h }, location.origin);
+}
+
+function wireCalib() {
+  $("btnCal").onclick = runCalibration;
+  for (const b of $("calSecs").querySelectorAll("button")) {
+    b.classList.toggle("on", +b.dataset.s === calSecs);
+    b.onclick = () => {
+      calSecs = +b.dataset.s; LS.set("calSecs", calSecs);
+      for (const x of $("calSecs").querySelectorAll("button")) x.classList.toggle("on", x === b);
+    };
+  }
+  $("subject").addEventListener("input", () => { if (S) { applyCalib(S); applyFlow(S); } });
+}
 
 async function startRec() {
   saveForm();
   $("btnStart").disabled = true;
-  const j = await api("/api/start", { subject: $("subject").value, label: $("label").value, notes: $("notes").value });
+  if (!$("subject").value.trim() || !$("taskSel").value) {
+    toast(!$("subject").value.trim() ? "Enter the subject first (step 2)" : "Pick a task first", true);
+    $("btnStart").disabled = false; return;
+  }
+  const t = TASKS.find((x) => x.key === $("taskSel").value) || {};
+  const j = await api("/api/start", { subject: $("subject").value.trim(), date: dateId($("testDate").value), task: $("taskSel").value,
+    task_name: t.name || "", trial: Math.max(1, parseInt($("label").value, 10) || 1), notes: $("notes").value, height_cm: heightVal() });
   if (j.ok) { toast("Recording " + j.session); $("banner").classList.add("hidden"); }
 }
 async function stopRec() {
@@ -999,14 +1585,40 @@ function daqCfgFromForm() {
 
 function wire() {
   for (const id of ["subject", "label", "notes"]) { $(id).value = LS.get("f." + id, ""); $(id).addEventListener("change", saveForm); }
+  { // height: from this form, else from the spine calibration (e.g. typed in the Spine view)
+    let sc = null; try { sc = JSON.parse(localStorage.getItem("spineCal") || "null"); } catch { }
+    $("heightCm").value = LS.get("f.heightCm", "") || (sc && sc.height_cm) || "";
+    $("heightCm").addEventListener("change", pushHeight);
+    window.addEventListener("storage", (e) => {
+      if (e.key !== "spineCal") return;
+      try { const c = JSON.parse(e.newValue || "null"); if (c && document.activeElement !== $("heightCm")) { $("heightCm").value = c.height_cm || ""; saveForm(); } } catch { }
+    });
+  }
+  $("testDate").value = todayId();                      // a new page load starts on today's date (editable)
+  $("testDate").addEventListener("change", () => { $("testDate").value = dateId($("testDate").value); saveForm(); refreshNextTrial(); });
+  $("subject").addEventListener("change", refreshNextTrial);
+  $("taskSel").addEventListener("change", () => { saveForm(); refreshNextTrial(); });
+  $("label").addEventListener("input", applyTaskInfo);
+  $("subject").addEventListener("input", applyTaskInfo);
+  loadTasks();
   $("btnStart").onclick = startRec;
   $("btnStop").onclick = stopRec;
+  $("btnBend").onclick = () => { $("btnBend").blur(); runBend(); };
+  $("tpRec").onclick = () => { $("tpRec").blur(); toggleRecording(); };
+  $("tpMark").onclick = () => { $("tpMark").blur(); mark(); };
+  $("tpTake").onclick = () => { const el = $("label"); el.scrollIntoView({ block: "center", behavior: "smooth" }); el.focus(); el.select(); };
+  for (const id of ["subject", "label"]) $(id).addEventListener("input", () => { if (S) applyTransport(S); });
   $("btnMark").onclick = mark;
   $("markText").addEventListener("keydown", (e) => { if (e.key === "Enter") mark(); });
   $("btnConnect").onclick = () => api("/api/connect", { port: $("portSel").value || null });
   $("btnDisconnect").onclick = () => api("/api/disconnect");
   $("portSel").addEventListener("focus", loadPorts);
   $("rateSel").onchange = () => api("/api/rate", { ms: +$("rateSel").value });
+  $("quatSel").onchange = async () => {
+    const j = await api("/api/quatmode", { mode: $("quatSel").value });
+    if (j.ok) toast(j.mode === "rv" ? "Rotation vector (with magnetometer): move each IMU in slow figure-8s to calibrate"
+      : "Game rotation vector (no magnetometer)");
+  };
   $("btnRestart").onclick = () => api("/api/restart");
   for (const id of ["daqEnabled", "daqDevice", "daqSync", "daqRate", "daqTerm", "daqRange", "daqExtra"])
     $(id).addEventListener("change", () => api("/api/daq", daqCfgFromForm()));
@@ -1019,6 +1631,14 @@ function wire() {
   $("btnOpenData").onclick = () => api("/api/open", {});
   $("btnRefreshFiles").onclick = () => loadSessions();
   $("filesSearch").addEventListener("input", renderSessions);
+  for (const b of $("plotSeg").querySelectorAll("button")) {
+    b.classList.toggle("on", b.dataset.p === plotMode);
+    b.onclick = () => {
+      plotMode = b.dataset.p; LS.set("plotMode", plotMode);
+      for (const x of $("plotSeg").querySelectorAll("button")) x.classList.toggle("on", x === b);
+      for (const p of pods.values()) p.dirty = true;
+    };
+  }
   for (const b of $("winSeg").querySelectorAll("button")) {
     b.classList.toggle("on", +b.dataset.w === windowSec);
     b.onclick = () => {
@@ -1053,6 +1673,8 @@ function wire() {
   }
   for (const t of document.querySelectorAll(".stile")) t.onclick = () => goTo(t.dataset.go);
   wireFolds();
+  wireSpine();
+  wireCalib();
   $("btnSettings").onclick = () => openDrawer(!$("drawer").classList.contains("open"));
   $("btnCloseDrawer").onclick = () => openDrawer(false);
   $("scrim").onclick = () => openDrawer(false);
@@ -1064,6 +1686,72 @@ function wire() {
       for (const x of $("scopeSeg").querySelectorAll("button")) x.classList.toggle("on", x === b);
       smDirty = true;
     };
+  }
+}
+
+// ---------------- spine panel (left side) ----------------
+// The Spine view page in "embed" mode, loaded only when the screen is wide enough to show it,
+// so narrow windows do not run a second 3D view and data stream.
+function spineCalText() {
+  try {
+    const c = JSON.parse(localStorage.getItem("spineCal") || "null");
+    if (!c || !c.q0) return ["not calibrated", "bad"];
+    if (!c.B) return ["half calibrated", "warn"];
+    return ["calibrated" + (c.when ? " " + new Date(c.when).toTimeString().slice(0, 5) : ""), "good"];
+  } catch { return ["", ""]; }
+}
+function wireSpine() {
+  const mq = matchMedia("(min-width: 1780px)"), fr = $("spineFrame");
+  const apply = () => {
+    if (mq.matches && fr.dataset.on !== "1") { fr.dataset.on = "1"; fr.src = "/spine?embed=1"; }
+    else if (!mq.matches && fr.dataset.on === "1") { fr.dataset.on = "0"; fr.src = "about:blank"; }
+  };
+  mq.addEventListener("change", apply);
+  apply();
+  // model options (same controls as the Spine view's "Model" card), sent to the embedded view
+  const opt = (k, d) => { try { const v = localStorage.getItem(k); return v == null ? d : JSON.parse(v); } catch { return d; } };
+  const put = (k, v) => { try { localStorage.setItem(k, JSON.stringify(v)); } catch { } };
+  const send = (o) => { if (fr.dataset.on === "1" && fr.contentWindow) fr.contentWindow.postMessage({ type: "spineopt", ...o }, location.origin); };
+  const syncTools = () => {
+    const view = opt("spineView", "iso");
+    for (const b of $("spView").querySelectorAll("button")) b.classList.toggle("on", b.dataset.v === view);
+    $("spRibs").checked = opt("showRibs", true); $("spTrail").checked = opt("showTrail", false);
+  };
+  syncTools();
+  for (const b of $("spView").querySelectorAll("button")) b.onclick = () => { put("spineView", b.dataset.v); syncTools(); send({ view: b.dataset.v }); };
+  $("spRibs").onchange = () => { put("showRibs", $("spRibs").checked); send({ ribs: $("spRibs").checked }); };
+  $("spTrail").onchange = () => { put("showTrail", $("spTrail").checked); send({ trail: $("spTrail").checked }); };
+  fr.addEventListener("load", () => send({ view: opt("spineView", "iso") }));
+  window.addEventListener("storage", (e) => { if (["spineView", "showRibs", "showTrail"].includes(e.key)) syncTools(); });
+  const hint = () => { const [t, c] = spineCalText(); const h = $("spineHint"); h.textContent = t; h.className = "hint " + c; };
+  hint();
+  window.addEventListener("storage", (e) => { if (e.key === "spineCal") hint(); });   // calibrated in the full view
+  setInterval(hint, 5000);
+}
+
+// ---------------- orientation mode (game rotation vector / rotation vector) ----------------
+const QUAT_SHORT = { game: "game RV", rv: "RV + mag" };
+// what the board actually runs; falls back to the requested mode while the board reports nothing
+const quatOf = (s) => (s && s.hello && s.hello.quat) || (s && s.quat_mode) || "game";
+
+function applyQuatMode(s) {
+  const want = s.quat_mode || "game", have = s.hello && s.hello.quat;
+  const sel = $("quatSel");
+  if (document.activeElement !== sel) sel.value = want;
+  const note = $("quatNote");
+  if (s.hello && s.hello.fw && !have) {
+    note.textContent = "This firmware only has the game rotation vector: upload imu_daq v1.3 to switch.";
+    note.className = "note bad";
+  } else if (have && have !== want) {
+    note.textContent = "Switching the IMUs…"; note.className = "note";
+  } else if (want === "rv") {
+    note.textContent = "Absolute heading shared by both IMUs (no relative yaw drift). Keep metal, motors and " +
+      "electronics away; calibrate with slow figure-8s until both IMUs show mag 3/3. Saved with each recording.";
+    note.className = "note";
+  } else {
+    note.textContent = "Heading is relative and drifts slowly (affects axial rotation over minutes); not " +
+      "affected by metal nearby. Saved with each recording.";
+    note.className = "note";
   }
 }
 
@@ -1107,6 +1795,8 @@ function onShortcut(e) {
   const k = e.key.toLowerCase();
   if (k === "m") { e.preventDefault(); mark(); }
   else if (k === "z") { e.preventDefault(); zeroAll(true); }
+  else if (k === "c") { e.preventDefault(); runCalibration(); }
+  else if (k === "b") { e.preventDefault(); runBend(); }
   else if (k === "s") { e.preventDefault(); openDrawer(!$("drawer").classList.contains("open")); }
   else if (FOLD_KEYS[k]) {
     e.preventDefault();
@@ -1137,7 +1827,8 @@ function connectStream() {
       b.textContent = "The IMU DAQ server is not running. Double-click “Start IMU DAQ.bat” on the Desktop " +
         "(or check its black window for an error). This page reconnects by itself.";
     }
-    for (const id of ["btnStart", "btnStop", "btnMark"]) $(id).disabled = true;
+    for (const id of ["btnStart", "btnStop", "btnMark", "tpRec", "tpMark"]) $(id).disabled = true;
+    $("tpMode").className = "tp-mode"; $("tpMode").lastChild.textContent = "NO SERVER";
   };
 }
 

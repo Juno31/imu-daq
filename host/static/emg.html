@@ -1,0 +1,115 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>EMG Normalization</title>
+<link rel="stylesheet" href="/static/app.css">
+<link rel="stylesheet" href="/static/emg.css">
+</head>
+<body>
+<header class="topbar">
+  <div class="brand"><span class="logo">◆</span> EMG normalization</div>
+  <div class="chip" id="connChip"><span class="dot" id="connDot"></span><span id="connText">Connecting…</span></div>
+  <div class="badge" id="stateBadge">—</div>
+  <div class="spacer"></div>
+  <a class="chip linkchip" href="/">← Acquisition</a>
+  <a class="chip linkchip" href="/review" target="_blank">Review ↗</a>
+</header>
+
+<div class="banner hidden" id="banner"></div>
+
+<div class="eg-shell">
+  <!-- left: participant + capture controls + analysis -->
+  <aside class="eg-side">
+    <section class="card stepcard" id="egWho">
+      <h2><span class="stepn">1</span>Participant</h2>
+      <div class="pairrow">
+        <label>Test date<input id="egDate" placeholder="YYMMDD" maxlength="10" autocomplete="off" title="Empty = today"></label>
+        <label>Subject<input id="egSubject" placeholder="sub01" autocomplete="off"></label>
+      </div>
+      <div class="takepath mono" id="egFolder"></div>
+    </section>
+
+    <section class="card stepcard" id="egRest">
+      <h2><span class="stepn">2</span>Baseline (rest)<span class="pill" id="egRestPill">NOT DONE</span></h2>
+      <p class="cap">Fully relaxed, electrodes on, no talking or moving. Gives each channel's DC offset and noise floor.</p>
+      <div class="calrow">
+        <div class="seg" id="egRestSecs"><button data-v="5" class="on">5 s</button><button data-v="10">10 s</button><button data-v="20">20 s</button></div>
+        <button class="btn calbtn" id="egRestBtn">◎ Record rest</button>
+      </div>
+      <div class="eg-restsum" id="egRestSum"></div>
+    </section>
+
+    <section class="card stepcard" id="egMvc">
+      <h2><span class="stepn">3</span>MVC / RVC<span class="pill" id="egMvcPill">0 TRIALS</span></h2>
+      <div class="eg-form">
+        <div class="eg-formrow">
+          <div class="seg" id="egKind"><button data-v="mvc" class="on">MVC</button><button data-v="rvc">RVC</button></div>
+          <div class="seg" id="egSecs" title="Duration"><button data-v="3">3 s</button><button data-v="5" class="on">5 s</button><button data-v="10">10 s</button></div>
+        </div>
+        <label>Target muscle<select id="egTarget"></select></label>
+        <button class="btn calbtn" id="egRecBtn">● Record MVC</button>
+      </div>
+      <p class="cap" id="egKindCap"></p>
+    </section>
+
+    <section class="card">
+      <h2>Analysis</h2>
+      <div class="eg-opt"><span>RMS window (MVC)</span>
+        <div class="seg" id="egWin"><button data-v="0.25">250 ms</button><button data-v="0.5" class="on">500 ms</button><button data-v="1">1 s</button></div></div>
+      <div class="eg-opt"><span>RVC hold used</span>
+        <div class="seg" id="egHold"><button data-v="0.5">50 %</button><button data-v="0.6" class="on">60 %</button><button data-v="0.8">80 %</button></div></div>
+      <label class="eg-tgl"><input type="checkbox" id="egFilter" checked> Band-pass 20–450 Hz before RMS</label>
+      <label class="eg-tgl"><input type="checkbox" id="egOwnGroup"> MVC/RVC only from trials that target the muscle</label>
+      <p class="cap">Offset = rest mean. Noise, MVC and RVC use the mean-removed signal. MVC = highest moving RMS in any included MVC trial.</p>
+    </section>
+  </aside>
+
+  <main class="eg-main">
+    <!-- signals: the main view -->
+    <section class="card eg-sig" id="egSig">
+      <div class="eg-sighead">
+        <h2>EMG signals</h2>
+        <div class="eg-src" id="egSrc" role="tablist" aria-label="Signal source"></div>
+        <div class="spacer"></div>
+        <div class="seg" id="egScale" title="Vertical scale"><button data-v="each" class="on">Per channel</button><button data-v="same">Shared</button></div>
+        <div class="seg" id="egShow" title="What the trial view draws"><button data-v="both" class="on">Raw + RMS</button><button data-v="rms">RMS</button></div>
+      </div>
+      <div class="eg-sub" id="egSigSub"></div>
+
+      <div class="eg-run hidden" id="egRun">
+        <div class="eg-phase" id="egPhase">Get ready</div>
+        <div class="calprog"><div class="bar"><i id="egBar"></i></div><span id="egLeft"></span></div>
+        <button class="btn small" id="egAbort" title="Esc">Stop now</button>
+      </div>
+
+      <div class="eg-rows" id="egRows"></div>
+      <div class="eg-axis"><span></span><canvas id="egAxis"></canvas><span></span></div>
+      <p class="cap" id="egSigCap"></p>
+    </section>
+
+    <!-- trials -->
+    <section class="card">
+      <div class="fileshead"><h2>Trials</h2><span class="hint" id="egTrialsHint"></span><div class="spacer"></div>
+        <button class="btn small ghost" id="egReload" title="Reload and re-analyse">↻</button></div>
+      <div class="eg-tablewrap"><table class="eg-table" id="egTrials"></table></div>
+      <p class="cap">Click a row to show it above. Untick a trial to leave it out (e.g. a bad repeat). Values: rest = noise RMS, MVC = peak moving RMS, RVC = hold RMS (mV). ★ = used as the reference.</p>
+    </section>
+
+    <!-- references -->
+    <section class="card stepcard" id="egRef">
+      <h2><span class="stepn">4</span>Reference values<span class="pill" id="egSavedPill">NOT SAVED</span></h2>
+      <div class="eg-tablewrap"><table class="eg-table" id="egRefs"></table></div>
+      <div class="eg-saverow">
+        <span class="hint" id="egSaveHint"></span><div class="spacer"></div>
+        <button class="btn calbtn" id="egSave">Save for this subject</button>
+      </div>
+    </section>
+  </main>
+</div>
+
+<div class="toasts" id="toasts" role="status" aria-live="polite"></div>
+<script src="/static/emg.js"></script>
+</body>
+</html>

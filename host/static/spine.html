@@ -6,6 +6,7 @@
 <title>Spine View</title>
 <link rel="stylesheet" href="/static/app.css">
 <link rel="stylesheet" href="/static/spine.css">
+<script>/* ?embed: only the 3D rendering (used inside the main GUI) */ if (new URLSearchParams(location.search).has("embed")) document.documentElement.classList.add("embed");</script>
 <script type="importmap">
 { "imports": {
   "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
@@ -48,9 +49,10 @@
 
     <section class="card">
       <h2>Model</h2>
-      <label class="row">Lumbar share of T12 motion
-        <input type="range" id="lumbarShare" min="0" max="100" step="5" value="70"><span class="mono" id="lumbarShareV">70%</span></label>
-      <p class="hint">No pelvis sensor yet: this much of T12's motion is spread over S1–L1; the rest is treated as pelvis tilt.</p>
+      <label class="row">Participant height
+        <input type="number" id="heightCm" min="100" max="230" step="0.5" placeholder="180" style="width:80px"> cm
+        <span class="mono" id="scaleV">×1.00</span></label>
+      <p class="hint">Uniform scaling: height ÷ 180 cm (Gait2392 generic subject), same in X, Y and Z. Saved with the spine calibration.</p>
       <label class="row"><input type="checkbox" id="showRibs" checked> Ribs</label>
       <label class="row"><input type="checkbox" id="showTrail"> T7 path trail</label>
       <div class="btnrow">
@@ -65,6 +67,16 @@
   <section class="stage card">
     <div id="three" class="three"></div>
     <div class="overlay" id="overlay">Loading 3D…</div>
+    <div class="calgate hidden" id="calGate" role="status">
+      <div class="cg-icon">◎</div>
+      <b id="calGateTitle">Static calibration not done</b>
+      <p id="calGateText">The spine model is shown once the participant's neutral posture and body axes are known.</p>
+      <ol class="cg-steps">
+        <li id="cgStill"><span>a</span>Still hold <kbd>C</kbd></li>
+        <li id="cgBend"><span>b</span>Forward bend <kbd>B</kbd></li>
+      </ol>
+      <p class="cg-where" id="calGateWhere">Step 3 · Static calibration on the Acquisition page</p>
+    </div>
   </section>
 
   <aside class="side">
