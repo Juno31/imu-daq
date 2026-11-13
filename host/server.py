@@ -64,6 +64,14 @@ class App:
     def __init__(self, data_dir):
         self.data_dir = data_dir
         os.makedirs(data_dir, exist_ok=True)
+        # spine calibration (neutral quaternions, body axes, sensor map, height): the server copy is the
+        # master; pages load it from GET /api/spine_cal and re-load when spine_cal_rev changes
+        self.spine_cal, self.spine_cal_rev = None, 1
+        try:
+            with open(os.path.join(data_dir, "spine_cal_last.json"), encoding="utf-8") as f:
+                self.spine_cal = json.load(f)
+        except (OSError, ValueError):
+            pass
         self.lock = threading.RLock()
         self.perf0, self.unix0 = time.perf_counter(), time.time()
         self.dev = Device(self._on_frame, self._on_msg, self._on_pong, self._on_disconnect)
@@ -676,6 +684,7 @@ class App:
                         "preview_error": self.preview_err, "preview_on": self.preview_on},
                 "last_summary": self.last_summary, "data_dir": self.data_dir,
                 "bad_lines": self.dev.bad_lines,
+                "spine_cal_rev": self.spine_cal_rev,
             }
         # sync monitor + clock plot (outside the main lock: the frame reader must not wait on it)
         if sm is not None:
@@ -697,6 +706,25 @@ class App:
         except Exception:
             out["emg"] = None
         return out
+
+    def set_spine_cal(self, body):
+        """Store a spine calibration sent by a page. A page that sends no body axes (B) for the same
+        neutral pose (q0) is out of date: keep the forward-bend axis instead of clearing it."""
+        old = self.spine_cal or {}
+        kept = False
+        if body.get("B") is None and old.get("B") is not None and same_q0(body.get("q0"), old.get("q0")):
+            body = dict(body, B=old["B"])
+            kept = True
+            self.log("warn", "spine calibration: a page sent no forward-bend axis for the same neutral pose; "
+                             "kept the existing axis", "spine")
+        self.spine_cal = body
+        self.spine_cal_rev += 1
+        save_spine_cal(self.data_dir, body, "spine_cal_last.json")
+        sess = self.session
+        if sess and not sess.closed:
+            save_spine_cal(sess.dir, body)
+            sess.event(self.unix(), "spine_cal", json.dumps(body.get("map")), "", "")
+        return body, kept
 
     def sessions(self, limit=300):
         # recordings live in <date>/<subject>/<trial>/ (or, older ones, directly in the data folder)
@@ -751,6 +779,16 @@ class App:
 
 # ---------------- HTTP ----------------
 APP = None
+def same_q0(a, b, tol=1e-5):
+    """True when two {imu: [w, x, y, z]} neutral sets are the same calibration."""
+    if not isinstance(a, dict) or not isinstance(b, dict) or not a or set(a) != set(b):
+        return False
+    try:
+        return all(len(a[k]) == 4 and max(abs(float(x) - float(y)) for x, y in zip(a[k], b[k])) < tol for k in a)
+    except (TypeError, ValueError):
+        return False
+
+
 def save_spine_cal(folder, cal, name="spine_cal.json"):
     """Store the Spine view calibration (neutral quaternions, body axes) next to a recording."""
     if not cal or not folder:
@@ -830,6 +868,8 @@ class Handler(BaseHTTPRequestHandler):
                 if not rel or not full.startswith(root + os.sep) or not os.path.isfile(os.path.join(full, "summary.json")):
                     return self._json({"ok": False, "error": "recording not found"}, 404)
                 return self._json({"ok": True, **review.load(full, root)})
+            if path == "/api/spine_cal":
+                return self._json({"ok": True, "cal": APP.spine_cal, "rev": APP.spine_cal_rev})
             if path == "/api/stream":
                 return self._stream()
             self._json({"error": "not found"}, 404)
@@ -916,14 +956,9 @@ class Handler(BaseHTTPRequestHandler):
             if path == "/api/daq":
                 APP.set_daq(body)
                 return self._json({"ok": True, "cfg": APP.daq_cfg})
-            if path == "/api/spine_cal":          # calibration from the Spine view
-                APP.spine_cal = body
-                save_spine_cal(APP.data_dir, body, "spine_cal_last.json")
-                sess = APP.session
-                if sess and not sess.closed:
-                    save_spine_cal(sess.dir, body)
-                    sess.event(APP.unix(), "spine_cal", json.dumps(body.get("map")), "", "")
-                return self._json({"ok": True})
+            if path == "/api/spine_cal":          # calibration from the main page or the Spine view
+                cal, kept = APP.set_spine_cal(body if isinstance(body, dict) else {})
+                return self._json({"ok": True, "cal": cal, "rev": APP.spine_cal_rev, "kept_axis": kept})
             if path == "/api/emgcal/save":
                 import emgnorm
                 if not body.get("subject") or not body.get("channels"):

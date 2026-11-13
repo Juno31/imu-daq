@@ -19,8 +19,8 @@
   <span class="hint" id="rvTitle">Pick a recording on the left</span>
   <div class="spacer"></div>
   <a class="chip linkchip" href="/" title="Recording, sync and device settings">← Acquisition</a>
-  <a class="chip linkchip" href="/emg" target="_blank" title="Baseline offset and MVC / RVC">EMG norm ↗</a>
-  <a class="chip linkchip" href="/spine" target="_blank" title="Live spine view">Spine view ↗</a>
+  <a class="chip linkchip" href="/emg" title="Baseline offset and MVC / RVC">EMG norm</a>
+  <a class="chip linkchip" href="/spine" title="Live spine view">Spine view</a>
 </header>
 
 <div class="rv-shell">
@@ -91,7 +91,7 @@
               <span class="legend"><span><i style="background:var(--roll)"></i>Flexion</span><span><i style="background:var(--pitch)"></i>Lat. bend</span><span><i style="background:var(--yaw)"></i>Axial rot.</span></span></div>
             <div class="rv-tracks" id="rvSpineTracks"></div>
           </section>
-          <section class="card rv-plotcard">
+          <section class="card rv-plotcard" id="rvImuCard">
             <div class="fileshead"><h2>IMU</h2><span class="hint" id="rvImuHint"></span><div class="spacer"></div>
               <div class="seg" id="rvImuMode"><button data-v="ang" class="on">Angles</button><button data-v="acc">Acc</button><button data-v="gyr">Gyro</button></div></div>
             <div class="rv-tracks" id="rvImuTracks"></div>

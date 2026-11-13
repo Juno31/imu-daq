@@ -97,3 +97,8 @@
   .rv-track { grid-template-columns: 1fr; }
   .rv-keys { display: none; }
 }
+
+/* EMG normalization captures: EMG only, full width */
+.rv-body.emgonly .rv-spine, .rv-body.emgonly #rvSpinePlot, .rv-body.emgonly #rvImuCard { display: none; }
+.rv-body.emgonly .rv-grid { grid-template-columns: minmax(0, 1fr); }
+.rv-body.emgonly .rv-track.emg .rv-cvwrap { height: clamp(64px, calc((100vh - 380px) / 8), 110px); }

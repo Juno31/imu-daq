@@ -736,6 +736,82 @@ function wireFolds() {
   }
 }
 
+// ---------------- steps 1-4: minimizable (like the Live signals sections) ----------------
+// Header click (or Enter) minimizes a step to its header plus a one-line summary. Space stays "record".
+const esc = (t) => String(t ?? "").replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+function stepHead(n) { const el = $("step" + n); return n === 1 ? el : el.querySelector("h2"); }
+function setStep(n, min) {
+  const el = $("step" + n), head = stepHead(n);
+  el.classList.toggle("min", min);
+  head.setAttribute("aria-expanded", String(!min));
+  LS.set("stepmin." + n, min);
+  if (!min) { emgDirty = true; for (const p of pods.values()) p.dirty = true; }
+  updateStepSums();
+}
+function wireSteps() {
+  for (const n of [1, 2, 3, 4]) {
+    const head = stepHead(n);
+    const chev = document.createElement("span");
+    chev.className = "chev stepchev"; chev.textContent = "›";
+    head.insertBefore(chev, head.firstChild);
+    const sum = document.createElement("span");
+    sum.className = "stepsum"; sum.id = "stepSum" + n;
+    head.appendChild(sum);
+    head.classList.add("stephdr");
+    head.tabIndex = 0; head.setAttribute("role", "button");
+    head.title = "Click to minimize / expand this step";
+    head.addEventListener("click", (e) => { if (!e.target.closest("button, a, input, select")) setStep(n, !$("step" + n).classList.contains("min")); });
+    head.addEventListener("keydown", (e) => { if (e.key === "Enter" && e.target === head) { e.preventDefault(); setStep(n, !$("step" + n).classList.contains("min")); } });
+  }
+  for (const n of [1, 2, 3, 4]) setStep(n, !!LS.get("stepmin." + n, false));   // after all headers exist
+}
+const pillMark = (id) => { const el = $(id); if (!el) return ["", ""];
+  const c = el.className; return c.includes(" ok") ? ["✓", "good"] : c.includes("warn") ? ["!", "warn"] : c.includes("bad") ? ["✗", "bad"] : ["✗", "bad"]; };
+function updateStepSums() {
+  if (![1, 2, 3, 4].every((n) => $("stepSum" + n))) return;
+  // 1: device tiles
+  $("stepSum1").innerHTML = ["stDaq", "stImu", "stEmg", "stSync"].map((id) => {
+    const t = $(id), c = /\bok\b/.test(t.className) ? "good" : /\bbad\b/.test(t.className) ? "bad" : /\bwarn\b/.test(t.className) ? "warn" : "";
+    return `<span class="${c}">${esc(t.querySelector("small").textContent)} ${esc(t.querySelector("b").textContent)}</span>`;
+  }).join("<i>·</i>");
+  // 2: participant
+  const subj = $("subject").value.trim(), h = $("heightCm") ? $("heightCm").value : "";
+  $("stepSum2").innerHTML = [subj ? `<b>${esc(subj)}</b>` : `<span class="warn">no subject</span>`, esc(dateId($("testDate").value)),
+    h ? esc(h) + " cm" : "", esc($("notes").value.trim())].filter(Boolean).join("<i>·</i>");
+  // 3: the calibration parts
+  const parts = [["Still hold", "calPill"], ["Forward bend", "bendPill"]];
+  if ($("emgNormStep") && !$("emgNormStep").classList.contains("hidden")) parts.push(["EMG norm", "emgNormPill"]);
+  $("stepSum3").innerHTML = parts.map(([l, id]) => { const [m, c] = pillMark(id); return `<span class="${c}">${l} ${m}</span>`; }).join("<i>·</i>");
+  // Setup group: steps 1-3 on one line
+  if ($("setupSum")) {
+    $("setupSum").innerHTML = [1, 2, 3].map((n) => $("stepSum" + n).innerHTML).join('<i class="sep">|</i>');
+    const done = [1, 2, 3].filter((n) => $("step" + n).classList.contains("done")).length;
+    $("setupPill").textContent = done === 3 ? "READY" : `${done} / 3 DONE`;
+    $("setupPill").className = "pill " + (done === 3 ? "ok" : "warn");
+  }
+  // 4: next trial
+  const sel = $("taskSel"), task = sel.selectedIndex >= 0 && sel.value ? sel.options[sel.selectedIndex].text : "";
+  const rec = S && S.state === "recording";
+  $("stepSum4").innerHTML = (rec ? `<span class="bad">● REC</span><i>·</i>` : "") +
+    (task ? `<b>${esc(task)}</b><i>·</i>trial ${esc($("label").value || "1")}<i>·</i><span class="mono">${esc($("takePath").textContent.replace(/^→\s*/, ""))}</span>`
+      : `<span class="warn">no task selected</span>`);
+}
+
+// Setup group (steps 1-3): minimize as a whole while recording; one summary line when minimized.
+function setSetup(min) {
+  $("setupGroup").classList.toggle("min", min);
+  $("setupHead").setAttribute("aria-expanded", String(!min));
+  LS.set("setupmin", min);
+  if (!min) { emgDirty = true; for (const p of pods.values()) p.dirty = true; }
+  updateStepSums();
+}
+function wireSetup() {
+  const head = $("setupHead");
+  head.addEventListener("click", (e) => { if (!e.target.closest("button, a, input, select")) setSetup(!$("setupGroup").classList.contains("min")); });
+  head.addEventListener("keydown", (e) => { if (e.key === "Enter" && e.target === head) { e.preventDefault(); setSetup(!$("setupGroup").classList.contains("min")); } });
+  setSetup(!!LS.get("setupmin", false));
+}
+
 function openDrawer(open) {
   $("drawer").classList.toggle("open", open);
   $("drawer").setAttribute("aria-hidden", String(!open));
@@ -1178,6 +1254,31 @@ function renderCalResult(box, c, cur, att) {
   box.appendChild(m);
 }
 
+// The server holds the master spine calibration. This page keeps a copy in localStorage ("spineCal",
+// shared with the Spine view and its embedded copy) and re-loads it whenever the server's revision changes.
+let spineRev = null, spineSynced = false;
+function writeSpineCal(cal) {
+  const txt = JSON.stringify(cal);
+  try { if (localStorage.getItem("spineCal") !== txt) localStorage.setItem("spineCal", txt); } catch { }
+  const fr = $("spineFrame");                      // the embedded view gets no storage event from its parent
+  if (fr && fr.dataset.on === "1" && fr.contentWindow) fr.contentWindow.postMessage({ type: "spinecal", cal }, location.origin);
+}
+async function syncSpineCal() {
+  try {
+    const j = await (await fetch("/api/spine_cal", { cache: "no-store" })).json();
+    if (j.ok) { if (j.cal) writeSpineCal(j.cal); spineRev = j.rev; }
+  } catch { }
+  spineSynced = true;
+  if (S) { applyCalib(S); applyFlow(S); }
+}
+async function postSpineCal(sc) {
+  try {
+    const r = await fetch("/api/spine_cal", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(sc) });
+    const j = await r.json();
+    if (j.ok && j.cal) { spineRev = j.rev; writeSpineCal(j.cal); if (S) applyFlow(S); }
+  } catch { }
+}
+
 function applyCalToViews(cur) {
   // IMU display: the neutral pose becomes the zero of the angle readouts (recorded data unchanged)
   for (const p of pods.values()) {
@@ -1188,23 +1289,33 @@ function applyCalToViews(cur) {
   // Spine view: same neutral quaternions (keeps its sensor map and flexion axis)
   try {
     const sc = JSON.parse(localStorage.getItem("spineCal") || "null") || { q0: null, B: null, map: null, when: null };
-    sc.q0 = {};
-    for (const [n, v] of Object.entries(cur.imus || {})) if (v.q0) sc.q0[n] = v.q0;
-    sc.B = null; LS.set("bendRes", null);       // the flexion axis belongs to the old neutral: redo the forward bend
+    const q0 = {};
+    for (const [n, v] of Object.entries(cur.imus || {})) if (v.q0) q0[n] = v.q0;
+    if (sameQ0(q0, sc.q0)) return;                // already applied (e.g. another browser): keep its forward-bend axis
+    sc.q0 = q0;
+    sc.B = null; LS.set("bendRes", null);       // a new neutral pose: the flexion axis belongs to the old one, redo the forward bend
     const names = Object.keys(sc.q0);
     if (!sc.map && names.length >= 2) sc.map = { T7: names[0], T12: names[1] };
     sc.when = new Date().toISOString();
     localStorage.setItem("spineCal", JSON.stringify(sc));
-    fetch("/api/spine_cal", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(sc) }).catch(() => {});
+    postSpineCal(sc);
     const fr = $("spineFrame");
     if (fr && fr.dataset.on === "1") fr.src = "/spine?embed=1&t=" + Date.now();
   } catch { }
+}
+
+function sameQ0(a, b) {
+  if (!a || !b) return false;
+  const ka = Object.keys(a), kb = Object.keys(b);
+  return ka.length > 0 && ka.length === kb.length && ka.every((k) => b[k] && a[k].every((v, i) => Math.abs(v - b[k][i]) < 1e-5));
 }
 
 function applyCalib(s) {
   const c = s.calib || {}, cur = c.current, att = c.attempt;
   const subj = $("subject").value.trim();
   $("calProg").classList.toggle("hidden", !c.running);
+  if (c.running && $("step3").classList.contains("min")) setStep(3, false);   // show the countdown
+  if (c.running && $("setupGroup").classList.contains("min")) setSetup(false);
   if (c.running) {
     const f = c.seconds ? 1 - c.remaining_s / c.seconds : 0;
     $("calBar").style.width = `${Math.max(0, Math.min(100, f * 100)).toFixed(0)}%`;
@@ -1219,7 +1330,7 @@ function applyCalib(s) {
   else { pill.textContent = "NOT DONE"; pill.className = "pill"; }
   const key = JSON.stringify([c.running, c.error, cur && cur.session, att && att.session]);
   if (key !== calRenderKey) { calRenderKey = key; renderCalResult($("calRes"), c, cur, att); }
-  if (cur && cur.ok && cur.session !== calApplied && pods.size) {
+  if (cur && cur.ok && cur.session !== calApplied && pods.size && spineSynced) {
     calApplied = cur.session; LS.set("calApplied", calApplied);
     applyCalToViews(cur);
     if (S && S.calib && S.calib.current === cur) toast("Calibrated: angle display and Spine view use this neutral pose");
@@ -1261,6 +1372,8 @@ function runBend() {
   const names = sc.map ? [sc.map.T7, sc.map.T12] : Object.keys(sc.q0).slice(0, 2);
   if (!names.every((n) => sc.q0[n] && pods.has(n) && pods.get(n).q)) { toast("No live data from both IMUs", true); return; }
   bend = { until: performance.now() + BEND_SECS * 1000, samples: Object.fromEntries(names.map((n) => [n, []])) };
+  if ($("step3").classList.contains("min")) setStep(3, false);
+  if ($("setupGroup").classList.contains("min")) setSetup(false);
   $("bendProg").classList.remove("hidden");
   $("btnBend").disabled = true;
   applyBend();
@@ -1300,7 +1413,7 @@ function finishBend(b) {
     sc.B = qFromAxes(X, Y, Z);
     sc.when = new Date().toISOString();
     try { localStorage.setItem("spineCal", JSON.stringify(sc)); } catch { }
-    fetch("/api/spine_cal", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(sc) }).catch(() => {});
+    postSpineCal(sc);
     const fr = $("spineFrame");
     if (fr && fr.dataset.on === "1") fr.src = "/spine?embed=1&t=" + Date.now();
     res = { ok: true, warn: tilt > 25,
@@ -1313,6 +1426,11 @@ function finishBend(b) {
   applyBend();
   if (S) applyFlow(S);
 }
+
+// leaving the page: a forward bend is captured here, and Stop (Space) only exists on this page
+window.addEventListener("beforeunload", (e) => {
+  if (bend || (S && S.state === "recording")) { e.preventDefault(); e.returnValue = ""; }
+});
 
 function bendDone() { const sc = spineCal(); return !!(sc && sc.q0 && sc.B); }
 
@@ -1333,10 +1451,56 @@ function applyBend() {
   else box.appendChild(calAlert("warn", "Needed after every still hold: without it, flexion, side bend and rotation are mixed."));
 }
 
+// ---------------- EMG normalization status (step 3c; measured on the /emg page) ----------------
+let emgNormKey = "", emgNormRes = null, emgNormBusy = false;
+async function checkEmgNorm(force) {
+  const subj = $("subject").value.trim(), date = dateId($("testDate").value);
+  const key = `${date}|${subj}`;
+  if (!force && key === emgNormKey) { showEmgNorm(); return; }
+  if (emgNormBusy) { emgNormKey = ""; return; }          // retry on the next status update
+  emgNormKey = key; emgNormRes = null;
+  if (subj) {
+    emgNormBusy = true;
+    try {
+      const r = await fetch("/api/emgcal/load?" + new URLSearchParams({ date, subject: subj }));
+      emgNormRes = r.ok ? { ok: true, norm: (await r.json()).norm || null } : { ok: false };
+    } catch { emgNormRes = { ok: false }; }
+    emgNormBusy = false;
+  }
+  showEmgNorm();
+}
+function showEmgNorm() {
+  const step = $("emgNormStep"), pill = $("emgNormPill"), cap = $("emgNormCap"), btn = $("btnEmgNorm");
+  const hasEmg = !!(S && S.emg && S.emg.chans && S.emg.chans.length);
+  step.classList.toggle("hidden", !hasEmg);
+  if (!hasEmg) return;
+  const subj = $("subject").value.trim(), n = emgNormRes && emgNormRes.norm;
+  const ch = n && n.channels ? Object.values(n.channels) : [];
+  const withRef = ch.filter((c) => c.ref_mv), withRest = ch.filter((c) => c.noise_mv != null);
+  const total = S.emg.chans.length;
+  const done = withRef.length >= total && withRest.length >= total;
+  btn.classList.toggle("ghost", done);
+  btn.innerHTML = done ? "Open EMG norm page →" : "⚡ Measure EMG rest &amp; MVC / RVC →";
+  if (!subj) { pill.textContent = "NOT DONE"; pill.className = "pill"; cap.textContent = "Enter the subject first, then measure the rest baseline and MVC / RVC on the EMG norm page."; }
+  else if (emgNormRes && !emgNormRes.ok) { pill.textContent = "UNKNOWN"; pill.className = "pill"; cap.textContent = "Could not check (restart the server once to enable the EMG norm page)."; }
+  else if (!n) { pill.textContent = "NOT DONE"; pill.className = "pill warn"; cap.textContent = `No rest baseline or MVC / RVC saved for ${subj} on this test date. Needed to express EMG as %MVC.`; }
+  else {
+    const kinds = {}; for (const c of withRef) kinds[c.ref_kind] = (kinds[c.ref_kind] || 0) + 1;
+    const kt = Object.entries(kinds).map(([k, v]) => `${k} ${v}`).join(", ");
+    pill.textContent = done ? "DONE " + (n.saved || "").slice(11, 16) : "PARTIAL";
+    pill.className = "pill " + (done ? "ok" : "warn");
+    cap.textContent = `Saved ${(n.saved || "").slice(0, 16)} · reference for ${withRef.length}/${total} channels${kt ? " (" + kt + ")" : ""}` +
+      (withRest.length < total ? ` · rest baseline for ${withRest.length}/${total}` : "") + (done ? "" : " · finish it on the EMG norm page");
+  }
+}
+
 // ---------------- experiment flow: which step is next ----------------
 let flowPrevState = null;
 function applyFlow(s) {
+  updateStepSums();
+  if (s.spine_cal_rev != null && spineRev != null && s.spine_cal_rev !== spineRev) { spineRev = s.spine_cal_rev; syncSpineCal(); }
   applyBend();
+  checkEmgNorm();
   const tiles = ["stDaq", "stImu", "stEmg", "stSync"].map((id) => $(id).className);
   const done = {
     1: tiles.every((c) => !/\b(bad|warn)\b/.test(c)) && !!s.port,
@@ -1529,7 +1693,7 @@ function pushHeight() {
   if ((sc.height_cm ?? null) === h) return;
   if (h == null) delete sc.height_cm; else sc.height_cm = h;
   try { localStorage.setItem("spineCal", JSON.stringify(sc)); } catch { }
-  fetch("/api/spine_cal", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(sc) }).catch(() => {});
+  postSpineCal(sc);
   const fr = $("spineFrame");                 // the embedded view does not get storage events from its own parent
   if (fr && fr.dataset.on === "1" && fr.contentWindow) fr.contentWindow.postMessage({ type: "spineopt", height: h }, location.origin);
 }
@@ -1544,6 +1708,12 @@ function wireCalib() {
     };
   }
   $("subject").addEventListener("input", () => { if (S) { applyCalib(S); applyFlow(S); } });
+  // step 3c: re-check after the subject / date changes and when coming back from the EMG norm tab
+  for (const id of ["subject", "testDate"]) $(id).addEventListener("change", () => checkEmgNorm());
+  window.addEventListener("focus", () => checkEmgNorm(true));
+  document.addEventListener("visibilitychange", () => { if (!document.hidden) checkEmgNorm(true); });
+  $("btnEmgNorm").addEventListener("click", () => saveForm());      // the EMG page reads the same participant
+  setInterval(() => checkEmgNorm(true), 30000);
 }
 
 async function startRec() {
@@ -1673,6 +1843,8 @@ function wire() {
   }
   for (const t of document.querySelectorAll(".stile")) t.onclick = () => goTo(t.dataset.go);
   wireFolds();
+  wireSteps();
+  wireSetup();
   wireSpine();
   wireCalib();
   $("btnSettings").onclick = () => openDrawer(!$("drawer").classList.contains("open"));
@@ -1701,6 +1873,7 @@ function spineCalText() {
   } catch { return ["", ""]; }
 }
 function wireSpine() {
+  syncSpineCal();
   const mq = matchMedia("(min-width: 1780px)"), fr = $("spineFrame");
   const apply = () => {
     if (mq.matches && fr.dataset.on !== "1") { fr.dataset.on = "1"; fr.src = "/spine?embed=1"; }
@@ -1809,7 +1982,7 @@ function onShortcut(e) {
 // ---------------- stream ----------------
 let serverDown = false;
 function connectStream() {
-  const es = new EventSource("/api/stream");
+  const es = openStream();          // one shared /api/stream for all tabs (stream.js)
   es.onmessage = (ev) => {
     if (serverDown) { serverDown = false; $("banner").classList.add("hidden"); toast("Server connected"); }
     const m = JSON.parse(ev.data);

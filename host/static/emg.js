@@ -14,7 +14,7 @@ const CAP = {
   rvc: "Reference voluntary contraction: a fixed, repeatable submaximal task (e.g. holding the trunk horizontal, or a set load). Use the same task for every participant.",
 };
 
-let S = null, TR = [], NORM = null, REFS = {}, CH = [], running = null;
+let S = null, TR = [], NORM = null, REFS = {}, CH = [], running = null, subjRel = "";
 let opt = { win: LS.get("eg.win", 0.5), hold: LS.get("eg.hold", 0.6), filter: LS.get("eg.filter", true), own: LS.get("eg.own", false) };
 let kind = "mvc", secs = 5, restSecs = 5;
 const excluded = new Set(LS.get("eg.excluded", []));
@@ -57,6 +57,7 @@ function initWho() {
   for (const id of ["egDate", "egSubject"]) $(id).addEventListener("change", () => {
     LS.set("imudaq.f.testDate", $("egDate").value); LS.set("imudaq.f.subject", $("egSubject").value);   // same participant as the main page
     for (const k of Object.keys(chosen)) delete chosen[k];
+    trialEdited.rest = trialEdited.cap = false;
     loadTrials();
   });
 }
@@ -71,9 +72,11 @@ async function loadTrials() {
   try { j = await (await fetch("/api/emgcal/trials?" + q)).json(); } catch { j = { ok: false, error: "server not reachable" }; }
   if (!j.ok) { toast(j.error || "Cannot load trials", true); $("egTrialsHint").textContent = ""; return; }
   TR = j.trials || []; NORM = j.norm || null;
-  $("egFolder").textContent = "→ " + (j.rel || "").replace(/\\/g, "/") + "/"; $("egFolder").className = "takepath mono";
+  subjRel = (j.rel || "").replace(/\\/g, "/");
+  $("egFolder").textContent = "→ " + subjRel + "/"; $("egFolder").className = "takepath mono";
   if (NORM && NORM.channels) for (const [n, c] of Object.entries(NORM.channels)) if (!chosen[n] && c.ref_kind) chosen[n] = c.ref_kind;
   render();
+  fillTrials();
 }
 
 function channels() {
@@ -126,6 +129,7 @@ function render() {
   REFS = computeRefs();
   renderTargets(); renderRest(); renderTrials(); renderRefs();
   renderSrc(); buildRows(); sigText(); drawSignals();
+  if (SESS.length) renderSessions();
 }
 
 function renderTargets() {
@@ -402,6 +406,127 @@ function sigText() {
     : "Grey = raw signal, blue = 100 ms RMS. The whole rest recording gives the offset and noise.";
 }
 
+// ---------------- saved recordings panel (same list as the Acquisition page) ----------------
+const FILE_DESC = {
+  "imu_synced.csv": "IMU + PC & DAQ time (main file)", "imu.csv": "raw IMU frames", "events.csv": "start/stop, markers, warnings",
+  "summary.json": "quality report", "session.json": "subject, trial, settings", "clock_sync.csv": "PC clock pings",
+  "daq_raw.f32": "DAQ samples (SYNC + EMG)", "daq_meta.json": "DAQ channels & rate", "daq_pulses.csv": "SYNC pulses",
+  "spine_cal.json": "spine calibration", "calibration.json": "static calibration used (neutral pose)",
+  "emg_norm.json": "EMG normalization used (offset, MVC / RVC)",
+};
+const FILE_ORDER = Object.keys(FILE_DESC);
+let SESS = [], TASKS = [];
+const openSess = new Set(LS.get("eg.openSess", []));
+const fmtBytes = (b) => b >= 1 << 30 ? (b / (1 << 30)).toFixed(1) + " GB" : b >= 1 << 20 ? (b / (1 << 20)).toFixed(1) + " MB" : b >= 1024 ? Math.round(b / 1024) + " kB" : b + " B";
+
+async function loadSessions() {
+  try { SESS = (await (await fetch("/api/sessions")).json()).sessions || []; } catch { SESS = []; }
+  renderSessions();
+}
+function sessTitle(s) {
+  if (s.task === "static_cal") return `Static calibration${/_\d+$/.test(s.name) ? " (" + s.name.match(/_(\d+)$/)[1] + ")" : ""}`;
+  const tk = TASKS.find((x) => x.key === s.task);
+  if (s.task) return `${tk ? tk.name : s.task_name || s.task} · trial ${String(s.trial_n).padStart(2, "0")}`;
+  return [s.subject, s.trial].filter(Boolean).join(" · ") || s.name;
+}
+function renderSessions() {
+  const box = $("egSessions"), q = $("egFilesSearch").value.trim().toLowerCase();
+  const only = $("egFilesSubj").checked && subjRel ? subjRel + "/" : null;   // e.g. "261114/sub01/"
+  const list = SESS.filter((s) => (!q || `${s.rel || s.name} ${s.subject} ${s.trial} ${s.task} ${s.task_name} ${s.notes}`.toLowerCase().includes(q)) &&
+    (!only || (s.rel || "").replace(/\\/g, "/").startsWith(only)));
+  $("egFilesCount").textContent = SESS.length ? String(SESS.length) : "";
+  const total = SESS.reduce((a, s) => a + (s.bytes || 0), 0);
+  $("egFilesFoot").textContent = SESS.length ? `${fmtBytes(total)} in the latest ${SESS.length} · click a recording for its files, click a file to open it` : "";
+  box.innerHTML = "";
+  if (!list.length) { box.innerHTML = `<div class="empty">${SESS.length ? "No match." : "No recordings yet."}</div>`; return; }
+  let grp = "";
+  for (const s of list) {
+    const g = s.date && s.subject_id ? `${s.date} · ${s.subject_id}` : "older recordings";
+    if (g !== grp) { grp = g; const h = document.createElement("div"); h.className = "sessgroup"; h.textContent = g; box.appendChild(h); }
+    const isEmg = String(s.task || "").startsWith("emg_"), mine = TR.find((t) => t.rel === s.rel);
+    const el = document.createElement("div");
+    el.className = "sess2" + (openSess.has(s.name) ? " open" : "") + (mine && mine.rel === src ? " shown" : "");
+    let tag = `<span class="pill tag">IMU only</span>`;
+    if (s.sync === true) tag = `<span class="pill ok tag">SYNC ✓</span>`;
+    else if (s.sync === false) tag = `<span class="pill bad tag">SYNC ✗</span>`;
+    if (s.aborted) tag = `<span class="pill warn tag">ABORTED</span>`;
+    el.innerHTML = `<div class="sh" title="Show files"><span class="who"></span>${tag}<span class="when"></span><span class="meta"></span></div><div class="fl"></div>`;
+    el.querySelector(".who").textContent = (isEmg ? "⚡ " : "") + sessTitle(s);
+    el.querySelector(".when").textContent = (s.started || "").replace("T", " ").slice(0, 19);
+    el.querySelector(".meta").textContent = `${s.duration_s ?? 0} s · ${(s.frames ?? 0).toLocaleString()} frames · ${fmtBytes(s.bytes || 0)}`;
+    el.querySelector(".sh").onclick = () => {
+      el.classList.toggle("open");
+      if (el.classList.contains("open")) openSess.add(s.name); else openSess.delete(s.name);
+      LS.set("eg.openSess", [...openSess].slice(-20));
+    };
+    const fl = el.querySelector(".fl");
+    if (s.notes) { const n = document.createElement("div"); n.className = "notes"; n.textContent = s.notes; fl.appendChild(n); }
+    const files = (s.files || []).slice().sort((a, b) => {
+      const ia = FILE_ORDER.indexOf(a.name), ib = FILE_ORDER.indexOf(b.name);
+      return (ia < 0 ? 99 : ia) - (ib < 0 ? 99 : ib) || a.name.localeCompare(b.name);
+    });
+    for (const f of files) {
+      const row = document.createElement("div");
+      row.className = "f" + (f.name === "daq_raw.f32" ? " main" : "");
+      row.title = `Open ${f.name} (Shift+click: show in Explorer)`;
+      row.innerHTML = `<span class="nm"></span><span class="ds"></span><span class="sz"></span>`;
+      row.querySelector(".nm").textContent = f.name;
+      row.querySelector(".ds").textContent = FILE_DESC[f.name] || "";
+      row.querySelector(".sz").textContent = fmtBytes(f.bytes);
+      row.onclick = (e) => api("/api/open", { file: s.dir + "\\" + f.name, reveal: e.shiftKey });
+      fl.appendChild(row);
+    }
+    const acts = document.createElement("div");
+    acts.className = "acts";
+    if (mine) {                                         // an EMG capture of this subject: show it in the plot
+      const sb = document.createElement("button");
+      sb.className = "btn small"; sb.textContent = "Show above";
+      sb.onclick = () => { selectSrc(s.rel); $("egSig").scrollIntoView({ behavior: "smooth", block: "start" }); };
+      acts.appendChild(sb);
+    }
+    const rv = document.createElement("a");
+    rv.className = "btn small ghost"; rv.textContent = "Review";
+    rv.href = "/review?rel=" + encodeURIComponent(s.rel || "");
+    const ob = document.createElement("button");
+    ob.className = "btn small ghost"; ob.textContent = "Open folder";
+    ob.onclick = () => api("/api/open", { dir: s.dir });
+    const cp = document.createElement("button");
+    cp.className = "btn small ghost"; cp.textContent = "Copy path";
+    cp.onclick = async () => { try { await navigator.clipboard.writeText(s.dir); toast("Path copied"); } catch { toast(s.dir); } };
+    acts.append(rv, ob, cp);
+    fl.appendChild(acts);
+    box.appendChild(el);
+  }
+}
+
+// ---------------- trial numbers (editable) ----------------
+const trialEdited = { rest: false, cap: false };
+async function nextTrial(k) {
+  const w = who();
+  if (!w.subject) return 1;
+  try { return (await (await fetch("/api/next_trial?" + new URLSearchParams({ date: w.date, subject: w.subject, task: "emg_" + k }))).json()).trial || 1; }
+  catch { return 1; }
+}
+async function fillTrials(reset) {
+  if (reset) trialEdited.rest = trialEdited.cap = false;
+  if (!trialEdited.rest) $("egRestTrial").value = await nextTrial("rest");
+  if (!trialEdited.cap) $("egTrial").value = await nextTrial(kind);
+  trialHints();
+}
+function trialHints() {
+  for (const [id, hid, k] of [["egRestTrial", "egRestTrialHint", "rest"], ["egTrial", "egTrialHint", kind]]) {
+    const n = parseInt($(id).value, 10), h = $(hid);
+    const taken = n >= 1 && TR.some((t) => t.kind === k && +t.trial === n);
+    $(id).classList.toggle("warn", taken || !(n >= 1));
+    h.classList.toggle("hidden", !taken && n >= 1);
+    h.textContent = !(n >= 1) ? "Enter a trial number (1 or more)." : `${KIND[k]} trial ${String(n).padStart(2, "0")} already exists: it is kept, and this one is saved as a repeat (…_trial${String(n).padStart(2, "0")}_2).`;
+  }
+}
+for (const [id, key] of [["egRestTrial", "rest"], ["egTrial", "cap"]]) {
+  $(id).addEventListener("input", () => { trialEdited[key] = $(id).value !== ""; trialHints(); });
+  $(id).addEventListener("change", () => { if ($(id).value === "") { trialEdited[key] = false; fillTrials(); } });
+}
+
 // ---------------- recording a capture ----------------
 async function capture(k) {
   const w = who();
@@ -409,8 +534,11 @@ async function capture(k) {
   if (!S || S.state !== "idle") { toast(S ? `Not now: ${S.state}` : "Server not connected", true); return; }
   if (!(S.daq && S.daq.cfg && S.daq.cfg.enabled)) { toast("Recording with the DAQ is off: turn on Record DAQ in Settings on the Acquisition page", true); return; }
   const task = "emg_" + k, dur = k === "rest" ? restSecs : secs, target = k === "rest" ? "" : $("egTarget").value;
-  let n = 1;
-  try { n = (await (await fetch("/api/next_trial?" + new URLSearchParams({ date: w.date, subject: w.subject, task }))).json()).trial || 1; } catch { }
+  const inp = $(k === "rest" ? "egRestTrial" : "egTrial");
+  let n = parseInt(inp.value, 10);
+  if (!(n >= 1)) {
+    try { n = (await (await fetch("/api/next_trial?" + new URLSearchParams({ date: w.date, subject: w.subject, task }))).json()).trial || 1; } catch { n = 1; }
+  }
   const tLabel = target && target !== "all" ? target : k === "rest" ? "" : "all muscles";
   const j = await api("/api/start", { subject: w.subject, date: w.date, task, task_name: `EMG ${KIND[k]}`, trial: n,
     notes: `EMG ${KIND[k]}${tLabel ? " · " + tLabel : ""}`, emgcal: { kind: k, target: target || "", seconds: dur } });
@@ -448,10 +576,12 @@ async function finishRun() {
   await loadTrials();
   const last = TR.slice().sort((a, b) => (a.started || "").localeCompare(b.started || "")).pop();
   if (last) selectSrc(last.rel);
+  loadSessions();
+  fillTrials(true);                                    // next free numbers after a capture
   toast("Saved: " + (last ? last.name : "recording"));
 }
 function lockUi(on) {
-  for (const id of ["egRestBtn", "egRecBtn", "egSave", "egDate", "egSubject"]) $(id).disabled = on;
+  for (const id of ["egRestBtn", "egRecBtn", "egSave", "egDate", "egSubject", "egRestTrial", "egTrial"]) $(id).disabled = on;
 }
 
 // ---------------- live status ----------------
@@ -474,7 +604,7 @@ function onStatus(s) {
   if (src === "live") drawSignals();
 }
 function connect() {
-  const es = new EventSource("/api/stream");
+  const es = openStream();          // one shared /api/stream for all tabs (stream.js)
   es.onmessage = (ev) => { const m = JSON.parse(ev.data); if (m.s) onStatus(m.s); };
   es.onerror = () => { $("connDot").className = "dot"; $("connText").textContent = "Server offline"; };
 }
@@ -486,6 +616,7 @@ seg("egRestSecs", restSecs, (v) => { restSecs = +v; });
 seg("egSecs", secs, (v) => { secs = +v; });
 seg("egKind", kind, (v) => {
   kind = v; $("egRecBtn").textContent = "● Record " + KIND[v]; $("egKindCap").textContent = CAP[v];
+  trialEdited.cap = false; fillTrials();
 });
 $("egKindCap").textContent = CAP[kind];
 $("egFilter").checked = opt.filter; $("egOwnGroup").checked = opt.own;
@@ -506,7 +637,16 @@ $("egSave").onclick = async () => {
   if (j.ok) { NORM = j.norm; toast("Saved " + j.path); render(); }
 };
 document.addEventListener("keydown", (e) => { if (e.key === "Escape" && running) $("egAbort").click(); });
+// a capture is stopped by this page's timer: leaving now would leave the server recording
+window.addEventListener("beforeunload", (e) => { if (running) { e.preventDefault(); e.returnValue = ""; } });
 
+$("egFilesRefresh").onclick = loadSessions;
+$("egFilesOpen").onclick = () => api("/api/open", {});
+$("egFilesSearch").addEventListener("input", renderSessions);
+$("egFilesSubj").checked = LS.get("eg.filesSubj", false);
+$("egFilesSubj").onchange = () => { LS.set("eg.filesSubj", $("egFilesSubj").checked); renderSessions(); };
+fetch("/static/tasks.json", { cache: "no-store" }).then((r) => r.json()).then((t) => { TASKS = t; renderSessions(); }).catch(() => {});
+loadSessions();
 initWho();
 loadTrials();
 connect();

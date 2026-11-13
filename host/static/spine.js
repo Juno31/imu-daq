@@ -101,6 +101,8 @@ function startCapture(kind, secs) {
   setMsg(kind === "neutral" ? "Hold still…" : "Bend forward slowly and come back up…", "busy");
 }
 
+window.addEventListener("beforeunload", (e) => { if (capture) { e.preventDefault(); e.returnValue = ""; } });
+
 function onCaptureSample() {
   if (!capture) return;
   for (const n of Object.keys(capture.samples)) if (live[n]) capture.samples[n].push(live[n].slice());
@@ -152,7 +154,24 @@ function finishFlex(c) {
 function persist() {
   save("spineCal", cal);
   updateCalUi();
-  fetch("/api/spine_cal", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(cal) }).catch(() => {});
+  fetch("/api/spine_cal", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(cal) })
+    .then((r) => r.json()).then((j) => { if (j.ok && j.cal) { spineRev = j.rev; adoptCal(j.cal); } }).catch(() => {});
+}
+
+// The server holds the master calibration: load it at start and whenever its revision changes.
+let spineRev = null;
+function adoptCal(c) {
+  for (const k of Object.keys(cal)) if (!(k in c)) delete cal[k];
+  Object.assign(cal, c);
+  save("spineCal", cal);
+  $("heightCm").value = cal.height_cm || "";
+  updateCalUi(); applyScale();
+}
+async function syncCal() {
+  try {
+    const j = await (await fetch("/api/spine_cal", { cache: "no-store" })).json();
+    if (j.ok) { spineRev = j.rev; if (j.cal) adoptCal(j.cal); }
+  } catch { /* server offline: keep the local copy */ }
 }
 
 // Spine rendering needs both parts of the static calibration: neutral (q0 of the mapped sensors) and
@@ -215,7 +234,9 @@ function applyOpts(o) {
   }
 }
 window.addEventListener("message", (e) => {
-  if (e.origin === location.origin && e.data && e.data.type === "spineopt") applyOpts(e.data);
+  if (e.origin !== location.origin || !e.data) return;
+  if (e.data.type === "spineopt") applyOpts(e.data);
+  else if (e.data.type === "spinecal" && e.data.cal) adoptCal(e.data.cal);   // from the main page
 });
 
 // Participant height -> uniform model scale (Gait2392 generic subject is 1.80 m tall)
@@ -254,10 +275,11 @@ function angleBox(el, a) {
 
 // ---------------- stream ----------------
 function connect() {
-  const es = new EventSource("/api/stream");
+  const es = openStream();          // one shared /api/stream for all tabs (stream.js)
   es.onmessage = (ev) => {
     const m = JSON.parse(ev.data);
     if (m.s) {
+      if (m.s.spine_cal_rev != null && spineRev != null && m.s.spine_cal_rev !== spineRev) { spineRev = m.s.spine_cal_rev; syncCal(); }
       status = m.s;
       const pods = status.hello && status.hello.pods ? status.hello.pods.split(",").map((s) => s.split(":")[0]) : [];
       if (pods.join() !== podNames.join()) { podNames = pods; fillMap(); updateGate(); }
@@ -442,6 +464,7 @@ function loop() {
 }
 
 updateCalUi();
+syncCal();
 if (cal.q0) setMsg(cal.B ? "Loaded the last calibration. Recalibrate if the sensors were moved or restarted." : "Neutral loaded; do step 2.", cal.B ? "" : "");
 initThree().catch((e) => { $("overlay").textContent = "3D view failed: " + e.message; });
 connect();

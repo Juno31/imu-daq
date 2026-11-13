@@ -13,7 +13,7 @@ const css = (v) => getComputedStyle(document.documentElement).getPropertyValue(v
 let TASKS = [];
 let SESS = [], D = null, cur = 0, full = [0, 1], view = [0, 1], playing = false, speed = 1;
 let imuMode = LS.get("imuMode", "ang"), emgMode = LS.get("emgMode", "raw"), emgScale = LS.get("emgScale", "each");
-let anyway = false, spine = null, spineReady = null, tracks = [], der = null, loadSeq = 0;
+let emgOnly = false, anyway = false, spine = null, spineReady = null, tracks = [], der = null, loadSeq = 0;
 
 // ---------------- toasts ----------------
 function toast(text, bad) {
@@ -82,6 +82,9 @@ async function openRec(rel) {
   full = ts.length ? [Math.min(...ts), Math.max(...ts)] : [0, 1];
   view = full.slice(); cur = D.imu && D.imu.t.length ? D.imu.t[0] : full[0];
   $("rvEmpty").classList.add("hidden"); $("rvBody").classList.remove("hidden");
+  // EMG normalization captures (rest / MVC / RVC): EMG only, no spine model, angles or IMU
+  emgOnly = String(D.meta.task || "").startsWith("emg_");
+  $("rvBody").classList.toggle("emgonly", emgOnly);
   renderInfo(); derive(); buildTracks(); renderList();
   update(true);                               // plots do not wait for the 3D model
   await spineReady;
@@ -316,14 +319,16 @@ function buildTracks() {
   for (const id of ["rvSpineTracks", "rvImuTracks", "rvEmgTracks"]) $(id).innerHTML = "";
   // spine angles
   const cs = D.imu ? calState() : null;
-  if (D.imu && der.rel) {
+  if (emgOnly) { /* hidden for EMG normalization captures */ }
+  else if (D.imu && der.rel) {
     seriesTrack($("rvSpineTracks"), "T7–T12", cs.B ? "body axes" : "sensor axes", (k) => der.rel[k], "°", (v) => isFinite(v) ? v.toFixed(1) + "°" : "—", 10);
     axisTrack($("rvSpineTracks"));
   } else {
     $("rvSpineTracks").innerHTML = `<div class="emgempty">Needs the static calibration with a forward bend: see the spine model.</div>`;
   }
   // IMU
-  if (D.imu) {
+  if (emgOnly) { /* hidden */ }
+  else if (D.imu) {
     const names = Object.keys(D.imu.pods);
     for (const n of names) {
       const p = D.imu.pods[n], role = cs && cs.map.T7 === n ? "T7" : cs && cs.map.T12 === n ? "T12" : "";
@@ -406,7 +411,7 @@ function placeCursor() {
 
 // ---------------- spine replay ----------------
 function updateSpine() {
-  if (!D || !D.imu) { if (spine) spine.pose(null, null); return; }
+  if (!D || !D.imu || emgOnly) { if (spine) spine.pose(null, null); return; }
   const cs = calState();
   const gate = !cs.live;
   $("rvStage").classList.toggle("uncal", gate);

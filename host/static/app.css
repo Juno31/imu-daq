@@ -736,3 +736,72 @@ body { padding-bottom: var(--tbar); }
 .spinetools .tgl { flex-direction: row; align-items: center; gap: 6px; margin: 0; font-size: 12.5px; color: var(--text); cursor: pointer; }
 .spinetools .tgl input { width: auto; margin: 0; accent-color: var(--accent); }
 .spinetools .hint { margin: 0; font-size: 11.5px; }
+
+/* ---------- step 3c: EMG normalization (link to the /emg page) ---------- */
+.emgnormbtn { display: block; text-align: center; text-decoration: none; padding: 8px 12px; font-weight: 600;
+  background: var(--warn-soft); color: var(--warn); border-color: color-mix(in srgb, var(--warn) 45%, var(--border)); }
+.emgnormbtn:hover { background: color-mix(in srgb, var(--warn) 18%, var(--surface)); }
+.emgnormbtn.ghost { background: transparent; color: var(--text-2); border-color: var(--border-strong); font-weight: 500; }
+#emgNormCap { overflow-wrap: anywhere; }
+
+/* ---------- steps 1-4: minimizable ---------- */
+.stephdr { cursor: pointer; user-select: none; }
+.stephdr:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 6px; }
+.stepchev { flex: none; margin-right: 6px; transform: rotate(90deg); }
+.min .stepchev, .stephead.min .stepchev { transform: none; }
+.stepcard > h2.stephdr:hover, .stephead.stephdr:hover b { color: var(--accent); }
+.stepsum { display: none; min-width: 0; font-size: 12px; font-weight: 400; color: var(--text-2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.stepsum i { font-style: normal; color: var(--text-3); margin: 0 6px; }
+.stepsum b { font-weight: 650; color: var(--text); }
+.stepsum .good { color: var(--ok); } .stepsum .warn { color: var(--warn); } .stepsum .bad { color: var(--bad); }
+.stepsum .mono { font-size: 11.5px; color: var(--accent); }
+/* step 1 (row of tiles) */
+.stephead.min .hint { display: none; }
+.stephead.min .stepsum { display: block; flex: 1; }
+.stephead.min + .statusrow { display: none; }
+/* steps 2-4 (cards) */
+.stepcard.min { align-self: start; padding-bottom: 0; }
+.stepcard.min > :not(h2) { display: none !important; }
+.stepcard.min > h2 { border-bottom: 0; margin-bottom: 0; flex-wrap: wrap; row-gap: 2px; }
+.stepcard.min > h2 .stepsum { display: block; flex: 1 1 100%; padding-left: 50px; margin-top: 2px; }
+
+/* ---------- Setup group (steps 1-3) + Record trials (step 4) ---------- */
+.setupgroup { border: 1px solid var(--border); border-radius: calc(var(--radius) + 4px); padding: 10px 12px 12px;
+  background: color-mix(in srgb, var(--surface) 35%, transparent); display: flex; flex-direction: column; gap: 10px; }
+.setuphead { display: flex; align-items: center; gap: 9px; cursor: pointer; user-select: none; min-height: 28px; min-width: 0; }
+.setuphead:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 6px; }
+.setuphead b { font-size: 15px; font-weight: 700; }
+.setuphead:hover b { color: var(--accent); }
+.setuphead .pill { margin-left: auto; flex: none; }
+.setupgroup.min .setuphint { display: none; }
+.setupsum { display: none; min-width: 0; flex: 1; font-size: 12px; color: var(--text-2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.setupsum i { font-style: normal; color: var(--text-3); margin: 0 6px; }
+.setupsum i.sep { margin: 0 10px; color: var(--border-strong); }
+.setupsum b { font-weight: 650; color: var(--text); }
+.setupsum .good { color: var(--ok); } .setupsum .warn { color: var(--warn); } .setupsum .bad { color: var(--bad); }
+.setupgroup.min .setupsum { display: block; }
+.setupgroup.min .stepchev { transform: none; }
+.setupgroup.min { padding-bottom: 10px; }
+.setupgroup.min .setupbody { display: none; }
+.setupbody { display: flex; flex-direction: column; gap: 12px; }
+.setupbody .stephead { margin-bottom: -2px; }
+.flowrow.setuprow { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+
+.recmain { border-color: color-mix(in srgb, var(--accent) 35%, var(--border)); }
+.rm-grid { display: grid; grid-template-columns: minmax(0, 1.15fr) minmax(0, 1.25fr) minmax(0, 0.9fr); gap: 0; align-items: stretch; }
+.rm-col { display: flex; flex-direction: column; gap: 8px; min-width: 0; padding: 2px 16px; }
+.rm-col:first-child { padding-left: 0; }
+.rm-col:last-child { padding-right: 0; }
+.rm-col + .rm-col { border-left: 1px solid var(--border); }
+.rm-rec { justify-content: center; }
+.rm-rec .recbtns .btn.start, .rm-rec .recbtns .btn.stop { padding: 14px 12px; font-size: 16px; }
+.rm-stats .recstats { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.rm-stats .recstats div.wide { grid-column: 1 / -1; }
+.rm-stats .recstats dd { font-size: 15px; }
+.stepcard.recmain.min > h2 .stepsum { padding-left: 50px; }
+@media (max-width: 1100px) {
+  .rm-grid { grid-template-columns: 1fr; gap: 12px; }
+  .rm-col { padding: 0; }
+  .rm-col + .rm-col { border-left: 0; border-top: 1px solid var(--border); padding-top: 12px; }
+}
+@media (max-width: 760px) { .flowrow.setuprow { grid-template-columns: 1fr; } }
