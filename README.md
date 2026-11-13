@@ -41,25 +41,42 @@ share one time base (≈ 14 µs).
 2. Double-click **`start.bat`** (or the **IMU DAQ** shortcut). The browser opens the GUI.
    Only one server can run: a second launch just opens the browser. To restart, **close the black server
    window first**.
-3. Check the four status lights are green, enter Subject / Trial, press **Space** (or Start), and
+3. **Setup** (once per participant): check the four status lights are green, enter test date, subject and
+   height, do the **static calibration** (still hold `C`, then forward bend `B`), and measure the
+   **EMG normalization** (rest baseline and MVC / RVC) on the EMG norm page.
+4. **Record trials**: minimize the Setup block, pick the task and trial, press **Space** (or Start), and
    **Space** again to stop. A banner reports frames, missing frames and **SYNC PASS / FAIL**.
 
 Closing the browser does not stop a recording; closing the server window does (it saves first).
 
 ### The GUI
 
+All pages open in the same browser tab and share one live-data connection, so several tabs can stay open.
+
+**Main page** (`/`)
+
 | Part | What it shows |
 |---|---|
-| **Status lights** | DAQ · IMU · EMG · Sync, one word each (green / yellow / red). Click for detail. |
-| **Recording bar** | Subject, trial, notes, Start/Stop, marker, frame and missing counters |
-| **IMU** | per IMU: 3D board, roll/pitch/yaw, 5/10/30 s plot, % new data, stalls |
-| **EMG** | 8 channels in L/R pairs: last 2 s envelope, RMS (100 ms), clipping warning, scale |
-| **Sync detail** | SYNC scope with frame numbers, pulse↔frame match strip, board↔DAQ and board↔PC timing |
-| **Event log** | start/stop, markers, IMU restarts, warnings |
-| **Saved recordings** (right side) | latest recordings with SYNC result and size; click for files, click a file to open it |
-| **⚙ Settings** | DAQ device/channels/rate/range, board port, IMU rate, clock statistics |
-| **Spine view ↗** | calibrated 3D spine model from the two IMUs (separate tab) |
+| **Setup** (steps 1–3) | One block, minimizable to a one-line summary with a READY / n of 3 DONE pill. Each step can also be minimized on its own. |
+| 1 · System check | DAQ · IMU · EMG · Sync lights (green / yellow / red); click a tile for detail |
+| 2 · Participant | test date, subject, height (scales the spine model, saved with each trial), notes |
+| 3 · Static calibration | a · still hold (per-IMU table: moved, tilt, gyro bias, mag cal), b · forward bend (body axes for spine angles), c · EMG normalization status with a link to the EMG norm page |
+| **Record trials** (step 4) | task and trial, output path, Start/Stop, marker, frame / missing / marker counters |
+| **Live signals** | IMU (3D board, roll/pitch/yaw, plots), EMG (2 s envelope, 100 ms RMS, clipping), Sync detail, Event log |
+| **Spine** (left, wide screens) | calibrated 3D spine model with view, ribs, trail and lumbar-share controls; blurred until the static calibration is done |
+| **Saved recordings** (right) | latest recordings with SYNC result and size; click for files, click a file to open it |
+| **⚙ Settings** | DAQ device/channels/rate/range, board port, IMU rate, orientation mode, clock statistics |
 
+**Other pages** (links in the top bar)
+
+| Page | Use |
+|---|---|
+| **EMG norm** (`/emg`) | Records rest, MVC and RVC captures (short recordings, editable trial number) and shows them as the main view: live 8-channel scope, or a saved capture with raw signal, 100 ms RMS, the analysed window and the reference line. Computes per channel offset, noise, MVC (highest 500 ms RMS, 20–450 Hz) and RVC; **Save** writes `<date>/<subject>/emg_norm.json`, copied into every later trial. |
+| **Review** (`/review`) | Opens a finished recording: playback timeline, spine model replay, spine and IMU angles, EMG raw / RMS / **%MVC**. EMG norm captures show EMG only. |
+| **Spine view** (`/spine`) | Full spine view: sensor placement, calibration, model options, angles |
+
+The spine calibration (neutral pose, body axes, height) is kept by the server (`data/spine_cal_last.json`)
+and shared by all pages; a page that is out of date cannot clear the forward-bend axis.
 Sections open and close by clicking their header; the browser remembers the layout.
 While not recording the DAQ runs a **preview** (nothing saved) so the DAQ/EMG lights and EMG traces work
 before Start; turn it off with **Preview** in the EMG section if another program needs the DAQ.
@@ -71,9 +88,11 @@ before Start; turn it off with **Preview** in the EMG section if another program
 | `Space` | Start / stop recording (a second press within 1 s is ignored) |
 | `M` | Event marker (uses the marker text) |
 | `Z` | Zero the IMU display (recorded data unchanged) |
+| `C` · `B` | Static calibration: still hold · forward bend |
 | `1` `2` `3` `4` | Open / close IMU · EMG · Sync detail · Event log |
 | `S` | Settings |
-| `Esc` | Leave a text field (keys are off while typing) · close panels |
+| `Esc` | Leave a text field (keys are off while typing) · close panels · stop an EMG capture early |
+| `Enter` | On a step header: minimize / expand it |
 
 ## Hardware
 
@@ -162,7 +181,9 @@ has exactly one pulse. EMG is sampled on the same DAQ clock, so `daq_time_s` lin
 The DAQ default rate is **20 kHz**: edge timing SD ≈ 14 µs (vs 29 µs at 10 kHz), pulses clearly resolved
 (1 ms = 20 samples), ample for EMG; 9 channels = 180 kS/s, well within the USB-6363.
 
-## Session folder (`data/<date>_<time>_<subject>_<trial>/`, not in git)
+## Session folder (`data/<date>/<subject>/<subject>_<task>_trial<NN>/`, not in git)
+
+A repeat of an existing trial number is saved as `…_trial<NN>_2`; nothing is overwritten.
 
 | File | Content |
 |---|---|
@@ -174,7 +195,9 @@ The DAQ default rate is **20 kHz**: edge timing SD ≈ 14 µs (vs 29 µs at 10 k
 | `clock_sync.csv` | every ping used for the PC clock fit |
 | `session.json` | subject, trial, notes, firmware, DAQ settings |
 | `summary.json` | quality report: rate, missing frames, % new data, clock fit, SYNC check |
-| `spine_cal.json` | Spine view calibration (if made) |
+| `spine_cal.json` | spine calibration used (neutral quaternions, body axes, sensor map, height) |
+| `calibration.json` | static calibration used (still hold results) |
+| `emg_norm.json` | EMG normalization used (offset, noise, MVC / RVC per channel), if made |
 
 Read the DAQ file in Python:
 ```python
@@ -203,6 +226,8 @@ Details at the top of `imu_daq.ino`.
 | IMU light red / NOT FOUND | Check the cable; for 0x4B on an Adafruit board check the DI–3Vo solder, then replug USB |
 | DAQ light "Not found" | Power adapter + switch on the USB-6363, check NI MAX, then Refresh in Settings |
 | EMG "Clipping" | Raise Range to ±10 V or lower the amplifier gain |
+| A page keeps loading | Reload; all pages share one connection now. If it persists, close other IMU DAQ tabs |
+| EMG norm "NOT DONE" | Record rest and MVC / RVC on the EMG norm page, then **Save for this subject** |
 | SYNC FAIL | Check AI0+/AI0− wiring and Input = Differential; see `daq_pulses.csv`, `summary.json` |
 
 Note: unconnected EMG inputs still read ~1.5–2 mV RMS, so a flat-signal check cannot detect a missing
