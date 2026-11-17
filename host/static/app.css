@@ -827,7 +827,12 @@ body { padding-bottom: var(--tbar); }
 .gpcur { display: block; font-size: 11px; color: var(--text-3); margin-top: 2px; min-height: 14px; }
 .gpcur.warn { color: var(--warn); }
 
-/* Recording: only what has to be watched (IMU, EMG, take, cameras); setup, sync detail, log and files come back after Stop */
-body.recording #setupGroup, body.recording #step5, body.recording #syncCard, body.recording #foldLog,
-body.recording #filesPanel, body.recording .divider, body.recording #taskInfo { display: none; }
-body.recording .layout { gap: 10px; }
+/* Recording: the layout never changes; setup and saved recordings are only dimmed (locked anyway) */
+body.recording #setupGroup, body.recording #filesPanel { opacity: .4; pointer-events: none; transition: opacity .2s; }
+/* trial result floats over the page instead of pushing it down */
+.banner { position: fixed; top: 60px; left: 50%; transform: translateX(-50%); z-index: 9; margin: 0;
+  width: min(1100px, calc(100% - 40px)); box-shadow: 0 6px 24px rgba(0, 0, 0, .35); }
+/* IMU pod: header line (state, angles, data quality) + plot only */
+.pod .podhead .metric.roll { margin-left: 4px; }
+.pod .podhead .metric b { font-size: 14px; }
+.pod .podhead { flex-wrap: wrap; row-gap: 4px; margin-bottom: 4px; }

@@ -389,23 +389,13 @@
       <span class="addr mono"></span>
       <span class="pill podstate">—</span>
       <span class="pill headacc hidden" title="Rotation vector: the IMU's own heading accuracy estimate and magnetometer calibration (0-3)"></span>
+      <span class="pill warn magcal hidden" title="Magnetometer not calibrated yet: move the IMU slowly in a figure-8 until it reaches 2-3"></span>
       <div class="spacer"></div>
-      <span class="metric"><b class="fresh">—</b><small>new data</small></span>
-      <span class="metric"><b class="stalls">0</b><small>stalls</small></span>
-    </div>
-    <div class="podbody">
-      <canvas class="cube"></canvas>
-      <div class="angles">
-        <div class="ang roll"><small>Roll</small><b>—</b></div>
-        <div class="ang pitch"><small>Pitch</small><b>—</b></div>
-        <div class="ang yaw"><small>Yaw</small><b>—</b></div>
-        <div class="quat mono"></div>
-        <div class="sens hidden">
-          <div class="sacc" title="Accelerometer (includes gravity: about 9.81 at rest)"><span>ACC</span><b>—</b><small></small></div>
-          <div class="sgyr" title="Gyroscope"><span>GYRO</span><b>—</b><small></small></div>
-          <div class="smag" title="Magnetometer"><span>MAG</span><b>—</b><small></small></div>
-        </div>
-      </div>
+      <span class="metric roll"><b>—</b><small>roll</small></span>
+      <span class="metric pitch"><b>—</b><small>pitch</small></span>
+      <span class="metric yaw"><b>—</b><small>yaw</small></span>
+      <span class="metric" title="Share of frames with a new IMU sample (100% = no dropped samples)"><b class="fresh">—</b><small>new data</small></span>
+      <span class="metric" title="Times the IMU stopped sending and was restarted"><b class="stalls">0</b><small>stalls</small></span>
     </div>
     <canvas class="plot"></canvas>
   </section>

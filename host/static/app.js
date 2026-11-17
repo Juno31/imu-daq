@@ -46,7 +46,7 @@ function makePod(name) {
     name, node,
     light: node.querySelector(".light"), state: node.querySelector(".podstate"),
     addr: node.querySelector(".addr"), fresh: node.querySelector(".fresh"), stalls: node.querySelector(".stalls"),
-    headacc: node.querySelector(".headacc"),
+    headacc: node.querySelector(".headacc"), magcal: node.querySelector(".magcal"),
     cube: node.querySelector(".cube"), plot: node.querySelector(".plot"),
     roll: node.querySelector(".roll b"), pitch: node.querySelector(".pitch b"), yaw: node.querySelector(".yaw b"),
     quat: node.querySelector(".quat"),
@@ -248,6 +248,10 @@ function drawSensorPlot(p, m) {
 }
 
 function updateSensorText(p) {
+  const low = p.magAcc !== null && p.magAcc !== undefined && p.magAcc < 2 && p.headacc.classList.contains("hidden");
+  p.magcal.classList.toggle("hidden", !low);
+  if (low) p.magcal.textContent = `mag cal ${p.magAcc}/3`;
+  if (!p.sens) return;
   if (!p.x) { p.sens.classList.add("hidden"); return; }
   p.sens.classList.remove("hidden");
   const x = p.x, mag3 = (a, b, c) => Math.hypot(a, b, c);
@@ -285,6 +289,7 @@ function project(p, cx, cy, s) {
 }
 
 function drawCube(p) {
+  if (!p.cube) return;
   const [ctx, W, H] = fitCanvas(p.cube);
   ctx.clearRect(0, 0, W, H);
   const q = p.ref ? qmul(qconj(p.ref), p.q) : p.q;
@@ -876,7 +881,7 @@ function frameLoop(ts) {
       p.roll.textContent = e[0].toFixed(1) + "°";
       p.pitch.textContent = e[1].toFixed(1) + "°";
       p.yaw.textContent = e[2].toFixed(1) + "°";
-      p.quat.textContent = `q = [${p.q.map((v) => v.toFixed(4)).join(", ")}]` + (p.ref ? "  (display zeroed)" : "");
+      if (p.quat) p.quat.textContent = `q = [${p.q.map((v) => v.toFixed(4)).join(", ")}]` + (p.ref ? "  (display zeroed)" : "");
       updateSensorText(p);
     }
     if (S && !imuOpen) setText("sumImu", imuSummary(S));
