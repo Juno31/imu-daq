@@ -46,7 +46,7 @@ function makePod(name) {
     name, node,
     light: node.querySelector(".light"), state: node.querySelector(".podstate"),
     addr: node.querySelector(".addr"), fresh: node.querySelector(".fresh"), stalls: node.querySelector(".stalls"),
-    headacc: node.querySelector(".headacc"),
+    headacc: node.querySelector(".headacc"), magcal: node.querySelector(".magcal"),
     cube: node.querySelector(".cube"), plot: node.querySelector(".plot"),
     roll: node.querySelector(".roll b"), pitch: node.querySelector(".pitch b"), yaw: node.querySelector(".yaw b"),
     quat: node.querySelector(".quat"),
@@ -248,6 +248,10 @@ function drawSensorPlot(p, m) {
 }
 
 function updateSensorText(p) {
+  const low = p.magAcc !== null && p.magAcc !== undefined && p.magAcc < 2 && p.headacc.classList.contains("hidden");
+  p.magcal.classList.toggle("hidden", !low);
+  if (low) p.magcal.textContent = `mag cal ${p.magAcc}/3`;
+  if (!p.sens) return;
   if (!p.x) { p.sens.classList.add("hidden"); return; }
   p.sens.classList.remove("hidden");
   const x = p.x, mag3 = (a, b, c) => Math.hypot(a, b, c);
@@ -285,6 +289,7 @@ function project(p, cx, cy, s) {
 }
 
 function drawCube(p) {
+  if (!p.cube) return;
   const [ctx, W, H] = fitCanvas(p.cube);
   ctx.clearRect(0, 0, W, H);
   const q = p.ref ? qmul(qconj(p.ref), p.q) : p.q;
@@ -704,6 +709,26 @@ function applyTiles(s) {
   else if (lv.sync_hi > 1.0) tile("stSync", "warn", "Check SYNC wire", `ai0 not low while idle (${lv.sync_hi.toFixed(1)} V)`);
   else if (ls && ls.daq_sync && !ls.daq_sync.ok) tile("stSync", "bad", "Ready · last FAIL", pc + " · DAQ ready");
   else tile("stSync", "ok", "Ready", [pc, "DAQ ready", last].filter(Boolean).join(" · "));
+  // Cameras (GoPro)
+  const g = s.gopro;
+  if (g) {
+    const gc = g.cfg || {}, cams = g.cams || [], on = cams.filter((x) => x.online);
+    const via = gc.transport === "ble" ? "Bluetooth" : "USB";
+    const off = cams.filter((x) => !x.online).map((x) => x.name);
+    const low = on.filter((x) => (x.battery != null && x.battery < 20) || (x.sd_free_gb != null && x.sd_free_gb < 5))
+      .map((x) => `${x.name} ${x.battery != null && x.battery < 20 ? "battery " + x.battery + "%" : "SD " + x.sd_free_gb + " GB"}`);
+    const recN = on.filter((x) => x.encoding).length;
+    const bats = on.map((x) => x.battery).filter((x) => x != null), sds = on.map((x) => x.sd_free_gb).filter((x) => x != null);
+    const info = [via, bats.length ? `min battery ${Math.min(...bats)}%` : "", sds.length ? `SD ≥${Math.min(...sds).toFixed(0)} GB` : ""].filter(Boolean).join(" · ");
+    if (!gc.enabled) tile("stCam", "", "Off", "recordings without video");
+    else if (g.action) tile("stCam", "warn", g.action === "pair" ? "Pairing…" : g.action === "disconnect" ? "Disconnecting…" : "Connecting…", via);
+    else if (!g.connected) tile("stCam", "warn", "Not connected", "Settings → GoPro cameras → Connect");
+    else if (!cams.length) tile("stCam", "bad", "None found", gc.transport === "ble" ? "turn the cameras on" : "plug in USB-C (GoPro Connect)");
+    else if (off.length) tile("stCam", "bad", `${on.length} / ${cams.length} on`, `offline: ${off.join(", ")}`);
+    else if (recN) tile("stCam", "ok", `${recN} recording`, info, true);
+    else if (low.length) tile("stCam", "warn", `${on.length} connected`, low.join(" · "));
+    else tile("stCam", "ok", `${on.length} connected`, info);
+  }
 }
 
 function drawSync() { drawScope(); drawStrip(); drawResid(); drawClock(); }
@@ -770,7 +795,7 @@ const pillMark = (id) => { const el = $(id); if (!el) return ["", ""];
 function updateStepSums() {
   if (![1, 2, 3, 4].every((n) => $("stepSum" + n))) return;
   // 1: device tiles
-  $("stepSum1").innerHTML = ["stDaq", "stImu", "stEmg", "stSync"].map((id) => {
+  $("stepSum1").innerHTML = ["stDaq", "stImu", "stEmg", "stSync", "stCam"].map((id) => {
     const t = $(id), c = /\bok\b/.test(t.className) ? "good" : /\bbad\b/.test(t.className) ? "bad" : /\bwarn\b/.test(t.className) ? "warn" : "";
     return `<span class="${c}">${esc(t.querySelector("small").textContent)} ${esc(t.querySelector("b").textContent)}</span>`;
   }).join("<i>·</i>");
@@ -820,6 +845,7 @@ function openDrawer(open) {
 
 function goTo(id) {
   if (id === "drawer") return openDrawer(true);
+  if (id === "drawerGopro") { openDrawer(true); setTimeout(() => $("goproCard").scrollIntoView({ behavior: "smooth", block: "start" }), 150); return; }
   const el = $(id);
   if (!el) return;
   if (el.classList.contains("fold")) setFold(el, true);
@@ -854,7 +880,7 @@ function frameLoop(ts) {
       p.roll.textContent = e[0].toFixed(1) + "°";
       p.pitch.textContent = e[1].toFixed(1) + "°";
       p.yaw.textContent = e[2].toFixed(1) + "°";
-      p.quat.textContent = `q = [${p.q.map((v) => v.toFixed(4)).join(", ")}]` + (p.ref ? "  (display zeroed)" : "");
+      if (p.quat) p.quat.textContent = `q = [${p.q.map((v) => v.toFixed(4)).join(", ")}]` + (p.ref ? "  (display zeroed)" : "");
       updateSensorText(p);
     }
     if (S && !imuOpen) setText("sumImu", imuSummary(S));
@@ -930,6 +956,7 @@ function applyTransport(s) {
   mode.className = "tp-mode " + (recording ? "rec" : st === "idle" ? "idle" : st === "disconnected" ? "" : "busy");
   mode.lastChild.textContent = word;
   $("transport").classList.toggle("rec", recording);
+  document.body.classList.toggle("recording", recording || st === "starting" || st === "stopping");
   setText("tpTakeName", rec ? rec.name : (takeName() || "—"));
   if (rec) setText("tpFrames", String(rec.frames).padStart(6, "0"));
   else if (st === "idle" && !recording) setText("tpFrames", "000000");
@@ -991,17 +1018,8 @@ function applyStatus(s) {
   }
   // DAQ
   applyDaq(s.daq, st);
-  // recording card
-  const rec = s.rec;
-  setText("recFrames", rec ? rec.frames.toLocaleString() : "—");
-  setText("recMissing", rec ? rec.missing : "—");
-  $("recMissing").className = rec && rec.missing ? "bad" : rec ? "good" : "";
-  setText("recMarkers", rec ? rec.markers : "—");
-  setText("recName", rec ? rec.name : (s.last_summary ? "last: " + s.last_summary.session : "—"));
   applyTransport(s);
   const idle = st === "idle", recording = st === "recording";
-  $("btnStart").disabled = !idle;
-  $("btnStop").disabled = !recording;
   for (const id of ["portSel", "btnConnect", "btnDisconnect", "rateSel", "btnRestart", "daqEnabled", "daqDevice",
     "daqSync", "daqRate", "daqTerm", "daqRange", "daqExtra", "btnDaqRefresh"])
     $(id).disabled = !(idle || st === "disconnected" || st === "connecting") ||
@@ -1048,8 +1066,115 @@ function applyStatus(s) {
   applyEmg(s);
   applyCalib(s);
   applyFlow(s);
+  applyGopro(s.gopro, st);
   // summary banner after a recording
   if (prevState === "stopping" && st !== "stopping" && s.last_summary) { showSummary(s.last_summary); loadSessions(true); }
+}
+
+// GoPro videos copied from the SD cards -> trial folders (dry run, confirm, then copy in the background)
+async function importVideos() {
+  const folder = prompt("Folder with the files copied from the GoPro SD cards (sub-folders are fine):", LS.get("videoImportDir", ""));
+  if (!folder) return;
+  LS.set("videoImportDir", folder);
+  const r = await api("/api/video_import", { folder, dry_run: true });
+  if (!r.ok) return;
+  if (!r.imported.length) { toast(`No video matched a trial (${r.unmatched.length} file(s) found)`, true); return; }
+  const lines = r.imported.slice(0, 12).map((x) => `${x.trial}  ${x.cam}  (${x.files.length} file${x.files.length > 1 ? "s" : ""}, ${x.offset_s >= 0 ? "+" : ""}${x.offset_s} s)`);
+  if (r.imported.length > 12) lines.push(`… and ${r.imported.length - 12} more`);
+  const extra = (r.unmatched.length ? `\n\nNot matched: ${r.unmatched.length} file(s)` : "")
+    + (r.trials_without_video.length ? `\nTrials still without video: ${r.trials_without_video.length}` : "");
+  if (!confirm(`Copy ${r.imported.length} video(s) into the trial folders?\n\n${lines.join("\n")}${extra}`)) return;
+  const j = await api("/api/video_import", { folder, dry_run: false });
+  if (j.ok) toast("Importing videos: progress in the Event log");
+}
+
+// GoPro cameras over USB: strip in the Record block + list in Settings
+function gpEsc(v) { return String(v == null ? "" : v).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c]); }
+function applyGopro(g, st) {
+  if (!g) return;
+  const cfg = g.cfg || {}, cams = g.cams || [];
+  for (const [id, k] of [["gpEnabled", "enabled"], ["gpDownload", "download"], ["gpRequire", "require"]])
+    if (document.activeElement !== $(id)) $(id).checked = !!cfg[k];
+  const lock = st === "recording" || st === "starting" || st === "stopping";
+  const ble = cfg.transport === "ble";
+  if (document.activeElement !== $("gpTransport")) $("gpTransport").value = cfg.transport || "usb";
+  for (const id of ["gpEnabled", "gpDownload", "gpRequire", "gpTransport"]) $(id).disabled = lock;
+  $("btnGpRescan").disabled = lock || !cfg.enabled || !!g.action;
+  $("btnGpDisconnect").disabled = lock || !!g.action || (!g.connected && !cams.length);
+  $("btnGpPair").disabled = lock || !cfg.enabled || !ble || !!g.action;
+  $("btnGpPair").classList.toggle("hidden", !ble);
+  setText("btnGpRescan", g.action === "connect" ? "Connecting…" : g.connected ? "↻ Rescan" : "Connect");
+  setText("btnGpPair", g.action === "pair" ? "Pairing…" : "Pair new camera");
+  applyGpVideo(g, lock, cams);
+}
+
+// Video settings: one select per setting; options = what every camera accepts now; per-camera values shown
+function applyGpVideo(g, lock, cams) {
+  const cfg = g.cfg || {}, ble = cfg.transport === "ble";
+  const v = g.video || { settings: [], errors: {} }, box = $("gpVideo");
+  const names = cams.filter((c) => c.online).map((c) => c.name);
+  const sig = v.settings.map((s) => s.id + ":" + s.options.map((o) => o.v).join(",")).join("|");
+  if (box.dataset.sig !== sig) {           // rebuild only when the option lists change
+    box.dataset.sig = sig;
+    box.innerHTML = v.settings.map((s) => `<label>${gpEsc(s.name)}<select data-sid="${s.id}">` +
+      s.options.map((o) => `<option value="${o.v}">${gpEsc(o.label)}</option>`).join("") +
+      `</select><span class="gpcur" data-cur="${s.id}"></span></label>`).join("");
+    for (const sel of box.querySelectorAll("select")) sel.addEventListener("change", () => { sel.dataset.dirty = "1"; });
+  }
+  for (const s of v.settings) {
+    const sel = box.querySelector(`select[data-sid="${s.id}"]`), cur = box.querySelector(`[data-cur="${s.id}"]`);
+    const vals = names.map((n) => s.current[n]).filter((x) => x != null);
+    const same = vals.length && vals.every((x) => x === vals[0]);
+    if (!sel.dataset.dirty && document.activeElement !== sel) {
+      const want = s.wanted != null ? s.wanted : same ? vals[0] : null;
+      if (want != null && [...sel.options].some((o) => +o.value === want)) sel.value = String(want);
+    }
+    sel.disabled = lock || !!g.action || !names.length;
+    const lab = (x) => (s.options.find((o) => o.v === x) || { label: x == null ? "?" : "#" + x }).label;
+    const txt = !vals.length ? "" : same ? `now: ${lab(vals[0])}` : "now: " + names.map((n) => `${n} ${lab(s.current[n])}`).join(", ");
+    cur.textContent = txt; cur.className = "gpcur" + (vals.length && !same ? " warn" : "");
+  }
+  $("btnGpApply").disabled = $("btnGpRead").disabled = lock || !!g.action || !names.length;
+  setText("btnGpApply", g.action === "apply" ? "Applying…" : "Apply to all cameras");
+  const errs = Object.entries(v.errors || {}).map(([n, e]) => `${n}: ${e}`);
+  setText("gpVideoNote", !names.length ? "Connect the cameras to change their settings."
+    : errs.length ? "Could not read: " + errs.join(" · ")
+    : "Frame rates offered depend on the resolution: apply the resolution first, then pick the frame rate.");
+  $("gpDownloadSw").classList.toggle("hidden", ble);
+  setText("gpHint", ble ? "Bluetooth" : "USB-C · GoPro Connect");
+  setText("gpNote", ble
+    ? "Bluetooth starts and stops the cameras; copy the videos from the SD cards afterwards. First time per camera: Connections → Connect Device → Quik App (pairing mode)."
+    : "On each camera: Preferences → Connections → USB Connection → GoPro Connect.");
+  const cell = (c) => {
+    const dl = c.download;
+    let state, cls;
+    if (!c.online) { state = c.error ? "offline" : "connecting"; cls = "bad"; }
+    else if (c.encoding) { state = "REC" + (c.video_s ? " " + c.video_s + " s" : ""); cls = "rec"; }
+    else if (dl && dl.state === "downloading") { state = "↓ " + (dl.total ? Math.round(100 * dl.done / dl.total) + "%" : (dl.done / 1e6).toFixed(0) + " MB"); cls = "busy"; }
+    else if (dl && dl.state === "waiting") { state = "closing file"; cls = "busy"; }
+    else if (dl && dl.state === "error") { state = "download failed"; cls = "warn"; }
+    else { state = "ready"; cls = "ok"; }
+    const bat = c.battery != null ? `${c.battery}%` : "—";
+    const sd = c.sd_free_gb != null ? `${c.sd_free_gb} GB` : "—";
+    const tip = `${c.model || "GoPro"} · ${c.ip}${c.serial ? " · serial " + c.serial : ""}${c.error ? " · " + c.error : ""}${dl && dl.error ? " · " + dl.error : ""}`;
+    return { state, cls, bat, sd, tip };
+  };
+  const strip = $("camStrip");
+  let html;
+  if (!cfg.enabled) html = `<span class="camnote">Video off (Settings → GoPro cameras)</span>`;
+  else if (!g.connected && !cams.length) html = `<span class="camnote warn">Cameras not connected: Settings → GoPro cameras → Connect</span>`;
+  else if (!cams.length) html = ble
+    ? `<span class="camnote warn">No GoPro found over Bluetooth: turn the cameras on (first time: Connections → Connect Device → Quik App)</span>`
+    : `<span class="camnote warn">No GoPro found over USB: plug in each camera by USB-C and set USB Connection → GoPro Connect</span>`;
+  else html = cams.map((c) => { const x = cell(c);
+    return `<span class="cam ${x.cls}" title="${gpEsc(x.tip)}"><i></i><b>${gpEsc(c.name)}</b><span>${gpEsc(x.state)}</span><span class="mono">bat ${x.bat}</span><span class="mono">SD ${x.sd}</span></span>`; }).join("");
+  if (strip.dataset.h !== html) { strip.dataset.h = html; strip.innerHTML = html; }
+  const list = $("gpList");
+  const lh = cams.map((c) => { const x = cell(c);
+    return `<div class="camrow ${x.cls}" title="${gpEsc(x.tip)}"><i></i><b>${gpEsc(c.name)}</b><span>${gpEsc(c.model || "GoPro")}</span><span class="mono">${gpEsc(c.ip)}</span><span>${gpEsc(x.state)}</span></div>`; }).join("")
+    || (g.connected ? `<div class="camrow bad"><i></i><span>No camera found</span></div>`
+                    : `<div class="camrow"><i></i><span>Not connected: press Connect</span></div>`);
+  if (list.dataset.h !== lh) { list.dataset.h = lh; list.innerHTML = lh; }
 }
 
 function applyDaq(d, st) {
@@ -1429,7 +1554,7 @@ function applyFlow(s) {
   updateStepSums();
   if (s.spine_cal_rev != null && spineRev != null && s.spine_cal_rev !== spineRev) { spineRev = s.spine_cal_rev; syncSpineCal(); }
   applyBend();
-  const tiles = ["stDaq", "stImu", "stEmg", "stSync"].map((id) => $(id).className);
+  const tiles = ["stDaq", "stImu", "stEmg", "stSync", "stCam"].map((id) => $(id).className);
   const done = {
     1: tiles.every((c) => !/\b(bad|warn)\b/.test(c)) && !!s.port,
     2: !!$("subject").value.trim(),
@@ -1626,6 +1751,37 @@ function pushHeight() {
   if (fr && fr.dataset.on === "1" && fr.contentWindow) fr.contentWindow.postMessage({ type: "spineopt", height: h }, location.origin);
 }
 
+// Participant card: Apply checks the fields, saves them and updates everything that depends on them
+const SUBJ_FIELDS = ["testDate", "subject", "heightCm", "notes"];
+function participantDirty(on) {
+  const b = $("btnSubjApply");
+  b.classList.toggle("dirty", on);
+  b.classList.toggle("applied", !on);
+  b.textContent = on ? "Apply" : "Applied ✓";
+}
+function applyParticipant() {
+  const subj = $("subject").value.trim();
+  if (!subj) { toast("Enter the subject first", true); $("subject").focus(); return; }
+  if ($("heightCm").value !== "" && heightVal() == null) { toast("Height must be 100–230 cm", true); $("heightCm").focus(); return; }
+  $("testDate").value = dateId($("testDate").value);
+  saveForm();
+  pushHeight();
+  refreshNextTrial();
+  if (S) { applyCalib(S); applyFlow(S); }
+  updateStepSums();
+  participantDirty(false);
+  const h = heightVal();
+  toast(`Participant: ${subjId(subj)} · ${$("testDate").value}` + (h ? ` · ${h} cm` : ""));
+}
+function wireParticipant() {
+  $("btnSubjApply").onclick = applyParticipant;
+  for (const id of SUBJ_FIELDS) {
+    $(id).addEventListener("input", () => participantDirty(true));
+    $(id).addEventListener("keydown", (e) => { if (e.key === "Enter") { e.preventDefault(); applyParticipant(); } });
+  }
+  participantDirty(!$("subject").value.trim());
+}
+
 function wireCalib() {
   $("btnCal").onclick = runCalibration;
   for (const b of $("calSecs").querySelectorAll("button")) {
@@ -1640,10 +1796,9 @@ function wireCalib() {
 
 async function startRec() {
   saveForm();
-  $("btnStart").disabled = true;
   if (!$("subject").value.trim() || !$("taskSel").value) {
     toast(!$("subject").value.trim() ? "Enter the subject first (step 2)" : "Pick a task first", true);
-    $("btnStart").disabled = false; return;
+    return;
   }
   const t = TASKS.find((x) => x.key === $("taskSel").value) || {};
   const j = await api("/api/start", { subject: $("subject").value.trim(), date: dateId($("testDate").value), task: $("taskSel").value,
@@ -1651,13 +1806,12 @@ async function startRec() {
   if (j.ok) { toast("Recording " + j.session); $("banner").classList.add("hidden"); }
 }
 async function stopRec() {
-  $("btnStop").disabled = true;
+  $("tpRec").disabled = true;
   await api("/api/stop");
 }
 async function mark() {
-  const txt = $("markText").value.trim();
-  const j = await api("/api/marker", { text: txt });
-  if (j.ok) { toast(S && S.state === "recording" ? `Marker${txt ? ": " + txt : ""}` : "Marker logged (not recording)"); $("markText").value = ""; }
+  const j = await api("/api/marker", { text: "" });
+  if (j.ok) toast(S && S.state === "recording" ? `Marker ${S.rec ? S.rec.markers + 1 : ""}`.trim() : "Marker logged (not recording)");
 }
 
 async function loadPorts() {
@@ -1693,15 +1847,11 @@ function wire() {
   $("label").addEventListener("input", applyTaskInfo);
   $("subject").addEventListener("input", applyTaskInfo);
   loadTasks();
-  $("btnStart").onclick = startRec;
-  $("btnStop").onclick = stopRec;
   $("btnBend").onclick = () => { $("btnBend").blur(); runBend(); };
   $("tpRec").onclick = () => { $("tpRec").blur(); toggleRecording(); };
   $("tpMark").onclick = () => { $("tpMark").blur(); mark(); };
   $("tpTake").onclick = () => { const el = $("label"); el.scrollIntoView({ block: "center", behavior: "smooth" }); el.focus(); el.select(); };
   for (const id of ["subject", "label"]) $(id).addEventListener("input", () => { if (S) applyTransport(S); });
-  $("btnMark").onclick = mark;
-  $("markText").addEventListener("keydown", (e) => { if (e.key === "Enter") mark(); });
   $("btnConnect").onclick = () => api("/api/connect", { port: $("portSel").value || null });
   $("btnDisconnect").onclick = () => api("/api/disconnect");
   $("portSel").addEventListener("focus", loadPorts);
@@ -1714,6 +1864,24 @@ function wire() {
   $("btnRestart").onclick = () => api("/api/restart");
   for (const id of ["daqEnabled", "daqDevice", "daqSync", "daqRate", "daqTerm", "daqRange", "daqExtra"])
     $(id).addEventListener("change", () => api("/api/daq", daqCfgFromForm()));
+  $("btnImportVideo").onclick = importVideos;
+  $("btnGpRead").onclick = () => api("/api/gopro/action", { action: "settings" });
+  $("btnGpApply").onclick = async () => {
+    const values = {};
+    for (const sel of $("gpVideo").querySelectorAll("select")) values[sel.dataset.sid] = +sel.value;
+    const j = await api("/api/gopro/video", { values });
+    if (j.ok) { for (const sel of $("gpVideo").querySelectorAll("select")) delete sel.dataset.dirty; toast("Applying camera settings…"); }
+  };
+  $("btnGpRescan").onclick = async () => { const j = await api("/api/gopro/action", { action: "connect" }); if (j.ok) toast("Connecting to cameras…"); };
+  $("btnGpDisconnect").onclick = async () => { const j = await api("/api/gopro/action", { action: "disconnect" }); if (j.ok) toast("Disconnecting cameras…"); };
+  $("btnGpPair").onclick = async () => {
+    if (!confirm("Put the new camera in pairing mode first:\nConnections → Connect Device → Quik App\n\nThen press OK to pair.")) return;
+    const j = await api("/api/gopro/action", { action: "pair" });
+    if (j.ok) toast("Pairing: the result shows in the Event log");
+  };
+  for (const id of ["gpEnabled", "gpDownload", "gpRequire", "gpTransport"])
+    $(id).addEventListener("change", () => api("/api/gopro", { enabled: $("gpEnabled").checked,
+      download: $("gpDownload").checked, require: $("gpRequire").checked, transport: $("gpTransport").value }));
   $("btnDaqRefresh").onclick = async () => {
     const r = await (await fetch("/api/daq/devices")).json();
     toast(r.devices.length ? `Found ${r.devices.map((d) => d.name + " " + d.product).join(", ")}` : (r.error || "No NI-DAQmx device found"), !r.devices.length);
@@ -1769,6 +1937,7 @@ function wire() {
   wireSetup();
   wireSpine();
   wireCalib();
+  wireParticipant();
   $("btnSettings").onclick = () => openDrawer(!$("drawer").classList.contains("open"));
   $("btnCloseDrawer").onclick = () => openDrawer(false);
   $("scrim").onclick = () => openDrawer(false);
@@ -1921,7 +2090,7 @@ function connectStream() {
       b.textContent = "The IMU DAQ server is not running. Double-click “Start IMU DAQ.bat” on the Desktop " +
         "(or check its black window for an error). This page reconnects by itself.";
     }
-    for (const id of ["btnStart", "btnStop", "btnMark", "tpRec", "tpMark"]) $(id).disabled = true;
+    for (const id of ["tpRec", "tpMark"]) $(id).disabled = true;
     $("tpMode").className = "tp-mode"; $("tpMode").lastChild.textContent = "NO SERVER";
   };
 }

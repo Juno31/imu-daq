@@ -47,7 +47,7 @@
     </div>
     <div class="setupbody">
     <div class="stephead" id="step1" data-step="1"><span class="stepn">1</span><b>System check</b>
-      <span class="hint">all four green before the participant arrives · click a tile for detail</span></div>
+      <span class="hint">all green before the participant arrives · click a tile for detail</span></div>
     <div class="statusrow">
       <button class="stile" id="stDaq" data-go="drawer" title="NI DAQ: device found and reading (click for settings)">
         <span class="sl"></span><span class="st"><small>DAQ</small><b>—</b><span class="sd">—</span></span></button>
@@ -57,6 +57,8 @@
         <span class="sl"></span><span class="st"><small>EMG</small><b>—</b><span class="sd">—</span></span></button>
       <button class="stile" id="stSync" data-go="syncCard" title="Time sync between board, DAQ and PC (click for detail)">
         <span class="sl"></span><span class="st"><small>Sync</small><b>—</b><span class="sd">—</span></span></button>
+      <button class="stile" id="stCam" data-go="drawerGopro" title="GoPro cameras: connected, battery, SD card (click for settings)">
+        <span class="sl"></span><span class="st"><small>Cameras</small><b>—</b><span class="sd">—</span></span></button>
     </div>
       <div class="flowrow setuprow">
       <section class="card stepcard" id="step2" data-step="2">
@@ -70,7 +72,10 @@
             title="Scales the spine model (height ÷ 180 cm) and is saved with every trial"></label>
           <label>Notes<input id="notes" placeholder="optional" autocomplete="off" title="Saved with every trial"></label>
         </div>
-        <p class="cap" id="subjHint">Attach the IMUs and EMG electrodes, then check the live signals below.</p>
+        <div class="applyrow">
+          <p class="cap" id="subjHint">Attach the IMUs and EMG electrodes, then check the live signals below.</p>
+          <button class="btn small" id="btnSubjApply" title="Use these participant details for the next recordings (Enter in any field does the same)">Apply</button>
+        </div>
       </section>
 
       <section class="card stepcard" id="step3" data-step="3">
@@ -111,25 +116,8 @@
         <p class="cap taskinfo" id="taskInfo"></p>
         <div class="takepath mono" id="takePath" title="Where the next trial is saved"></div>
       </div>
-      <div class="rm-col rm-rec">
-        <div class="recbtns">
-          <button class="btn start" id="btnStart" title="Shortcut: Space">● Start <kbd class="k">Space</kbd></button>
-          <button class="btn stop" id="btnStop" disabled title="Shortcut: Space">■ Stop <kbd class="k">Space</kbd></button>
-        </div>
-        <div class="markrow">
-          <input id="markText" placeholder="Marker text (M)" autocomplete="off">
-          <button class="btn" id="btnMark" title="Shortcut: M">Mark</button>
-        </div>
-      </div>
-      <div class="rm-col rm-stats">
-        <dl class="recstats">
-          <div><dt>Frames</dt><dd id="recFrames">—</dd></div>
-          <div><dt>Missing</dt><dd id="recMissing">—</dd></div>
-          <div><dt>Markers</dt><dd id="recMarkers">—</dd></div>
-          <div class="wide"><dt>Session</dt><dd id="recName" class="ellip">—</dd></div>
-        </dl>
-      </div>
     </div>
+    <div class="camstrip" id="camStrip" title="GoPro cameras over USB: started and stopped with each recording (Settings → GoPro)"></div>
   </section>
 
   <!-- Live signals (used in steps 1-4) -->
@@ -241,6 +229,7 @@
     <div class="spacer"></div>
     <button class="btn small ghost" id="btnRefreshFiles" title="Reload the list">↻</button>
     <button class="btn small ghost" id="btnOpenData" title="Open the data folder in Explorer">Open folder</button>
+    <button class="btn small ghost" id="btnImportVideo" title="Copy GoPro videos from SD-card copies into the trial folders, named like the trials">Import videos</button>
   </div>
   <input class="filesearch" id="filesSearch" placeholder="Filter by subject, trial or date" autocomplete="off">
   <div class="sessions" id="sessions"></div>
@@ -275,6 +264,34 @@
       <div><dt>DAQ pulses</dt><dd id="daqPulses">—</dd></div>
       <div><dt>SYNC level</dt><dd id="daqLevel">—</dd></div>
     </dl>
+  </section>
+
+  <section class="card" id="goproCard">
+    <h2>GoPro cameras <span class="hint" id="gpHint">USB-C · GoPro Connect</span></h2>
+    <div class="row">
+      <label class="switch"><input type="checkbox" id="gpEnabled"><span></span> Record video</label>
+      <label class="switch" id="gpDownloadSw"><input type="checkbox" id="gpDownload"><span></span> Download after stop</label>
+    </div>
+    <label>Connection<select id="gpTransport">
+      <option value="usb">USB-C cable (start/stop + download)</option>
+      <option value="ble">Bluetooth (start/stop only)</option></select></label>
+    <div class="row">
+      <label class="switch" title="Refuse to start the recording if any camera fails to start"><input type="checkbox" id="gpRequire"><span></span> Require all cameras</label>
+    </div>
+    <div class="row">
+      <button class="btn small" id="btnGpRescan" title="Look for cameras and connect (cameras are not connected until you press this)">Connect</button>
+      <button class="btn small ghost" id="btnGpDisconnect" title="Disconnect every camera">Disconnect</button>
+      <button class="btn small ghost" id="btnGpPair" title="Bluetooth: put the new camera in pairing mode first (Connections → Connect Device → Quik App)">Pair new camera</button>
+    </div>
+    <div class="camlist" id="gpList"></div>
+    <h3 class="gpsub">Video settings <span class="hint">same on all cameras · kept and re-applied when a camera connects</span></h3>
+    <div class="grid2" id="gpVideo"></div>
+    <div class="row">
+      <button class="btn small" id="btnGpApply" title="Set these on every connected camera (video mode first)">Apply to all cameras</button>
+      <button class="btn small ghost" id="btnGpRead" title="Read the current settings from the cameras">Read from cameras</button>
+    </div>
+    <p class="note" id="gpVideoNote"></p>
+    <p class="note" id="gpNote"></p>
   </section>
 
   <section class="card">
@@ -342,7 +359,7 @@
     <h2>Keyboard shortcuts</h2>
     <dl>
       <dt><kbd>Space</kbd></dt><dd>Start / stop recording</dd>
-      <dt><kbd>M</kbd></dt><dd>Event marker (uses the marker text, if any)</dd>
+      <dt><kbd>M</kbd></dt><dd>Event marker</dd>
       <dt><kbd>Z</kbd></dt><dd>Zero the IMU display (data unchanged)</dd>
       <dt><kbd>1</kbd> <kbd>2</kbd> <kbd>3</kbd> <kbd>4</kbd></dt><dd>Open / close IMU · EMG · Sync detail · Event log</dd>
       <dt><kbd>S</kbd></dt><dd>Settings panel</dd>
@@ -363,23 +380,13 @@
       <span class="addr mono"></span>
       <span class="pill podstate">—</span>
       <span class="pill headacc hidden" title="Rotation vector: the IMU's own heading accuracy estimate and magnetometer calibration (0-3)"></span>
+      <span class="pill warn magcal hidden" title="Magnetometer not calibrated yet: move the IMU slowly in a figure-8 until it reaches 2-3"></span>
       <div class="spacer"></div>
-      <span class="metric"><b class="fresh">—</b><small>new data</small></span>
-      <span class="metric"><b class="stalls">0</b><small>stalls</small></span>
-    </div>
-    <div class="podbody">
-      <canvas class="cube"></canvas>
-      <div class="angles">
-        <div class="ang roll"><small>Roll</small><b>—</b></div>
-        <div class="ang pitch"><small>Pitch</small><b>—</b></div>
-        <div class="ang yaw"><small>Yaw</small><b>—</b></div>
-        <div class="quat mono"></div>
-        <div class="sens hidden">
-          <div class="sacc" title="Accelerometer (includes gravity: about 9.81 at rest)"><span>ACC</span><b>—</b><small></small></div>
-          <div class="sgyr" title="Gyroscope"><span>GYRO</span><b>—</b><small></small></div>
-          <div class="smag" title="Magnetometer"><span>MAG</span><b>—</b><small></small></div>
-        </div>
-      </div>
+      <span class="metric roll"><b>—</b><small>roll</small></span>
+      <span class="metric pitch"><b>—</b><small>pitch</small></span>
+      <span class="metric yaw"><b>—</b><small>yaw</small></span>
+      <span class="metric" title="Share of frames with a new IMU sample (100% = no dropped samples)"><b class="fresh">—</b><small>new data</small></span>
+      <span class="metric" title="Times the IMU stopped sending and was restarted"><b class="stalls">0</b><small>stalls</small></span>
     </div>
     <canvas class="plot"></canvas>
   </section>

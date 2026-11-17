@@ -280,7 +280,7 @@ input:disabled, select:disabled, textarea:disabled { opacity: .6; }
 .hint.bad { color: var(--bad); }
 
 /* ---------- status tiles ---------- */
-.statusrow { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; }
+.statusrow { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 12px; }
 .stile {
   display: flex; align-items: center; gap: 12px; text-align: left; cursor: pointer; font: inherit; color: inherit;
   background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); box-shadow: var(--shadow);
@@ -304,7 +304,8 @@ input:disabled, select:disabled, textarea:disabled { opacity: .6; }
 .stile.live .sl { animation: pulse 1.6s ease-in-out infinite; }
 @keyframes pulse { 50% { box-shadow: 0 0 0 7px transparent; } }
 @media (prefers-reduced-motion: reduce) { .stile.live .sl { animation: none; } }
-@media (max-width: 900px) { .statusrow { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (max-width: 1100px) { .statusrow { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+@media (max-width: 700px) { .statusrow { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
 @media (max-width: 420px) { .statusrow { grid-template-columns: 1fr; } }
 
 /* ---------- EMG ---------- */
@@ -517,6 +518,10 @@ input:disabled, select:disabled, textarea:disabled { opacity: .6; }
 .stepcard h2 .pill { margin-left: auto; }
 .stepcard label { margin: 0; }
 .stepcard .cap { margin: 0; }
+.applyrow { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+.applyrow .btn { flex: none; min-width: 84px; }
+.btn.dirty { background: var(--accent); color: #fff; border-color: transparent; }
+.btn.applied { color: var(--ok); }
 .stepcard.recbar { display: flex; }
 .recgrid { display: grid; grid-template-columns: 90px minmax(0, 1fr); gap: 10px; align-items: end; }
 .stepcard .markrow { margin: 0; }
@@ -778,16 +783,11 @@ body { padding-bottom: var(--tbar); }
 .flowrow.setuprow { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 
 .recmain { border-color: color-mix(in srgb, var(--accent) 35%, var(--border)); }
-.rm-grid { display: grid; grid-template-columns: minmax(0, 1.15fr) minmax(0, 1.25fr) minmax(0, 0.9fr); gap: 0; align-items: stretch; }
+.rm-grid { display: grid; grid-template-columns: minmax(0, 1fr); gap: 0; align-items: stretch; }
 .rm-col { display: flex; flex-direction: column; gap: 8px; min-width: 0; padding: 2px 16px; }
 .rm-col:first-child { padding-left: 0; }
 .rm-col:last-child { padding-right: 0; }
 .rm-col + .rm-col { border-left: 1px solid var(--border); }
-.rm-rec { justify-content: center; }
-.rm-rec .recbtns .btn.start, .rm-rec .recbtns .btn.stop { padding: 14px 12px; font-size: 16px; }
-.rm-stats .recstats { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-.rm-stats .recstats div.wide { grid-column: 1 / -1; }
-.rm-stats .recstats dd { font-size: 15px; }
 .stepcard.recmain.min > h2 .stepsum { padding-left: 50px; }
 @media (max-width: 1100px) {
   .rm-grid { grid-template-columns: 1fr; gap: 12px; }
@@ -795,3 +795,34 @@ body { padding-bottom: var(--tbar); }
   .rm-col + .rm-col { border-left: 0; border-top: 1px solid var(--border); padding-top: 12px; }
 }
 @media (max-width: 760px) { .flowrow.setuprow { grid-template-columns: 1fr; } }
+
+/* GoPro cameras: strip under the Record block + list in Settings */
+.camstrip { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
+.camstrip:empty { display: none; }
+.cam, .camrow { display: inline-flex; align-items: center; gap: 8px; padding: 5px 10px; border-radius: 8px;
+  background: var(--surface-2); font-size: 12px; color: var(--text-3); min-width: 0; }
+.cam b, .camrow b { color: var(--text); font-weight: 600; }
+.cam i, .camrow i { width: 8px; height: 8px; border-radius: 50%; background: var(--text-3); flex: none; }
+.cam.ok i, .camrow.ok i { background: var(--ok); }
+.cam.busy i, .camrow.busy i, .cam.warn i, .camrow.warn i { background: var(--warn); }
+.cam.bad i, .camrow.bad i { background: var(--bad); }
+.cam.rec i, .camrow.rec i { background: var(--bad); animation: pulse 1.6s ease-in-out infinite; }
+.cam.rec { background: var(--bad-soft); }
+.camnote { font-size: 12px; color: var(--text-3); }
+.camnote.warn { color: var(--warn); }
+.camlist { display: flex; flex-direction: column; gap: 6px; margin: 10px 0 4px; }
+.camrow { display: flex; }
+.camrow span.mono { margin-left: auto; }
+.gpsub { font-size: 13px; margin: 14px 0 6px; }
+.gpcur { display: block; font-size: 11px; color: var(--text-3); margin-top: 2px; min-height: 14px; }
+.gpcur.warn { color: var(--warn); }
+
+/* Recording: the layout never changes; setup and saved recordings are only dimmed (locked anyway) */
+body.recording #setupGroup, body.recording #filesPanel { opacity: .4; pointer-events: none; transition: opacity .2s; }
+/* trial result floats over the page instead of pushing it down */
+.banner { position: fixed; top: 60px; left: 50%; transform: translateX(-50%); z-index: 9; margin: 0;
+  width: min(1100px, calc(100% - 40px)); box-shadow: 0 6px 24px rgba(0, 0, 0, .35); }
+/* IMU pod: header line (state, angles, data quality) + plot only */
+.pod .podhead .metric.roll { margin-left: 4px; }
+.pod .podhead .metric b { font-size: 14px; }
+.pod .podhead { flex-wrap: wrap; row-gap: 4px; margin-bottom: 4px; }
