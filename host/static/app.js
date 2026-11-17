@@ -1120,12 +1120,14 @@ function gpEsc(v) { return String(v == null ? "" : v).replace(/[&<>"]/g, (c) => 
 function applyGopro(g, st) {
   if (!g) return;
   const cfg = g.cfg || {}, cams = g.cams || [];
-  for (const [id, k] of [["gpEnabled", "enabled"], ["gpDownload", "download"], ["gpRequire", "require"]])
+  for (const [id, k] of [["gpEnabled", "enabled"], ["gpDownload", "download"], ["gpRequire", "require"], ["gpLive", "live"]])
     if (document.activeElement !== $(id)) $(id).checked = !!cfg[k];
   const lock = st === "recording" || st === "starting" || st === "stopping";
   const ble = cfg.transport === "ble";
   if (document.activeElement !== $("gpTransport")) $("gpTransport").value = cfg.transport || "usb";
-  for (const id of ["gpEnabled", "gpDownload", "gpRequire", "gpTransport"]) $(id).disabled = lock;
+  for (const id of ["gpEnabled", "gpDownload", "gpRequire", "gpTransport", "gpLive"]) $(id).disabled = lock;
+  $("gpLiveSw").classList.toggle("hidden", ble);
+  applyGpLive(g, ble);
   $("btnGpRescan").disabled = lock || !cfg.enabled || !!g.action;
   $("btnGpDisconnect").disabled = lock || !!g.action || (!g.connected && !cams.length);
   $("btnGpPair").disabled = lock || !cfg.enabled || !ble || !!g.action;
@@ -1136,6 +1138,38 @@ function applyGopro(g, st) {
 }
 
 // Video settings: one select per setting; options = what every camera accepts now; per-camera values shown
+// Live camera tiles (USB preview, JPEG frames from the server). The <img> elements are only rebuilt
+// when the set of cameras changes.
+function applyGpLive(g, ble) {
+  const box = $("camLive"), cfg = g.cfg || {};
+  const on = !!cfg.enabled && !!cfg.live && !ble && !!g.connected;
+  const lv = g.live || {}, names = Object.keys(lv).sort();
+  box.classList.toggle("hidden", !on || !names.length);
+  const key = on ? names.join(",") : "";
+  if (box.dataset.key !== key) {
+    box.dataset.key = key;
+    box.innerHTML = names.map((n) => `<figure class="livecam" data-cam="${gpEsc(n)}">
+      <img alt="${gpEsc(n)} live view">
+      <figcaption><b>${gpEsc(n)}</b><span></span></figcaption></figure>`).join("");
+    // one frame at a time (not an MJPEG stream): Chrome allows only 6 open connections per host,
+    // and the live data stream + 3 endless MJPEG streams would starve the rest of the page
+    for (const fig of box.querySelectorAll("figure")) {
+      const img = fig.querySelector("img"), url = `/api/gopro/live/${encodeURIComponent(fig.dataset.cam)}.jpg?t=`;
+      const next = (ms) => setTimeout(() => { if (img.isConnected) img.src = url + Date.now(); }, ms);
+      img.onload = () => next(document.hidden ? 1000 : 90);
+      img.onerror = () => next(1000);
+      next(0);
+    }
+  }
+  for (const fig of box.querySelectorAll("figure")) {
+    const s = lv[fig.dataset.cam] || {};
+    fig.classList.toggle("off", !s.on);
+    const t = s.on ? `${s.fps} fps` : (s.error || "starting…");
+    const sp = fig.querySelector("figcaption span");
+    if (sp.textContent !== t) sp.textContent = t;
+  }
+}
+
 function applyGpVideo(g, lock, cams) {
   const cfg = g.cfg || {}, ble = cfg.transport === "ble";
   const v = g.video || { settings: [], errors: {} }, box = $("gpVideo");
@@ -1967,9 +2001,10 @@ function wire() {
     const j = await api("/api/gopro/action", { action: "pair" });
     if (j.ok) toast("Pairing: the result shows in the Event log");
   };
-  for (const id of ["gpEnabled", "gpDownload", "gpRequire", "gpTransport"])
+  for (const id of ["gpEnabled", "gpDownload", "gpRequire", "gpTransport", "gpLive"])
     $(id).addEventListener("change", () => api("/api/gopro", { enabled: $("gpEnabled").checked,
-      download: $("gpDownload").checked, require: $("gpRequire").checked, transport: $("gpTransport").value }));
+      download: $("gpDownload").checked, require: $("gpRequire").checked, transport: $("gpTransport").value,
+      live: $("gpLive").checked }));
   $("btnDaqRefresh").onclick = async () => {
     const r = await (await fetch("/api/daq/devices")).json();
     toast(r.devices.length ? `Found ${r.devices.map((d) => d.name + " " + d.product).join(", ")}` : (r.error || "No NI-DAQmx device found"), !r.devices.length);

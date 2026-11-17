@@ -188,7 +188,7 @@ class GoProRig:
     def __init__(self, log, cfg=None):
         self.log = log                      # log(level, text, source)
         self.cfg = {"enabled": True, "transport": "usb", "download": True, "require": False,
-                    "names": {}, "manual_ips": []}
+                    "names": {}, "manual_ips": [], "live": False}
         self.cfg.update(cfg or {})
         if self.cfg["transport"] not in ("usb", "ble"):
             self.cfg["transport"] = "usb"
@@ -208,6 +208,8 @@ class GoProRig:
         self.cfg.setdefault("video", {})    # wanted video settings, applied to every camera that connects
         self.scan_s = 4.0                   # Bluetooth scan length
         self.want = False                   # connect only after the GUI's Connect (or Pair) button
+        from gopro_live import LiveManager
+        self.live = LiveManager(log)        # live preview in the GUI (USB only)
         threading.Thread(target=self._poller, name="gopro-poll", daemon=True).start()
 
     # ---------------- discovery / polling ----------------
@@ -344,6 +346,11 @@ class GoProRig:
                                      + ("" if cams else "; no camera found - is it on"
                                         + (" and in pairing mode?" if act == "pair" else "?")), "gopro")
                     self.action = ""
+            try:
+                live = (self.cfg.get("enabled") and self.cfg.get("live") and self.want and not self.ble)
+                self.live.sync(live, self.online() if live else [], self.name_of)
+            except Exception as e:
+                self.log("warn", f"live view: {_err(e)}", "gopro")
             time.sleep(2.0)
 
     # ---------------- video settings ----------------
@@ -609,7 +616,7 @@ class GoProRig:
 
     # ---------------- settings / view ----------------
     def set_cfg(self, cfg):
-        for k in ("enabled", "download", "require"):
+        for k in ("enabled", "download", "require", "live"):
             if k in cfg:
                 self.cfg[k] = bool(cfg[k])
         if cfg.get("transport") in ("usb", "ble") and cfg["transport"] != self.cfg["transport"]:
@@ -627,7 +634,7 @@ class GoProRig:
 
     def snapshot(self):
         return {"cfg": self.cfg, "cams": self.snapshot_cams(), "recording": bool(self.rec), "action": self.action,
-                "connected": self.want,
+                "connected": self.want, "live": self.live.status(),
                 "video": self.video_view()}
 
     def snapshot_cams(self):
@@ -647,6 +654,7 @@ class GoProRig:
 
     def shutdown(self):
         self._stop = True
+        self.live.stop_all()
         self._drop_all()
 
 

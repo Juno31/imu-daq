@@ -147,6 +147,7 @@
       </div>
     </div>
     <div class="camstrip" id="camStrip" title="GoPro cameras over USB: started and stopped with each recording (Settings → GoPro)"></div>
+    <div class="camlive hidden" id="camLive"></div>
   </section>
 
   <!-- Live signals (used in steps 1-4) -->
@@ -306,6 +307,7 @@
       <option value="ble">Bluetooth (start/stop only)</option></select></label>
     <div class="row">
       <label class="switch" title="Refuse to start the recording if any camera fails to start"><input type="checkbox" id="gpRequire"><span></span> Require all cameras</label>
+      <label class="switch" id="gpLiveSw" title="USB only: low-resolution preview of each camera in the Record block (~0.5 s late, for framing)"><input type="checkbox" id="gpLive"><span></span> Live view</label>
     </div>
     <div class="row">
       <button class="btn small" id="btnGpRescan" title="Look for cameras and connect (cameras are not connected until you press this)">Connect</button>

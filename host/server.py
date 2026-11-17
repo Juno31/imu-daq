@@ -937,6 +937,8 @@ class Handler(BaseHTTPRequestHandler):
                 return self._json({"ok": True, "cal": APP.spine_cal, "rev": APP.spine_cal_rev})
             if path == "/api/stream":
                 return self._stream()
+            if path.startswith("/api/gopro/live/"):   # cam1.mjpg (stream) or cam1.jpg (one frame)
+                return self._live(path[len("/api/gopro/live/"):])
             self._json({"error": "not found"}, 404)
         except (BrokenPipeError, ConnectionResetError, ConnectionAbortedError):
             pass
@@ -953,6 +955,35 @@ class Handler(BaseHTTPRequestHandler):
         self.send_header("Cache-Control", "no-store")
         self.end_headers()
         self.wfile.write(body)
+
+    def _live(self, leaf):
+        """Live camera preview: <name>.mjpg = MJPEG stream for an <img>, <name>.jpg = latest frame."""
+        name, ext = os.path.splitext(leaf)
+        v = APP.gopro.live.view(name)
+        if v is None:
+            return self._json({"error": "no live view for " + name}, 404)
+        if ext == ".jpg":
+            if not v.frame:
+                return self._json({"error": "no frame yet"}, 503)
+            self.send_response(200)
+            self.send_header("Content-Type", "image/jpeg")
+            self.send_header("Content-Length", str(len(v.frame)))
+            self.send_header("Cache-Control", "no-store")
+            self.end_headers()
+            self.wfile.write(v.frame)
+            return
+        self.send_response(200)
+        self.send_header("Content-Type", "multipart/x-mixed-replace; boundary=frame")
+        self.send_header("Cache-Control", "no-store")
+        self.end_headers()
+        seq = -1
+        while APP.gopro.live.view(name) is v:
+            if v.seq != seq and v.frame:
+                seq, jpg = v.seq, v.frame
+                head = b"--frame\r\nContent-Type: image/jpeg\r\nContent-Length: %d\r\n\r\n" % len(jpg)
+                self.wfile.write(head + jpg + b"\r\n")
+                self.wfile.flush()
+            time.sleep(0.03)
 
     def _stream(self):
         self.send_response(200)
