@@ -205,7 +205,16 @@ class BleGoPro:
 
     def keep_alive(self):
         self.connect()
-        self._run(self._command(SET, SET_RSP, KEEP_ALIVE))
+        # right after connecting the camera can refuse this once (result 1): harmless, it is resent every poll
+        self._run(self._request(SET, SET_RSP, KEEP_ALIVE))
+
+    def set_clock(self, t=None):
+        """Camera clock = PC local time, so the file times on the SD card match the trials."""
+        lt = time.localtime(t or time.time())
+        y = lt.tm_year
+        data = bytes([0x09, 0x0D, 0x07, y >> 8, y & 0xFF, lt.tm_mon, lt.tm_mday, lt.tm_hour, lt.tm_min, lt.tm_sec])
+        self.connect()
+        self._run(self._command(CMD, CMD_RSP, data))
 
     def shutter(self, on):
         self.connect()

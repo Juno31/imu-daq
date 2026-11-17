@@ -654,6 +654,29 @@ class App:
         self.gopro.shutdown()
         self.dev.disconnect()
 
+    def video_import(self, folder, dry_run):
+        import video_import
+        if not folder or not os.path.isdir(folder):
+            raise RuntimeError(f"folder not found: {folder or '(empty)'}")
+        if dry_run:
+            return video_import.import_videos(folder, self.data_dir, True, log=lambda t: None)
+        if getattr(self, "importing", False):
+            raise RuntimeError("an import is already running")
+        self.importing = True
+
+        def run():
+            try:
+                r = video_import.import_videos(folder, self.data_dir, False,
+                                               log=lambda t: self.log("info", t, "video"))
+                self.log("info", f"video import done: {len(r['imported'])} copied, "
+                                 f"{len(r['unmatched'])} not matched", "video")
+            except Exception as e:
+                self.log("error", f"video import failed: {e}", "video")
+            finally:
+                self.importing = False
+        threading.Thread(target=run, name="video-import", daemon=True).start()
+        return {"started": True}
+
     def set_gopro(self, cfg):
         if self.state in ("recording", "starting", "stopping"):
             raise RuntimeError("stop the recording first")
@@ -1000,6 +1023,9 @@ class Handler(BaseHTTPRequestHandler):
                 return self._json({"ok": True, "cfg": APP.daq_cfg})
             if path == "/api/gopro":
                 return self._json({"ok": True, "cfg": APP.set_gopro(body)})
+            if path == "/api/video_import":       # SD-card copies -> trial folders (dry run first)
+                return self._json({"ok": True, **APP.video_import(str(body.get("folder", "")).strip().strip('"'),
+                                                                bool(body.get("dry_run", True)))})
             if path == "/api/spine_cal":          # calibration from the main page or the Spine view
                 cal, kept = APP.set_spine_cal(body if isinstance(body, dict) else {})
                 return self._json({"ok": True, "cal": cal, "rev": APP.spine_cal_rev, "kept_axis": kept})

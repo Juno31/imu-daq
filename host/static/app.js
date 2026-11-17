@@ -1077,6 +1077,23 @@ function applyStatus(s) {
   if (prevState === "stopping" && st !== "stopping" && s.last_summary) { showSummary(s.last_summary); loadSessions(true); }
 }
 
+// GoPro videos copied from the SD cards -> trial folders (dry run, confirm, then copy in the background)
+async function importVideos() {
+  const folder = prompt("Folder with the files copied from the GoPro SD cards (sub-folders are fine):", LS.get("videoImportDir", ""));
+  if (!folder) return;
+  LS.set("videoImportDir", folder);
+  const r = await api("/api/video_import", { folder, dry_run: true });
+  if (!r.ok) return;
+  if (!r.imported.length) { toast(`No video matched a trial (${r.unmatched.length} file(s) found)`, true); return; }
+  const lines = r.imported.slice(0, 12).map((x) => `${x.trial}  ${x.cam}  (${x.files.length} file${x.files.length > 1 ? "s" : ""}, ${x.offset_s >= 0 ? "+" : ""}${x.offset_s} s)`);
+  if (r.imported.length > 12) lines.push(`… and ${r.imported.length - 12} more`);
+  const extra = (r.unmatched.length ? `\n\nNot matched: ${r.unmatched.length} file(s)` : "")
+    + (r.trials_without_video.length ? `\nTrials still without video: ${r.trials_without_video.length}` : "");
+  if (!confirm(`Copy ${r.imported.length} video(s) into the trial folders?\n\n${lines.join("\n")}${extra}`)) return;
+  const j = await api("/api/video_import", { folder, dry_run: false });
+  if (j.ok) toast("Importing videos: progress in the Event log");
+}
+
 // GoPro cameras over USB: strip in the Record block + list in Settings
 function gpEsc(v) { return String(v == null ? "" : v).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c]); }
 function applyGopro(g, st) {
@@ -1839,6 +1856,7 @@ function wire() {
   $("btnRestart").onclick = () => api("/api/restart");
   for (const id of ["daqEnabled", "daqDevice", "daqSync", "daqRate", "daqTerm", "daqRange", "daqExtra"])
     $(id).addEventListener("change", () => api("/api/daq", daqCfgFromForm()));
+  $("btnImportVideo").onclick = importVideos;
   for (const id of ["gpEnabled", "gpDownload", "gpRequire", "gpTransport"])
     $(id).addEventListener("change", () => api("/api/gopro", { enabled: $("gpEnabled").checked,
       download: $("gpDownload").checked, require: $("gpRequire").checked, transport: $("gpTransport").value }));

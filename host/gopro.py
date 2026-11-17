@@ -85,6 +85,12 @@ class GoPro:
     def shutter(self, on):
         self._get("/gopro/camera/shutter/" + ("start" if on else "stop"), timeout=3.0)
 
+    def set_clock(self, t=None):
+        """Camera clock = PC local time, so the file times on the SD card match the trials."""
+        lt = time.localtime(t or time.time())
+        self._get(f"/gopro/camera/set_date_time?date={lt.tm_year}_{lt.tm_mon}_{lt.tm_mday}"
+                  f"&time={lt.tm_hour}_{lt.tm_min}_{lt.tm_sec}")
+
     def poll(self):
         st = self._get("/gopro/camera/state", timeout=2.0).get("status", {})
         self.state = {k: st.get(k) for k in (ST_BUSY, ST_ENCODING, ST_VIDEO_SECS, ST_SD_STATUS,
@@ -220,6 +226,11 @@ class GoProRig:
                 cam.load_info()
             cam.keep_alive()
             cam.poll()
+            if not was and not cam.encoding:
+                try:
+                    cam.set_clock()
+                except Exception as e:
+                    self.log("warn", f"{self.name_of(cam)}: could not set the camera clock: {_err(e)}", "gopro")
             if not was:
                 model = cam.info.get("model_name", "GoPro")
                 label = cam.serial if cam.serial.startswith("GoPro") else f"serial {cam.serial}"
