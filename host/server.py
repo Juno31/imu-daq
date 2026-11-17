@@ -1023,7 +1023,7 @@ class Handler(BaseHTTPRequestHandler):
                 return self._json({"ok": True, "cfg": APP.daq_cfg})
             if path == "/api/gopro":
                 return self._json({"ok": True, "cfg": APP.set_gopro(body)})
-            if path == "/api/gopro/action":       # "rescan" or "pair" (Settings buttons)
+            if path == "/api/gopro/action":       # "connect" / "pair" / "disconnect" (Settings buttons)
                 if APP.state in ("recording", "starting", "stopping"):
                     raise RuntimeError("stop the recording first")
                 APP.gopro.request(str(body.get("action", "")))

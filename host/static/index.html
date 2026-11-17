@@ -305,7 +305,8 @@
       <label class="switch" title="Refuse to start the recording if any camera fails to start"><input type="checkbox" id="gpRequire"><span></span> Require all cameras</label>
     </div>
     <div class="row">
-      <button class="btn small" id="btnGpRescan" title="Look for cameras now and retry the ones that are offline">↻ Rescan</button>
+      <button class="btn small" id="btnGpRescan" title="Look for cameras and connect (cameras are not connected until you press this)">Connect</button>
+      <button class="btn small ghost" id="btnGpDisconnect" title="Disconnect every camera">Disconnect</button>
       <button class="btn small ghost" id="btnGpPair" title="Bluetooth: put the new camera in pairing mode first (Connections → Connect Device → Quik App)">Pair new camera</button>
     </div>
     <div class="camlist" id="gpList"></div>

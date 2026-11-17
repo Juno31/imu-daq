@@ -716,7 +716,8 @@ function applyTiles(s) {
     const bats = on.map((x) => x.battery).filter((x) => x != null), sds = on.map((x) => x.sd_free_gb).filter((x) => x != null);
     const info = [via, bats.length ? `min battery ${Math.min(...bats)}%` : "", sds.length ? `SD ≥${Math.min(...sds).toFixed(0)} GB` : ""].filter(Boolean).join(" · ");
     if (!gc.enabled) tile("stCam", "", "Off", "recordings without video");
-    else if (g.action) tile("stCam", "warn", g.action === "pair" ? "Pairing…" : "Searching…", via);
+    else if (g.action) tile("stCam", "warn", g.action === "pair" ? "Pairing…" : g.action === "disconnect" ? "Disconnecting…" : "Connecting…", via);
+    else if (!g.connected) tile("stCam", "warn", "Not connected", "Settings → GoPro cameras → Connect");
     else if (!cams.length) tile("stCam", "bad", "None found", gc.transport === "ble" ? "turn the cameras on" : "plug in USB-C (GoPro Connect)");
     else if (off.length) tile("stCam", "bad", `${on.length} / ${cams.length} on`, `offline: ${off.join(", ")}`);
     else if (recN) tile("stCam", "ok", `${recN} recording`, info, true);
@@ -1126,15 +1127,17 @@ function applyGopro(g, st) {
   if (document.activeElement !== $("gpTransport")) $("gpTransport").value = cfg.transport || "usb";
   for (const id of ["gpEnabled", "gpDownload", "gpRequire", "gpTransport"]) $(id).disabled = lock;
   $("btnGpRescan").disabled = lock || !cfg.enabled || !!g.action;
+  $("btnGpDisconnect").disabled = lock || !!g.action || (!g.connected && !cams.length);
   $("btnGpPair").disabled = lock || !cfg.enabled || !ble || !!g.action;
   $("btnGpPair").classList.toggle("hidden", !ble);
-  setText("btnGpRescan", g.action === "rescan" ? "Searching…" : "↻ Rescan");
+  setText("btnGpRescan", g.action === "connect" ? "Connecting…" : g.connected ? "↻ Rescan" : "Connect");
   setText("btnGpPair", g.action === "pair" ? "Pairing…" : "Pair new camera");
   applyGpVideo(g, lock, cams);
 }
 
 // Video settings: one select per setting; options = what every camera accepts now; per-camera values shown
 function applyGpVideo(g, lock, cams) {
+  const cfg = g.cfg || {}, ble = cfg.transport === "ble";
   const v = g.video || { settings: [], errors: {} }, box = $("gpVideo");
   const names = cams.filter((c) => c.online).map((c) => c.name);
   const sig = v.settings.map((s) => s.id + ":" + s.options.map((o) => o.v).join(",")).join("|");
@@ -1186,6 +1189,7 @@ function applyGpVideo(g, lock, cams) {
   const strip = $("camStrip");
   let html;
   if (!cfg.enabled) html = `<span class="camnote">Video off (Settings → GoPro cameras)</span>`;
+  else if (!g.connected && !cams.length) html = `<span class="camnote warn">Cameras not connected: Settings → GoPro cameras → Connect</span>`;
   else if (!cams.length) html = ble
     ? `<span class="camnote warn">No GoPro found over Bluetooth: turn the cameras on (first time: Connections → Connect Device → Quik App)</span>`
     : `<span class="camnote warn">No GoPro found over USB: plug in each camera by USB-C and set USB Connection → GoPro Connect</span>`;
@@ -1195,7 +1199,8 @@ function applyGpVideo(g, lock, cams) {
   const list = $("gpList");
   const lh = cams.map((c) => { const x = cell(c);
     return `<div class="camrow ${x.cls}" title="${gpEsc(x.tip)}"><i></i><b>${gpEsc(c.name)}</b><span>${gpEsc(c.model || "GoPro")}</span><span class="mono">${gpEsc(c.ip)}</span><span>${gpEsc(x.state)}</span></div>`; }).join("")
-    || `<div class="camrow bad"><i></i><span>No camera found</span></div>`;
+    || (g.connected ? `<div class="camrow bad"><i></i><span>No camera found</span></div>`
+                    : `<div class="camrow"><i></i><span>Not connected: press Connect</span></div>`);
   if (list.dataset.h !== lh) { list.dataset.h = lh; list.innerHTML = lh; }
 }
 
@@ -1923,7 +1928,8 @@ function wire() {
     const j = await api("/api/gopro/video", { values });
     if (j.ok) { for (const sel of $("gpVideo").querySelectorAll("select")) delete sel.dataset.dirty; toast("Applying camera settings…"); }
   };
-  $("btnGpRescan").onclick = async () => { const j = await api("/api/gopro/action", { action: "rescan" }); if (j.ok) toast("Looking for cameras…"); };
+  $("btnGpRescan").onclick = async () => { const j = await api("/api/gopro/action", { action: "connect" }); if (j.ok) toast("Connecting to cameras…"); };
+  $("btnGpDisconnect").onclick = async () => { const j = await api("/api/gopro/action", { action: "disconnect" }); if (j.ok) toast("Disconnecting cameras…"); };
   $("btnGpPair").onclick = async () => {
     if (!confirm("Put the new camera in pairing mode first:\nConnections → Connect Device → Quik App\n\nThen press OK to pair.")) return;
     const j = await api("/api/gopro/action", { action: "pair" });

@@ -207,6 +207,7 @@ class GoProRig:
         self.cam_cfg = {}                   # name -> {"current": {...}, "caps": {...} or None, "error": ""}
         self.cfg.setdefault("video", {})    # wanted video settings, applied to every camera that connects
         self.scan_s = 4.0                   # Bluetooth scan length
+        self.want = False                   # connect only after the GUI's Connect (or Pair) button
         threading.Thread(target=self._poller, name="gopro-poll", daemon=True).start()
 
     # ---------------- discovery / polling ----------------
@@ -293,7 +294,7 @@ class GoProRig:
             elif self.ble and not getattr(cam, "warned", False) and cam.error != "waiting to retry":
                 cam.warned = True             # first failure only: the camera may be off or not paired
                 hint = ("" if "pairing mode" in cam.error else
-                        " - is the camera on? It is retried automatically, or press Rescan")
+                        " - is the camera on? It is retried automatically, or press Connect")
                 self.log("warn", f"{cam.serial or cam.ip}: Bluetooth connect failed ({cam.error}){hint}", "gopro")
 
     def _poller(self):
@@ -302,7 +303,10 @@ class GoProRig:
             if self._reset:
                 self._reset = False
                 self._drop_all()
-                self.ble_names, last_disc = {}, 0.0
+                self.ble_names, self.cam_cfg, last_disc = {}, {}, 0.0
+                if self.action == "disconnect":
+                    self.log("info", "GoPro: cameras disconnected", "gopro")
+                    self.action = ""
             if self.cfg.get("enabled") and not self.busy.is_set() and self.action in ("settings", "apply"):
                 act, cams = self.action, self.online()
                 if act == "apply":
@@ -315,7 +319,7 @@ class GoProRig:
                 else:
                     list(self.pool.map(self._read_one, cams))
                 self.action = ""
-            if self.cfg.get("enabled") and not self.busy.is_set():
+            if self.cfg.get("enabled") and self.want and not self.busy.is_set():
                 act = self.action
                 now = time.time()
                 if act or now - last_disc > (15.0 if self.ble else 5.0):
@@ -408,14 +412,22 @@ class GoProRig:
         return {"settings": out, "errors": errs}
 
     def request(self, act):
-        """'rescan': look for cameras now. 'pair': longer Bluetooth scan, then pair any camera in pairing mode.
-        'settings': read the video settings of every camera."""
-        if act not in ("rescan", "pair", "settings"):
+        """'connect': look for cameras and connect (nothing connects until this is pressed).
+        'pair': longer Bluetooth scan, then pair any camera in pairing mode.
+        'disconnect': drop every camera. 'settings': read the video settings of every camera."""
+        if act == "rescan":
+            act = "connect"
+        if act not in ("connect", "pair", "disconnect", "settings"):
             raise ValueError(act)
+        if act == "disconnect":
+            self.want, self.action, self._reset = False, "disconnect", True
+            return
         if not self.cfg.get("enabled"):
             raise RuntimeError("turn on Record video first")
         if act == "pair" and not self.ble:
             raise RuntimeError("pairing is for Bluetooth; USB cameras need no pairing")
+        if act in ("connect", "pair"):
+            self.want = True
         self.action = act
 
     def online(self):
@@ -431,7 +443,8 @@ class GoProRig:
         try:
             cams = self.online()
             if not cams:
-                msg = "no GoPro connected over USB"
+                msg = ("no GoPro connected (Settings > GoPro cameras > Connect)" if not self.want
+                       else "no GoPro connected")
                 if self.cfg.get("require"):
                     raise RuntimeError(msg)
                 self.log("warn", msg + "; recording without video", "gopro")
@@ -603,7 +616,7 @@ class GoProRig:
                 if not gopro_ble.HAVE_BLEAK:
                     raise RuntimeError(gopro_ble.BLEAK_ERR)
             self.cfg["transport"] = cfg["transport"]
-            self._reset = True
+            self.want, self._reset = False, True    # press Connect again for the new transport
         if "names" in cfg and isinstance(cfg["names"], dict):
             self.cfg["names"] = {str(k): str(v).strip()[:20] for k, v in cfg["names"].items() if str(v).strip()}
         if "manual_ips" in cfg:
@@ -612,6 +625,7 @@ class GoProRig:
 
     def snapshot(self):
         return {"cfg": self.cfg, "cams": self.snapshot_cams(), "recording": bool(self.rec), "action": self.action,
+                "connected": self.want,
                 "video": self.video_view()}
 
     def snapshot_cams(self):
