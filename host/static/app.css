@@ -805,3 +805,21 @@ body { padding-bottom: var(--tbar); }
   .rm-col + .rm-col { border-left: 0; border-top: 1px solid var(--border); padding-top: 12px; }
 }
 @media (max-width: 760px) { .flowrow.setuprow { grid-template-columns: 1fr; } }
+
+/* GoPro cameras: strip under the Record block + list in Settings */
+.camstrip { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
+.camstrip:empty { display: none; }
+.cam, .camrow { display: inline-flex; align-items: center; gap: 8px; padding: 5px 10px; border-radius: 8px;
+  background: var(--surface-2); font-size: 12px; color: var(--text-3); min-width: 0; }
+.cam b, .camrow b { color: var(--text); font-weight: 600; }
+.cam i, .camrow i { width: 8px; height: 8px; border-radius: 50%; background: var(--text-3); flex: none; }
+.cam.ok i, .camrow.ok i { background: var(--ok); }
+.cam.busy i, .camrow.busy i, .cam.warn i, .camrow.warn i { background: var(--warn); }
+.cam.bad i, .camrow.bad i { background: var(--bad); }
+.cam.rec i, .camrow.rec i { background: var(--bad); animation: pulse 1.6s ease-in-out infinite; }
+.cam.rec { background: var(--bad-soft); }
+.camnote { font-size: 12px; color: var(--text-3); }
+.camnote.warn { color: var(--warn); }
+.camlist { display: flex; flex-direction: column; gap: 6px; margin: 10px 0 4px; }
+.camrow { display: flex; }
+.camrow span.mono { margin-left: auto; }

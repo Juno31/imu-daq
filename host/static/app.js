@@ -1072,8 +1072,55 @@ function applyStatus(s) {
   applyEmg(s);
   applyCalib(s);
   applyFlow(s);
+  applyGopro(s.gopro, st);
   // summary banner after a recording
   if (prevState === "stopping" && st !== "stopping" && s.last_summary) { showSummary(s.last_summary); loadSessions(true); }
+}
+
+// GoPro cameras over USB: strip in the Record block + list in Settings
+function gpEsc(v) { return String(v == null ? "" : v).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c]); }
+function applyGopro(g, st) {
+  if (!g) return;
+  const cfg = g.cfg || {}, cams = g.cams || [];
+  for (const [id, k] of [["gpEnabled", "enabled"], ["gpDownload", "download"], ["gpRequire", "require"]])
+    if (document.activeElement !== $(id)) $(id).checked = !!cfg[k];
+  const lock = st === "recording" || st === "starting" || st === "stopping";
+  const ble = cfg.transport === "ble";
+  if (document.activeElement !== $("gpTransport")) $("gpTransport").value = cfg.transport || "usb";
+  for (const id of ["gpEnabled", "gpDownload", "gpRequire", "gpTransport"]) $(id).disabled = lock;
+  $("gpDownloadSw").classList.toggle("hidden", ble);
+  setText("gpHint", ble ? "Bluetooth" : "USB-C · GoPro Connect");
+  setText("gpNote", ble
+    ? "Bluetooth starts and stops the cameras; copy the videos from the SD cards afterwards. First time per camera: Connections → Connect Device → Quik App (pairing mode)."
+    : "On each camera: Preferences → Connections → USB Connection → GoPro Connect.");
+  const cell = (c) => {
+    const dl = c.download;
+    let state, cls;
+    if (!c.online) { state = c.error ? "offline" : "connecting"; cls = "bad"; }
+    else if (c.encoding) { state = "REC" + (c.video_s ? " " + c.video_s + " s" : ""); cls = "rec"; }
+    else if (dl && dl.state === "downloading") { state = "↓ " + (dl.total ? Math.round(100 * dl.done / dl.total) + "%" : (dl.done / 1e6).toFixed(0) + " MB"); cls = "busy"; }
+    else if (dl && dl.state === "waiting") { state = "closing file"; cls = "busy"; }
+    else if (dl && dl.state === "error") { state = "download failed"; cls = "warn"; }
+    else { state = "ready"; cls = "ok"; }
+    const bat = c.battery != null ? `${c.battery}%` : "—";
+    const sd = c.sd_free_gb != null ? `${c.sd_free_gb} GB` : "—";
+    const tip = `${c.model || "GoPro"} · ${c.ip}${c.serial ? " · serial " + c.serial : ""}${c.error ? " · " + c.error : ""}${dl && dl.error ? " · " + dl.error : ""}`;
+    return { state, cls, bat, sd, tip };
+  };
+  const strip = $("camStrip");
+  let html;
+  if (!cfg.enabled) html = `<span class="camnote">Video off (Settings → GoPro cameras)</span>`;
+  else if (!cams.length) html = ble
+    ? `<span class="camnote warn">No GoPro found over Bluetooth: turn the cameras on (first time: Connections → Connect Device → Quik App)</span>`
+    : `<span class="camnote warn">No GoPro found over USB: plug in each camera by USB-C and set USB Connection → GoPro Connect</span>`;
+  else html = cams.map((c) => { const x = cell(c);
+    return `<span class="cam ${x.cls}" title="${gpEsc(x.tip)}"><i></i><b>${gpEsc(c.name)}</b><span>${gpEsc(x.state)}</span><span class="mono">bat ${x.bat}</span><span class="mono">SD ${x.sd}</span></span>`; }).join("");
+  if (strip.dataset.h !== html) { strip.dataset.h = html; strip.innerHTML = html; }
+  const list = $("gpList");
+  const lh = cams.map((c) => { const x = cell(c);
+    return `<div class="camrow ${x.cls}" title="${gpEsc(x.tip)}"><i></i><b>${gpEsc(c.name)}</b><span>${gpEsc(c.model || "GoPro")}</span><span class="mono">${gpEsc(c.ip)}</span><span>${gpEsc(x.state)}</span></div>`; }).join("")
+    || `<div class="camrow bad"><i></i><span>No camera found</span></div>`;
+  if (list.dataset.h !== lh) { list.dataset.h = lh; list.innerHTML = lh; }
 }
 
 function applyDaq(d, st) {
@@ -1792,6 +1839,9 @@ function wire() {
   $("btnRestart").onclick = () => api("/api/restart");
   for (const id of ["daqEnabled", "daqDevice", "daqSync", "daqRate", "daqTerm", "daqRange", "daqExtra"])
     $(id).addEventListener("change", () => api("/api/daq", daqCfgFromForm()));
+  for (const id of ["gpEnabled", "gpDownload", "gpRequire", "gpTransport"])
+    $(id).addEventListener("change", () => api("/api/gopro", { enabled: $("gpEnabled").checked,
+      download: $("gpDownload").checked, require: $("gpRequire").checked, transport: $("gpTransport").value }));
   $("btnDaqRefresh").onclick = async () => {
     const r = await (await fetch("/api/daq/devices")).json();
     toast(r.devices.length ? `Found ${r.devices.map((d) => d.name + " " + d.product).join(", ")}` : (r.error || "No NI-DAQmx device found"), !r.devices.length);

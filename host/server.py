@@ -32,6 +32,7 @@ from syncmon import SyncMonitor           # noqa: E402
 import channels                           # noqa: E402
 import calibration as calmod              # noqa: E402
 from device import Device, guess_port, list_serial_ports   # noqa: E402
+from gopro import GoProRig                # noqa: E402
 from session import Session               # noqa: E402
 
 APP_VERSION = "1.1.0"
@@ -119,6 +120,8 @@ class App:
         self.stop_info = {}
         self.busy = threading.Lock()      # one start/stop at a time
         self.stray_noted = False
+        # GoPros over USB: started/stopped with each recording (settings kept in host_settings.json)
+        self.gopro = GoProRig(self.log, load_host_settings().get("gopro"))
         threading.Thread(target=self._maintain, name="maintain", daemon=True).start()
 
     # ---------------- helpers ----------------
@@ -471,7 +474,15 @@ class App:
                 self.rec = {"t0": time.time(), "frame_us": frame_us}
                 self.session = sess
             self.log("info", f"session {sess.name}")
-            # DAQ first, so it sees the frame-0 pulse
+            # GoPros first: they take ~1 s to start encoding, so the video covers frame 0
+            if meta.get("kind") != "static_calibration":
+                gp = self.gopro.start_all(self.unix, sess.dir)
+                if gp:
+                    ok = [n for n, r in gp.items() if r.get("ok")]
+                    sess.event(self.unix(), "gopro_start", ", ".join(ok) or "none started")
+                    sess.write_meta({"gopro": {n: {k: r.get(k) for k in ("serial", "model", "ok")}
+                                               for n, r in gp.items()}})
+            # DAQ next, so it sees the frame-0 pulse
             self.daq = None
             cfg = self.daq_cfg
             if cfg["enabled"]:
@@ -588,6 +599,12 @@ class App:
             except Exception as e:
                 self.log("warn", f"stop command failed: {e}")
         time.sleep(0.4)                     # let the last pulses and lines arrive
+        try:                                # GoPros last, so the video covers the final frame
+            gp = self.gopro.stop_all(self.unix)
+            if gp is not None:
+                sess.event(self.unix(), "gopro_stop", ", ".join(n for n, r in gp.items() if r.get("ok")))
+        except Exception as e:
+            self.log("warn", f"GoPro stop failed: {e}", "gopro")
         if reason:
             sess.event(self.unix(), "abort", reason)
         daq_meta = pulses = align = summary = None
@@ -634,7 +651,19 @@ class App:
             self._finish("server closed during recording")
         self.auto_connect = False
         self._stop_preview()
+        self.gopro.shutdown()
         self.dev.disconnect()
+
+    def set_gopro(self, cfg):
+        if self.state in ("recording", "starting", "stopping"):
+            raise RuntimeError("stop the recording first")
+        c = self.gopro.set_cfg(cfg)
+        save_host_settings({"gopro": c})
+        self.log("info", "GoPro: " + ("on" if c["enabled"] else "off")
+                 + (" over Bluetooth (videos stay on the SD cards)" if c["transport"] == "ble" else
+                    " over USB" + (", download after stop" if c["download"] else ", keep on SD card"))
+                 + (", required" if c["require"] else ""), "user")
+        return c
 
     # ---------------- views ----------------
     def frames_since(self, cursor, limit=600):
@@ -708,6 +737,7 @@ class App:
         else:
             out["sync"] = None
         out["clockplot"] = self.clock.plot_data()
+        out["gopro"] = self.gopro.snapshot()
         c = self.calib
         out["calib"] = {"running": c["running"], "seconds": c["seconds"], "session": c["session"], "error": c["error"],
                         "remaining_s": round(max(0.0, c["until"] - time.time()), 1) if c["running"] else 0.0,
@@ -968,6 +998,8 @@ class Handler(BaseHTTPRequestHandler):
             if path == "/api/daq":
                 APP.set_daq(body)
                 return self._json({"ok": True, "cfg": APP.daq_cfg})
+            if path == "/api/gopro":
+                return self._json({"ok": True, "cfg": APP.set_gopro(body)})
             if path == "/api/spine_cal":          # calibration from the main page or the Spine view
                 cal, kept = APP.set_spine_cal(body if isinstance(body, dict) else {})
                 return self._json({"ok": True, "cal": cal, "rev": APP.spine_cal_rev, "kept_axis": kept})

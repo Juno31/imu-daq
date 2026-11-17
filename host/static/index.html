@@ -141,6 +141,7 @@
         </dl>
       </div>
     </div>
+    <div class="camstrip" id="camStrip" title="GoPro cameras over USB: started and stopped with each recording (Settings → GoPro)"></div>
   </section>
 
   <!-- Live signals (used in steps 1-4) -->
@@ -286,6 +287,22 @@
       <div><dt>DAQ pulses</dt><dd id="daqPulses">—</dd></div>
       <div><dt>SYNC level</dt><dd id="daqLevel">—</dd></div>
     </dl>
+  </section>
+
+  <section class="card" id="goproCard">
+    <h2>GoPro cameras <span class="hint" id="gpHint">USB-C · GoPro Connect</span></h2>
+    <div class="row">
+      <label class="switch"><input type="checkbox" id="gpEnabled"><span></span> Record video</label>
+      <label class="switch" id="gpDownloadSw"><input type="checkbox" id="gpDownload"><span></span> Download after stop</label>
+    </div>
+    <label>Connection<select id="gpTransport">
+      <option value="usb">USB-C cable (start/stop + download)</option>
+      <option value="ble">Bluetooth (start/stop only)</option></select></label>
+    <div class="row">
+      <label class="switch" title="Refuse to start the recording if any camera fails to start"><input type="checkbox" id="gpRequire"><span></span> Require all cameras</label>
+    </div>
+    <div class="camlist" id="gpList"></div>
+    <p class="note" id="gpNote"></p>
   </section>
 
   <section class="card">
