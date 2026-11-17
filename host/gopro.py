@@ -570,8 +570,10 @@ class GoProRig:
             vdir = os.path.join(take["dir"], "video")
             os.makedirs(vdir, exist_ok=True)
             files = []
-            for rel in new:                       # long takes are split into several chapters
-                fname = f"{name}_{rel.split('/')[-1]}"
+            trial = os.path.basename(os.path.normpath(take["dir"]))
+            for i, rel in enumerate(new, 1):      # long takes are split into several chapters
+                # same names as video_import: <trial>_<cam>.mp4, or _chNN.mp4 per chapter
+                fname = f"{trial}_{name}.mp4" if len(new) == 1 else f"{trial}_{name}_ch{i:02d}.mp4"
                 dl.update(file=fname, done=0, total=0, state="downloading")
                 n = cam.download(rel, os.path.join(vdir, fname),
                                  lambda d, t: dl.update(done=d, total=t))
