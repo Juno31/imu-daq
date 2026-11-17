@@ -780,7 +780,6 @@ function updateStepSums() {
     h ? esc(h) + " cm" : "", esc($("notes").value.trim())].filter(Boolean).join("<i>·</i>");
   // 3: the calibration parts
   const parts = [["Still hold", "calPill"], ["Forward bend", "bendPill"]];
-  if ($("emgNormStep") && !$("emgNormStep").classList.contains("hidden")) parts.push(["EMG norm", "emgNormPill"]);
   $("stepSum3").innerHTML = parts.map(([l, id]) => { const [m, c] = pillMark(id); return `<span class="${c}">${l} ${m}</span>`; }).join("<i>·</i>");
   // Setup group: steps 1-3 on one line
   if ($("setupSum")) {
@@ -866,15 +865,10 @@ function frameLoop(ts) {
 }
 
 // ---------------- status ----------------
-const fmtTime = (s) => {
-  const m = Math.floor(s / 60), r = s - m * 60;
-  return `${String(m).padStart(2, "0")}:${r.toFixed(1).padStart(4, "0")}`;
-};
 let recT0 = null;
 function tickTimer() {
   if (recT0 !== null) {
     const sec = (performance.now() - recT0) / 1000;
-    $("timer").textContent = fmtTime(sec);
     $("tpTc").textContent = fmtTc(sec);
   }
 }
@@ -979,38 +973,20 @@ function applyStatus(s) {
   } else if (st === "connecting") setText("connText", "Connecting…");
   else setText("connText", "No board");
   conn.className = "chip " + (s.port && s.hello && s.hello.board ? "" : "warn");
-  // state badge
-  const badge = $("stateBadge");
-  const map = { idle: ["READY", "idle"], recording: ["REC", "rec"], starting: ["STARTING", "busy"],
-    stopping: ["SAVING", "busy"], connecting: ["CONNECTING", "busy"], disconnected: ["OFFLINE", ""] };
-  const [lab, cls] = map[st] || [st.toUpperCase(), ""];
-  badge.textContent = lab; badge.className = "badge " + cls;
   document.title = (st === "recording" ? "● REC — " : "") + "IMU DAQ";
-  // timer
+  // recording clock (drives the transport-bar time code)
   if (st === "recording" && s.rec) {
     const t = performance.now() - s.rec.elapsed * 1000;
     if (recT0 === null || Math.abs(recT0 - t) > 500) recT0 = t;
-    $("timer").classList.add("rec");
-  } else if (recT0 !== null) {
-    recT0 = null; $("timer").classList.remove("rec");
-  }
-  if (st !== "recording" && recT0 === null && prevState !== st) $("timer").textContent = "00:00.0";
-  // rate chip
-  const fus = s.hello && s.hello.frame_us ? +s.hello.frame_us : 10000;
-  const target = 1e6 / fus;
-  setText("rateChip", s.port ? `${s.rate_hz.toFixed(1)} Hz` : "— Hz");
-  $("rateChip").className = "chip mono " + (!s.port ? "" : Math.abs(s.rate_hz - target) < target * 0.03 ? "good" : "warn");
-  // clock chip + time sync card
+  } else recT0 = null;
+  // time sync card
   const c = s.clock || {};
   if (c.n) {
-    setText("clockChip", `clock ±${c.uncertainty_ms.toFixed(2)} ms`);
-    $("clockChip").className = "chip mono " + (c.uncertainty_ms < 2 ? "good" : "warn");
     setText("csRtt", `${c.rtt_ms_median.toFixed(2)} ms`);
     setText("csUnc", `±${c.uncertainty_ms.toFixed(2)} ms`);
     setText("csDrift", c.n >= 6 ? `${c.drift_ppm.toFixed(1)} ppm` : "measuring…");
     setText("csRes", `${c.resid_ms.toFixed(3)} ms`);
   } else {
-    setText("clockChip", "clock —"); $("clockChip").className = "chip mono";
     for (const id of ["csRtt", "csUnc", "csDrift", "csRes"]) setText(id, "—");
   }
   // DAQ
@@ -1093,21 +1069,17 @@ function applyDaq(d, st) {
     if (document.activeElement !== el) el.value = String(key === "rate" || key === "range" ? +cfg[key] : cfg[key]);
   }
   const note = $("daqNote");
-  const chip = $("daqChip");
   if (!d.devices.available) {
     note.textContent = d.devices.error || "NI-DAQmx not available"; note.className = "note bad";
-    chip.textContent = "DAQ unavailable"; chip.className = "chip mono bad";
   } else if (!devs.length) {
     note.textContent = "No NI-DAQmx device found. Plug in the DAQ (check NI MAX), then Refresh. Recordings run IMU-only.";
-    note.className = "note bad"; chip.textContent = "DAQ not found"; chip.className = "chip mono warn";
+    note.className = "note bad";
   } else if (!cfg.enabled) {
     note.textContent = "DAQ recording off: IMU-only recordings (PC clock sync only)."; note.className = "note";
-    chip.textContent = "DAQ off"; chip.className = "chip mono";
   } else {
     const dev = devs.find((x) => x.name === cfg.device);
     note.textContent = dev ? `${dev.product}: SYNC on ${cfg.sync_chan} (${cfg.terminal}), ${(+cfg.rate / 1000).toFixed(0)} kHz. Starts before the board, checked at stop.` : "Select a device.";
     note.className = "note good";
-    chip.textContent = `DAQ ${cfg.device}`; chip.className = "chip mono good";
   }
   const live = d.live;
   setText("daqPulses", live ? `${live.pulses.toLocaleString()} / ${S && S.rec ? S.rec.frames.toLocaleString() : "—"}` : "—");
@@ -1451,56 +1423,12 @@ function applyBend() {
   else box.appendChild(calAlert("warn", "Needed after every still hold: without it, flexion, side bend and rotation are mixed."));
 }
 
-// ---------------- EMG normalization status (step 3c; measured on the /emg page) ----------------
-let emgNormKey = "", emgNormRes = null, emgNormBusy = false;
-async function checkEmgNorm(force) {
-  const subj = $("subject").value.trim(), date = dateId($("testDate").value);
-  const key = `${date}|${subj}`;
-  if (!force && key === emgNormKey) { showEmgNorm(); return; }
-  if (emgNormBusy) { emgNormKey = ""; return; }          // retry on the next status update
-  emgNormKey = key; emgNormRes = null;
-  if (subj) {
-    emgNormBusy = true;
-    try {
-      const r = await fetch("/api/emgcal/load?" + new URLSearchParams({ date, subject: subj }));
-      emgNormRes = r.ok ? { ok: true, norm: (await r.json()).norm || null } : { ok: false };
-    } catch { emgNormRes = { ok: false }; }
-    emgNormBusy = false;
-  }
-  showEmgNorm();
-}
-function showEmgNorm() {
-  const step = $("emgNormStep"), pill = $("emgNormPill"), cap = $("emgNormCap"), btn = $("btnEmgNorm");
-  const hasEmg = !!(S && S.emg && S.emg.chans && S.emg.chans.length);
-  step.classList.toggle("hidden", !hasEmg);
-  if (!hasEmg) return;
-  const subj = $("subject").value.trim(), n = emgNormRes && emgNormRes.norm;
-  const ch = n && n.channels ? Object.values(n.channels) : [];
-  const withRef = ch.filter((c) => c.ref_mv), withRest = ch.filter((c) => c.noise_mv != null);
-  const total = S.emg.chans.length;
-  const done = withRef.length >= total && withRest.length >= total;
-  btn.classList.toggle("ghost", done);
-  btn.innerHTML = done ? "Open EMG norm page →" : "⚡ Measure EMG rest &amp; MVC / RVC →";
-  if (!subj) { pill.textContent = "NOT DONE"; pill.className = "pill"; cap.textContent = "Enter the subject first, then measure the rest baseline and MVC / RVC on the EMG norm page."; }
-  else if (emgNormRes && !emgNormRes.ok) { pill.textContent = "UNKNOWN"; pill.className = "pill"; cap.textContent = "Could not check (restart the server once to enable the EMG norm page)."; }
-  else if (!n) { pill.textContent = "NOT DONE"; pill.className = "pill warn"; cap.textContent = `No rest baseline or MVC / RVC saved for ${subj} on this test date. Needed to express EMG as %MVC.`; }
-  else {
-    const kinds = {}; for (const c of withRef) kinds[c.ref_kind] = (kinds[c.ref_kind] || 0) + 1;
-    const kt = Object.entries(kinds).map(([k, v]) => `${k} ${v}`).join(", ");
-    pill.textContent = done ? "DONE " + (n.saved || "").slice(11, 16) : "PARTIAL";
-    pill.className = "pill " + (done ? "ok" : "warn");
-    cap.textContent = `Saved ${(n.saved || "").slice(0, 16)} · reference for ${withRef.length}/${total} channels${kt ? " (" + kt + ")" : ""}` +
-      (withRest.length < total ? ` · rest baseline for ${withRest.length}/${total}` : "") + (done ? "" : " · finish it on the EMG norm page");
-  }
-}
-
 // ---------------- experiment flow: which step is next ----------------
 let flowPrevState = null;
 function applyFlow(s) {
   updateStepSums();
   if (s.spine_cal_rev != null && spineRev != null && s.spine_cal_rev !== spineRev) { spineRev = s.spine_cal_rev; syncSpineCal(); }
   applyBend();
-  checkEmgNorm();
   const tiles = ["stDaq", "stImu", "stEmg", "stSync"].map((id) => $(id).className);
   const done = {
     1: tiles.every((c) => !/\b(bad|warn)\b/.test(c)) && !!s.port,
@@ -1708,12 +1636,6 @@ function wireCalib() {
     };
   }
   $("subject").addEventListener("input", () => { if (S) { applyCalib(S); applyFlow(S); } });
-  // step 3c: re-check after the subject / date changes and when coming back from the EMG norm tab
-  for (const id of ["subject", "testDate"]) $(id).addEventListener("change", () => checkEmgNorm());
-  window.addEventListener("focus", () => checkEmgNorm(true));
-  document.addEventListener("visibilitychange", () => { if (!document.hidden) checkEmgNorm(true); });
-  $("btnEmgNorm").addEventListener("click", () => saveForm());      // the EMG page reads the same participant
-  setInterval(() => checkEmgNorm(true), 30000);
 }
 
 async function startRec() {
@@ -1992,7 +1914,6 @@ function connectStream() {
   };
   es.onerror = () => {
     $("connDot").className = "dot"; setText("connText", "Server offline");
-    $("stateBadge").textContent = "NO SERVER"; $("stateBadge").className = "badge";
     if (!serverDown) {
       serverDown = true;
       const b = $("banner");

@@ -10,12 +10,7 @@
 <header class="topbar">
   <div class="brand"><span class="logo">◆</span> IMU DAQ</div>
   <div class="chip" id="connChip"><span class="dot" id="connDot"></span><span id="connText">Connecting…</span></div>
-  <div class="badge" id="stateBadge">—</div>
-  <div class="timer" id="timer">00:00.0</div>
   <div class="spacer"></div>
-  <div class="chip mono" id="rateChip">— Hz</div>
-  <div class="chip mono hidden" id="clockChip" title="Board ↔ PC clock">clock —</div>
-  <div class="chip mono hidden" id="daqChip" title="NI DAQ">DAQ —</div>
   <a class="chip" href="/emg" style="text-decoration:none;color:inherit" title="Baseline offset and MVC / RVC of the EMG channels">EMG norm</a>
   <a class="chip" href="/review" style="text-decoration:none;color:inherit" title="Open a finished recording: IMU, EMG and spine replay">Review</a>
   <a class="chip" href="/spine" style="text-decoration:none;color:inherit" title="Calibrated 3D spine view">Spine view</a>
@@ -98,12 +93,6 @@
           <button class="btn bendbtn" id="btnBend" title="Capture a forward bend for 6 s (shortcut: B)">↓ Forward bend · 6 s <kbd class="k">B</kbd></button>
           <div class="calprog hidden" id="bendProg"><div class="bar"><i id="bendBar"></i></div><span id="bendLeft"></span></div>
           <div class="calres" id="bendRes"></div>
-        </div>
-        <div class="substep hidden" id="emgNormStep">
-          <div class="subhead"><span class="subn">c</span><b>EMG normalization</b><span class="pill" id="emgNormPill">NOT DONE</span></div>
-          <p class="cap" id="emgNormCap">Rest baseline (offset, noise) and MVC / RVC of each EMG channel, measured on the EMG norm page.</p>
-          <a class="btn emgnormbtn" id="btnEmgNorm" href="/emg"
-            title="Go to the EMG normalization page (same participant)">⚡ Measure EMG rest &amp; MVC / RVC</a>
         </div>
       </section>
       </div>

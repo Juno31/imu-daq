@@ -60,7 +60,7 @@ All pages open in the same browser tab and share one live-data connection, so se
 | **Setup** (steps 1–3) | One block, minimizable to a one-line summary with a READY / n of 3 DONE pill. Each step can also be minimized on its own. |
 | 1 · System check | DAQ · IMU · EMG · Sync lights (green / yellow / red); click a tile for detail |
 | 2 · Participant | test date, subject, height (scales the spine model, saved with each trial), notes |
-| 3 · Static calibration | a · still hold (per-IMU table: moved, tilt, gyro bias, mag cal), b · forward bend (body axes for spine angles), c · EMG normalization status with a link to the EMG norm page |
+| 3 · Static calibration | a · still hold (per-IMU table: moved, tilt, gyro bias, mag cal), b · forward bend (body axes for spine angles) |
 | **Record trials** (step 4) | task and trial, output path, Start/Stop, marker, frame / missing / marker counters |
 | **Live signals** | IMU (3D board, roll/pitch/yaw, plots), EMG (2 s envelope, 100 ms RMS, clipping), Sync detail, Event log |
 | **Spine** (left, wide screens) | calibrated 3D spine model with view, ribs, trail and lumbar-share controls; blurred until the static calibration is done |

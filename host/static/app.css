@@ -96,8 +96,6 @@ kbd {
 .badge.rec { color: #fff; background: var(--bad); border-color: transparent; animation: pulse 1.6s ease-in-out infinite; }
 .badge.busy { color: var(--warn); background: var(--warn-soft); border-color: transparent; }
 @keyframes pulse { 0%, 100% { opacity: 1 } 50% { opacity: .72 } }
-.timer { font: 600 20px/1 var(--mono); font-variant-numeric: tabular-nums; color: var(--text-3); min-width: 110px; }
-.timer.rec { color: var(--bad); }
 
 .banner {
   margin: 12px 20px 0; padding: 10px 14px; border-radius: 10px; font-size: 13px;
@@ -327,7 +325,6 @@ input:disabled, select:disabled, textarea:disabled { opacity: .6; }
 @media (max-width: 760px) { .emggrid { grid-template-columns: 1fr; } }
 
 /* replaced by the status tiles */
-#clockChip, #daqChip { display: none !important; }
 
 /* =========================================================================
    Compact layout (v1.2): status row, one-line recording bar, collapsible
@@ -736,13 +733,6 @@ body { padding-bottom: var(--tbar); }
 .spinetools .tgl { flex-direction: row; align-items: center; gap: 6px; margin: 0; font-size: 12.5px; color: var(--text); cursor: pointer; }
 .spinetools .tgl input { width: auto; margin: 0; accent-color: var(--accent); }
 .spinetools .hint { margin: 0; font-size: 11.5px; }
-
-/* ---------- step 3c: EMG normalization (link to the /emg page) ---------- */
-.emgnormbtn { display: block; text-align: center; text-decoration: none; padding: 8px 12px; font-weight: 600;
-  background: var(--warn-soft); color: var(--warn); border-color: color-mix(in srgb, var(--warn) 45%, var(--border)); }
-.emgnormbtn:hover { background: color-mix(in srgb, var(--warn) 18%, var(--surface)); }
-.emgnormbtn.ghost { background: transparent; color: var(--text-2); border-color: var(--border-strong); font-weight: 500; }
-#emgNormCap { overflow-wrap: anywhere; }
 
 /* ---------- steps 1-4: minimizable ---------- */
 .stephdr { cursor: pointer; user-select: none; }
