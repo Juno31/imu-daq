@@ -480,7 +480,7 @@ class App:
                 if gp:
                     ok = [n for n, r in gp.items() if r.get("ok")]
                     sess.event(self.unix(), "gopro_start", ", ".join(ok) or "none started")
-                    sess.write_meta({"gopro": {n: {k: r.get(k) for k in ("serial", "model", "ok")}
+                    sess.write_meta({"gopro": {n: {k: r.get(k) for k in ("serial", "model", "ok", "settings")}
                                                for n, r in gp.items()}})
             # DAQ next, so it sees the frame-0 pulse
             self.daq = None
@@ -1027,6 +1027,12 @@ class Handler(BaseHTTPRequestHandler):
                 if APP.state in ("recording", "starting", "stopping"):
                     raise RuntimeError("stop the recording first")
                 APP.gopro.request(str(body.get("action", "")))
+                return self._json({"ok": True})
+            if path == "/api/gopro/video":        # resolution / frame rate / lens / HyperSmooth for all cameras
+                if APP.state in ("recording", "starting", "stopping"):
+                    raise RuntimeError("stop the recording first")
+                c = APP.gopro.set_video(body.get("values") or {})
+                save_host_settings({"gopro": c})
                 return self._json({"ok": True})
             if path == "/api/video_import":       # SD-card copies -> trial folders (dry run first)
                 return self._json({"ok": True, **APP.video_import(str(body.get("folder", "")).strip().strip('"'),

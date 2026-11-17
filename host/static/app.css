@@ -824,3 +824,6 @@ body { padding-bottom: var(--tbar); }
 .camlist { display: flex; flex-direction: column; gap: 6px; margin: 10px 0 4px; }
 .camrow { display: flex; }
 .camrow span.mono { margin-left: auto; }
+.gpsub { font-size: 13px; margin: 14px 0 6px; }
+.gpcur { display: block; font-size: 11px; color: var(--text-3); margin-top: 2px; min-height: 14px; }
+.gpcur.warn { color: var(--warn); }

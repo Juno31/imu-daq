@@ -235,6 +235,36 @@ class BleGoPro:
         self.connect()
         self._run(self._command(CMD, CMD_RSP, SHUTTER_ON if on else SHUTTER_OFF))
 
+    # ---- video settings (resolution, frame rate, lens, HyperSmooth) ----
+    def get_settings(self, ids):
+        """Current values: {"2": 9, "3": 5, ...}."""
+        self.connect()
+        msg = self._run(self._request(QRY, QRY_RSP, bytes([1 + len(ids), 0x12, *ids])))
+        return parse_status(msg)
+
+    def get_caps(self, ids):
+        """Values the camera accepts now (they depend on the other settings): {"3": [0, 1, 5], ...}."""
+        self.connect()
+        msg = self._run(self._request(QRY, QRY_RSP, bytes([1 + len(ids), 0x32, *ids])))
+        if len(msg) < 2 or msg[1] != 0:
+            raise RuntimeError(f"capabilities query failed (result {msg[1] if len(msg) > 1 else '?'})")
+        out, i = {str(k): [] for k in ids}, 2
+        while i + 2 <= len(msg):
+            sid, ln = msg[i], msg[i + 1]
+            out.setdefault(str(sid), []).append(int.from_bytes(msg[i + 2:i + 2 + ln], "big"))
+            i += 2 + ln
+        return out
+
+    def set_setting(self, sid, value):
+        self.connect()
+        msg = self._run(self._request(SET, SET_RSP, bytes([3, sid, 1, value])))
+        if len(msg) >= 2 and msg[1] != 0:
+            raise RuntimeError(f"camera refused setting {sid} = {value} (result {msg[1]})")
+
+    def video_mode(self):
+        """Load the Video preset group, so the shutter records video (not photo / time lapse)."""
+        self._run(self._command(CMD, CMD_RSP, bytes([0x04, 0x3E, 0x02, 0x03, 0xE8])))
+
     def poll(self):
         self.connect()
         self.state = parse_status(self._run(self._request(QRY, QRY_RSP, status_query())))

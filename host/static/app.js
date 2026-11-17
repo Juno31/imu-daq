@@ -1130,6 +1130,40 @@ function applyGopro(g, st) {
   $("btnGpPair").classList.toggle("hidden", !ble);
   setText("btnGpRescan", g.action === "rescan" ? "Searching…" : "↻ Rescan");
   setText("btnGpPair", g.action === "pair" ? "Pairing…" : "Pair new camera");
+  applyGpVideo(g, lock, cams);
+}
+
+// Video settings: one select per setting; options = what every camera accepts now; per-camera values shown
+function applyGpVideo(g, lock, cams) {
+  const v = g.video || { settings: [], errors: {} }, box = $("gpVideo");
+  const names = cams.filter((c) => c.online).map((c) => c.name);
+  const sig = v.settings.map((s) => s.id + ":" + s.options.map((o) => o.v).join(",")).join("|");
+  if (box.dataset.sig !== sig) {           // rebuild only when the option lists change
+    box.dataset.sig = sig;
+    box.innerHTML = v.settings.map((s) => `<label>${gpEsc(s.name)}<select data-sid="${s.id}">` +
+      s.options.map((o) => `<option value="${o.v}">${gpEsc(o.label)}</option>`).join("") +
+      `</select><span class="gpcur" data-cur="${s.id}"></span></label>`).join("");
+    for (const sel of box.querySelectorAll("select")) sel.addEventListener("change", () => { sel.dataset.dirty = "1"; });
+  }
+  for (const s of v.settings) {
+    const sel = box.querySelector(`select[data-sid="${s.id}"]`), cur = box.querySelector(`[data-cur="${s.id}"]`);
+    const vals = names.map((n) => s.current[n]).filter((x) => x != null);
+    const same = vals.length && vals.every((x) => x === vals[0]);
+    if (!sel.dataset.dirty && document.activeElement !== sel) {
+      const want = s.wanted != null ? s.wanted : same ? vals[0] : null;
+      if (want != null && [...sel.options].some((o) => +o.value === want)) sel.value = String(want);
+    }
+    sel.disabled = lock || !!g.action || !names.length;
+    const lab = (x) => (s.options.find((o) => o.v === x) || { label: x == null ? "?" : "#" + x }).label;
+    const txt = !vals.length ? "" : same ? `now: ${lab(vals[0])}` : "now: " + names.map((n) => `${n} ${lab(s.current[n])}`).join(", ");
+    cur.textContent = txt; cur.className = "gpcur" + (vals.length && !same ? " warn" : "");
+  }
+  $("btnGpApply").disabled = $("btnGpRead").disabled = lock || !!g.action || !names.length;
+  setText("btnGpApply", g.action === "apply" ? "Applying…" : "Apply to all cameras");
+  const errs = Object.entries(v.errors || {}).map(([n, e]) => `${n}: ${e}`);
+  setText("gpVideoNote", !names.length ? "Connect the cameras to change their settings."
+    : errs.length ? "Could not read: " + errs.join(" · ")
+    : "Frame rates offered depend on the resolution: apply the resolution first, then pick the frame rate.");
   $("gpDownloadSw").classList.toggle("hidden", ble);
   setText("gpHint", ble ? "Bluetooth" : "USB-C · GoPro Connect");
   setText("gpNote", ble
@@ -1882,6 +1916,13 @@ function wire() {
   for (const id of ["daqEnabled", "daqDevice", "daqSync", "daqRate", "daqTerm", "daqRange", "daqExtra"])
     $(id).addEventListener("change", () => api("/api/daq", daqCfgFromForm()));
   $("btnImportVideo").onclick = importVideos;
+  $("btnGpRead").onclick = () => api("/api/gopro/action", { action: "settings" });
+  $("btnGpApply").onclick = async () => {
+    const values = {};
+    for (const sel of $("gpVideo").querySelectorAll("select")) values[sel.dataset.sid] = +sel.value;
+    const j = await api("/api/gopro/video", { values });
+    if (j.ok) { for (const sel of $("gpVideo").querySelectorAll("select")) delete sel.dataset.dirty; toast("Applying camera settings…"); }
+  };
   $("btnGpRescan").onclick = async () => { const j = await api("/api/gopro/action", { action: "rescan" }); if (j.ok) toast("Looking for cameras…"); };
   $("btnGpPair").onclick = async () => {
     if (!confirm("Put the new camera in pairing mode first:\nConnections → Connect Device → Quik App\n\nThen press OK to pair.")) return;

@@ -33,6 +33,30 @@ ST_SD_FREE_KB = "54"
 ST_BATTERY_PCT = "70"
 
 
+# Video settings shown in the GUI (Open GoPro setting ids; unknown values show as "#n").
+# Order matters when applying: resolution first, since it limits the frame rates.
+VIDEO_SETTINGS = [
+    (2, "Resolution", {1: "4K", 4: "2.7K", 6: "2.7K 4:3", 7: "1440", 9: "1080", 12: "720", 18: "4K 4:3",
+                       24: "5K", 25: "5K 4:3", 26: "5.3K 8:7", 27: "5.3K 4:3", 28: "4K 8:7", 100: "5.3K",
+                       107: "5.3K", 108: "4K", 109: "4K", 110: "1080", 111: "2.7K"}),
+    (3, "Frame rate", {0: "240", 1: "120", 2: "100", 5: "60", 6: "50", 8: "30", 9: "25", 10: "24",
+                       13: "200", 15: "400", 16: "360", 17: "300"}),
+    (121, "Lens", {0: "Wide", 2: "Narrow", 3: "SuperView", 4: "Linear", 7: "Max SuperView",
+                   8: "Linear + Horizon Leveling", 9: "HyperView", 10: "Linear + Horizon Lock",
+                   11: "Max HyperView", 12: "Ultra SuperView", 13: "Ultra Wide", 14: "Ultra Linear",
+                   104: "Ultra HyperView"}),
+    (135, "HyperSmooth", {0: "Off", 1: "Low", 2: "High", 3: "Boost", 4: "Auto Boost", 100: "Standard"}),
+]
+VIDEO_IDS = [s[0] for s in VIDEO_SETTINGS]
+
+
+def video_label(sid, val):
+    for i, _name, labels in VIDEO_SETTINGS:
+        if i == int(sid):
+            return labels.get(val, f"#{val}") if val is not None else "?"
+    return str(val)
+
+
 def local_usb_ips():
     """PC-side addresses on GoPro USB networks (172.2X.1YZ.n)."""
     ips = set()
@@ -84,6 +108,20 @@ class GoPro:
 
     def shutter(self, on):
         self._get("/gopro/camera/shutter/" + ("start" if on else "stop"), timeout=3.0)
+
+    # ---- video settings (USB: no capability query, the camera refuses what it cannot do) ----
+    def get_settings(self, ids):
+        st = self._get("/gopro/camera/state", timeout=3.0).get("settings", {})
+        return {str(k): st.get(str(k)) for k in ids}
+
+    def get_caps(self, ids):
+        return None
+
+    def set_setting(self, sid, value):
+        self._get(f"/gopro/camera/setting?setting={sid}&option={value}")
+
+    def video_mode(self):
+        self._get("/gopro/camera/presets/set_group?id=1000")
 
     def set_clock(self, t=None):
         """Camera clock = PC local time, so the file times on the SD card match the trials."""
@@ -164,7 +202,10 @@ class GoProRig:
         self.pool = ThreadPoolExecutor(max_workers=6, thread_name_prefix="gopro")
         self._stop = False
         self._reset = False                 # transport changed: the poller drops all cameras
-        self.action = ""                    # "rescan" / "pair" requested from the GUI
+        self.action = ""                    # "rescan" / "pair" / "settings" / "apply" requested from the GUI
+        self.apply_values = {}              # {"2": 9, ...} for "apply"
+        self.cam_cfg = {}                   # name -> {"current": {...}, "caps": {...} or None, "error": ""}
+        self.cfg.setdefault("video", {})    # wanted video settings, applied to every camera that connects
         self.scan_s = 4.0                   # Bluetooth scan length
         threading.Thread(target=self._poller, name="gopro-poll", daemon=True).start()
 
@@ -233,6 +274,12 @@ class GoProRig:
                     cam.set_clock()
                 except Exception as e:
                     self.log("warn", f"{self.name_of(cam)}: could not set the camera clock: {_err(e)}", "gopro")
+                if self.cfg.get("video"):     # same video settings on every camera
+                    err = self._apply_one(cam, self.cfg["video"])
+                    if err:
+                        self.log("warn", f"camera settings not applied - {err}", "gopro")
+                else:
+                    self._read_one(cam)
             if not was:
                 model = cam.info.get("model_name", "GoPro")
                 label = cam.serial if cam.serial.startswith("GoPro") else f"serial {cam.serial}"
@@ -256,6 +303,18 @@ class GoProRig:
                 self._reset = False
                 self._drop_all()
                 self.ble_names, last_disc = {}, 0.0
+            if self.cfg.get("enabled") and not self.busy.is_set() and self.action in ("settings", "apply"):
+                act, cams = self.action, self.online()
+                if act == "apply":
+                    vals = dict(self.apply_values)
+                    errs = [e for e in self.pool.map(lambda c: self._apply_one(c, vals), cams) if e]
+                    want = ", ".join(f"{n} {video_label(i, vals[str(i)])}" for i, n, _l in VIDEO_SETTINGS
+                                     if str(i) in vals)
+                    self.log("warn" if errs else "info", f"camera settings {want}: "
+                             + ("; ".join(errs) if errs else f"applied to {len(cams)} camera(s)"), "gopro")
+                else:
+                    list(self.pool.map(self._read_one, cams))
+                self.action = ""
             if self.cfg.get("enabled") and not self.busy.is_set():
                 act = self.action
                 now = time.time()
@@ -283,9 +342,75 @@ class GoProRig:
                     self.action = ""
             time.sleep(2.0)
 
+    # ---------------- video settings ----------------
+    def _read_one(self, cam):
+        n = self.name_of(cam)
+        try:
+            cur = cam.get_settings(VIDEO_IDS)
+            try:
+                caps = cam.get_caps(VIDEO_IDS)
+            except Exception:
+                caps = None
+            self.cam_cfg[n] = {"current": cur, "caps": caps, "error": ""}
+        except Exception as e:
+            self.cam_cfg.setdefault(n, {"current": {}, "caps": None})["error"] = _err(e)
+
+    def _apply_one(self, cam, values):
+        """Video mode, then each setting in order (resolution first). Returns an error text or ''."""
+        n, errs = self.name_of(cam), []
+        try:
+            cam.video_mode()
+        except Exception as e:
+            errs.append(f"video mode: {_err(e)}")
+        for sid, name, _labels in VIDEO_SETTINGS:
+            v = values.get(str(sid))
+            if v is None:
+                continue
+            try:
+                cam.set_setting(sid, int(v))
+            except Exception as e:
+                errs.append(f"{name} {video_label(sid, int(v))}: {_err(e)}")
+        time.sleep(1.5)                     # the camera reports a new value ~1 s after accepting it
+        self._read_one(cam)
+        return f"{n}: " + ", ".join(errs) if errs else ""
+
+    def set_video(self, values):
+        """Remember the wanted settings and apply them to all connected cameras (in the poller)."""
+        if not self.cfg.get("enabled"):
+            raise RuntimeError("turn on Record video first")
+        vals = {str(k): int(v) for k, v in (values or {}).items() if str(k) in map(str, VIDEO_IDS) and v not in ("", None)}
+        if not vals:
+            raise RuntimeError("no setting given")
+        self.cfg["video"] = {**self.cfg.get("video", {}), **vals}
+        self.apply_values = dict(self.cfg["video"])
+        self.action = "apply"
+        return self.cfg
+
+    def video_view(self):
+        """For the GUI: settings, per-camera current values, and the options all cameras accept now."""
+        names = [c["name"] for c in self.snapshot_cams()]
+        out = []
+        for sid, label, labels in VIDEO_SETTINGS:
+            k = str(sid)
+            cur = {n: self.cam_cfg.get(n, {}).get("current", {}).get(k) for n in names}
+            caps = [self.cam_cfg.get(n, {}).get("caps") for n in names if self.cam_cfg.get(n)]
+            if caps and all(c is not None for c in caps):
+                allowed = set(caps[0].get(k) or [])
+                for c in caps[1:]:
+                    allowed &= set(c.get(k) or [])
+                opts = [v for v in labels if v in allowed] + sorted(v for v in allowed if v not in labels)
+            else:
+                opts = list(labels)
+            out.append({"id": sid, "name": label, "current": cur,
+                        "options": [{"v": v, "label": video_label(sid, v)} for v in opts],
+                        "wanted": self.cfg.get("video", {}).get(k)})
+        errs = {n: c["error"] for n, c in self.cam_cfg.items() if c.get("error")}
+        return {"settings": out, "errors": errs}
+
     def request(self, act):
-        """'rescan': look for cameras now. 'pair': longer Bluetooth scan, then pair any camera in pairing mode."""
-        if act not in ("rescan", "pair"):
+        """'rescan': look for cameras now. 'pair': longer Bluetooth scan, then pair any camera in pairing mode.
+        'settings': read the video settings of every camera."""
+        if act not in ("rescan", "pair", "settings"):
             raise ValueError(act)
         if not self.cfg.get("enabled"):
             raise RuntimeError("turn on Record video first")
@@ -322,7 +447,10 @@ class GoProRig:
                               self.pool.map(_safe_media, cams)))
 
             def go(c):
-                r = {"ip": c.ip, "serial": c.serial, "model": c.info.get("model_name", "")}
+                cur = self.cam_cfg.get(self.name_of(c), {}).get("current", {})
+                r = {"ip": c.ip, "serial": c.serial, "model": c.info.get("model_name", ""),
+                     "settings": {name: video_label(sid, cur.get(str(sid))) for sid, name, _l in VIDEO_SETTINGS
+                                  if cur.get(str(sid)) is not None}}
                 r["t_send_unix"] = unix()
                 try:
                     c.shutter(True)
@@ -483,6 +611,10 @@ class GoProRig:
         return self.cfg
 
     def snapshot(self):
+        return {"cfg": self.cfg, "cams": self.snapshot_cams(), "recording": bool(self.rec), "action": self.action,
+                "video": self.video_view()}
+
+    def snapshot_cams(self):
         with self.lock:
             cams = sorted(self.cams.values(), key=lambda c: c.ip)
         out = []
@@ -495,7 +627,7 @@ class GoProRig:
                         if isinstance(s.get(ST_SD_FREE_KB), (int, float)) else None,
                         "sd_status": s.get(ST_SD_STATUS), "video_s": s.get(ST_VIDEO_SECS),
                         "download": self.downloads.get(n)})
-        return {"cfg": self.cfg, "cams": out, "recording": bool(self.rec), "action": self.action}
+        return out
 
     def shutdown(self):
         self._stop = True
