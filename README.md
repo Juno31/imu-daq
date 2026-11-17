@@ -130,9 +130,11 @@ amplifier outputs, or remove unused channels in Settings → EMG / extra channel
 
 ### Planned wiring: Teensy 4.1, 7 IMUs, 3 GoPros
 
-Next hardware revision (not built yet): a Teensy 4.1 with an Ethernet kit streams 7 IMUs (one TCA9548A
-I2C mux, ch 0–6) to the PC over UDP, keeps the SYNC pulse to the USB-6363, and three GoPro HERO13 cameras
-connect through a powered USB 3 hub.
+Next hardware revision (not built yet): a Teensy 4.1 with an Ethernet kit streams 7 IMUs to the PC over
+UDP, keeps the SYNC pulse to the USB-6363, and three GoPro HERO13 cameras connect through a powered USB 3 hub.
+The IMUs sit on two TCA9548A muxes on two separate I2C buses: mux A on `Wire` (pins 18/19, IMUs 1–4) and
+mux B on `Wire1` (pins 17/16, IMUs 5–7). The two buses are read in parallel; a timing simulation gave
+200 frames/s with a worst frame of 4.7 of 5 ms, while one bus overran even at 100 frames/s.
 
 ![Planned wiring: Teensy 4.1, 7 IMUs, NI USB-6363, 3 GoPros](hardware/wiring/teensy41_wiring.png)
 
