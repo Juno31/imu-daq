@@ -793,16 +793,11 @@ body { padding-bottom: var(--tbar); }
 .flowrow.setuprow { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 
 .recmain { border-color: color-mix(in srgb, var(--accent) 35%, var(--border)); }
-.rm-grid { display: grid; grid-template-columns: minmax(0, 1.15fr) minmax(0, 1.25fr) minmax(0, 0.9fr); gap: 0; align-items: stretch; }
+.rm-grid { display: grid; grid-template-columns: minmax(0, 1fr); gap: 0; align-items: stretch; }
 .rm-col { display: flex; flex-direction: column; gap: 8px; min-width: 0; padding: 2px 16px; }
 .rm-col:first-child { padding-left: 0; }
 .rm-col:last-child { padding-right: 0; }
 .rm-col + .rm-col { border-left: 1px solid var(--border); }
-.rm-rec { justify-content: center; }
-.rm-rec .recbtns .btn.start, .rm-rec .recbtns .btn.stop { padding: 14px 12px; font-size: 16px; }
-.rm-stats .recstats { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-.rm-stats .recstats div.wide { grid-column: 1 / -1; }
-.rm-stats .recstats dd { font-size: 15px; }
 .stepcard.recmain.min > h2 .stepsum { padding-left: 50px; }
 @media (max-width: 1100px) {
   .rm-grid { grid-template-columns: 1fr; gap: 12px; }
@@ -831,3 +826,8 @@ body { padding-bottom: var(--tbar); }
 .gpsub { font-size: 13px; margin: 14px 0 6px; }
 .gpcur { display: block; font-size: 11px; color: var(--text-3); margin-top: 2px; min-height: 14px; }
 .gpcur.warn { color: var(--warn); }
+
+/* Recording: only what has to be watched (IMU, EMG, take, cameras); setup, sync detail, log and files come back after Stop */
+body.recording #setupGroup, body.recording #step5, body.recording #syncCard, body.recording #foldLog,
+body.recording #filesPanel, body.recording .divider, body.recording #taskInfo { display: none; }
+body.recording .layout { gap: 10px; }

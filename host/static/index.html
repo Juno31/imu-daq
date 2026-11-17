@@ -10,8 +10,6 @@
 <header class="topbar">
   <div class="brand"><span class="logo">◆</span> IMU DAQ</div>
   <div class="chip" id="connChip"><span class="dot" id="connDot"></span><span id="connText">Connecting…</span></div>
-  <div class="badge" id="stateBadge">—</div>
-  <div class="timer" id="timer">00:00.0</div>
   <div class="spacer"></div>
   <div class="chip mono" id="rateChip">— Hz</div>
   <div class="chip mono hidden" id="clockChip" title="Board ↔ PC clock">clock —</div>
@@ -126,24 +124,6 @@
         </div>
         <p class="cap taskinfo" id="taskInfo"></p>
         <div class="takepath mono" id="takePath" title="Where the next trial is saved"></div>
-      </div>
-      <div class="rm-col rm-rec">
-        <div class="recbtns">
-          <button class="btn start" id="btnStart" title="Shortcut: Space">● Start <kbd class="k">Space</kbd></button>
-          <button class="btn stop" id="btnStop" disabled title="Shortcut: Space">■ Stop <kbd class="k">Space</kbd></button>
-        </div>
-        <div class="markrow">
-          <input id="markText" placeholder="Marker text (M)" autocomplete="off">
-          <button class="btn" id="btnMark" title="Shortcut: M">Mark</button>
-        </div>
-      </div>
-      <div class="rm-col rm-stats">
-        <dl class="recstats">
-          <div><dt>Frames</dt><dd id="recFrames">—</dd></div>
-          <div><dt>Missing</dt><dd id="recMissing">—</dd></div>
-          <div><dt>Markers</dt><dd id="recMarkers">—</dd></div>
-          <div class="wide"><dt>Session</dt><dd id="recName" class="ellip">—</dd></div>
-        </dl>
       </div>
     </div>
     <div class="camstrip" id="camStrip" title="GoPro cameras over USB: started and stopped with each recording (Settings → GoPro)"></div>
@@ -388,7 +368,7 @@
     <h2>Keyboard shortcuts</h2>
     <dl>
       <dt><kbd>Space</kbd></dt><dd>Start / stop recording</dd>
-      <dt><kbd>M</kbd></dt><dd>Event marker (uses the marker text, if any)</dd>
+      <dt><kbd>M</kbd></dt><dd>Event marker</dd>
       <dt><kbd>Z</kbd></dt><dd>Zero the IMU display (data unchanged)</dd>
       <dt><kbd>1</kbd> <kbd>2</kbd> <kbd>3</kbd> <kbd>4</kbd></dt><dd>Open / close IMU · EMG · Sync detail · Event log</dd>
       <dt><kbd>S</kbd></dt><dd>Settings panel</dd>

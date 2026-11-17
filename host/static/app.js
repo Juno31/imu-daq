@@ -887,15 +887,10 @@ function frameLoop(ts) {
 }
 
 // ---------------- status ----------------
-const fmtTime = (s) => {
-  const m = Math.floor(s / 60), r = s - m * 60;
-  return `${String(m).padStart(2, "0")}:${r.toFixed(1).padStart(4, "0")}`;
-};
 let recT0 = null;
 function tickTimer() {
   if (recT0 !== null) {
     const sec = (performance.now() - recT0) / 1000;
-    $("timer").textContent = fmtTime(sec);
     $("tpTc").textContent = fmtTc(sec);
   }
 }
@@ -957,6 +952,7 @@ function applyTransport(s) {
   mode.className = "tp-mode " + (recording ? "rec" : st === "idle" ? "idle" : st === "disconnected" ? "" : "busy");
   mode.lastChild.textContent = word;
   $("transport").classList.toggle("rec", recording);
+  document.body.classList.toggle("recording", recording || st === "starting" || st === "stopping");
   setText("tpTakeName", rec ? rec.name : (takeName() || "—"));
   if (rec) setText("tpFrames", String(rec.frames).padStart(6, "0"));
   else if (st === "idle" && !recording) setText("tpFrames", "000000");
@@ -1000,22 +996,12 @@ function applyStatus(s) {
   } else if (st === "connecting") setText("connText", "Connecting…");
   else setText("connText", "No board");
   conn.className = "chip " + (s.port && s.hello && s.hello.board ? "" : "warn");
-  // state badge
-  const badge = $("stateBadge");
-  const map = { idle: ["READY", "idle"], recording: ["REC", "rec"], starting: ["STARTING", "busy"],
-    stopping: ["SAVING", "busy"], connecting: ["CONNECTING", "busy"], disconnected: ["OFFLINE", ""] };
-  const [lab, cls] = map[st] || [st.toUpperCase(), ""];
-  badge.textContent = lab; badge.className = "badge " + cls;
   document.title = (st === "recording" ? "● REC — " : "") + "IMU DAQ";
   // timer
   if (st === "recording" && s.rec) {
     const t = performance.now() - s.rec.elapsed * 1000;
     if (recT0 === null || Math.abs(recT0 - t) > 500) recT0 = t;
-    $("timer").classList.add("rec");
-  } else if (recT0 !== null) {
-    recT0 = null; $("timer").classList.remove("rec");
-  }
-  if (st !== "recording" && recT0 === null && prevState !== st) $("timer").textContent = "00:00.0";
+  } else recT0 = null;
   // rate chip
   const fus = s.hello && s.hello.frame_us ? +s.hello.frame_us : 10000;
   const target = 1e6 / fus;
@@ -1036,17 +1022,8 @@ function applyStatus(s) {
   }
   // DAQ
   applyDaq(s.daq, st);
-  // recording card
-  const rec = s.rec;
-  setText("recFrames", rec ? rec.frames.toLocaleString() : "—");
-  setText("recMissing", rec ? rec.missing : "—");
-  $("recMissing").className = rec && rec.missing ? "bad" : rec ? "good" : "";
-  setText("recMarkers", rec ? rec.markers : "—");
-  setText("recName", rec ? rec.name : (s.last_summary ? "last: " + s.last_summary.session : "—"));
   applyTransport(s);
   const idle = st === "idle", recording = st === "recording";
-  $("btnStart").disabled = !idle;
-  $("btnStop").disabled = !recording;
   for (const id of ["portSel", "btnConnect", "btnDisconnect", "rateSel", "btnRestart", "daqEnabled", "daqDevice",
     "daqSync", "daqRate", "daqTerm", "daqRange", "daqExtra", "btnDaqRefresh"])
     $(id).disabled = !(idle || st === "disconnected" || st === "connecting") ||
@@ -1878,10 +1855,9 @@ function wireCalib() {
 
 async function startRec() {
   saveForm();
-  $("btnStart").disabled = true;
   if (!$("subject").value.trim() || !$("taskSel").value) {
     toast(!$("subject").value.trim() ? "Enter the subject first (step 2)" : "Pick a task first", true);
-    $("btnStart").disabled = false; return;
+    return;
   }
   const t = TASKS.find((x) => x.key === $("taskSel").value) || {};
   const j = await api("/api/start", { subject: $("subject").value.trim(), date: dateId($("testDate").value), task: $("taskSel").value,
@@ -1889,13 +1865,12 @@ async function startRec() {
   if (j.ok) { toast("Recording " + j.session); $("banner").classList.add("hidden"); }
 }
 async function stopRec() {
-  $("btnStop").disabled = true;
+  $("tpRec").disabled = true;
   await api("/api/stop");
 }
 async function mark() {
-  const txt = $("markText").value.trim();
-  const j = await api("/api/marker", { text: txt });
-  if (j.ok) { toast(S && S.state === "recording" ? `Marker${txt ? ": " + txt : ""}` : "Marker logged (not recording)"); $("markText").value = ""; }
+  const j = await api("/api/marker", { text: "" });
+  if (j.ok) toast(S && S.state === "recording" ? `Marker ${S.rec ? S.rec.markers + 1 : ""}`.trim() : "Marker logged (not recording)");
 }
 
 async function loadPorts() {
@@ -1931,15 +1906,11 @@ function wire() {
   $("label").addEventListener("input", applyTaskInfo);
   $("subject").addEventListener("input", applyTaskInfo);
   loadTasks();
-  $("btnStart").onclick = startRec;
-  $("btnStop").onclick = stopRec;
   $("btnBend").onclick = () => { $("btnBend").blur(); runBend(); };
   $("tpRec").onclick = () => { $("tpRec").blur(); toggleRecording(); };
   $("tpMark").onclick = () => { $("tpMark").blur(); mark(); };
   $("tpTake").onclick = () => { const el = $("label"); el.scrollIntoView({ block: "center", behavior: "smooth" }); el.focus(); el.select(); };
   for (const id of ["subject", "label"]) $(id).addEventListener("input", () => { if (S) applyTransport(S); });
-  $("btnMark").onclick = mark;
-  $("markText").addEventListener("keydown", (e) => { if (e.key === "Enter") mark(); });
   $("btnConnect").onclick = () => api("/api/connect", { port: $("portSel").value || null });
   $("btnDisconnect").onclick = () => api("/api/disconnect");
   $("portSel").addEventListener("focus", loadPorts);
@@ -2171,7 +2142,6 @@ function connectStream() {
   };
   es.onerror = () => {
     $("connDot").className = "dot"; setText("connText", "Server offline");
-    $("stateBadge").textContent = "NO SERVER"; $("stateBadge").className = "badge";
     if (!serverDown) {
       serverDown = true;
       const b = $("banner");
@@ -2179,7 +2149,7 @@ function connectStream() {
       b.textContent = "The IMU DAQ server is not running. Double-click “Start IMU DAQ.bat” on the Desktop " +
         "(or check its black window for an error). This page reconnects by itself.";
     }
-    for (const id of ["btnStart", "btnStop", "btnMark", "tpRec", "tpMark"]) $(id).disabled = true;
+    for (const id of ["tpRec", "tpMark"]) $(id).disabled = true;
     $("tpMode").className = "tp-mode"; $("tpMode").lastChild.textContent = "NO SERVER";
   };
 }
