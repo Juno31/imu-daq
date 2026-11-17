@@ -52,7 +52,7 @@
     </div>
     <div class="setupbody">
     <div class="stephead" id="step1" data-step="1"><span class="stepn">1</span><b>System check</b>
-      <span class="hint">all four green before the participant arrives · click a tile for detail</span></div>
+      <span class="hint">all green before the participant arrives · click a tile for detail</span></div>
     <div class="statusrow">
       <button class="stile" id="stDaq" data-go="drawer" title="NI DAQ: device found and reading (click for settings)">
         <span class="sl"></span><span class="st"><small>DAQ</small><b>—</b><span class="sd">—</span></span></button>
@@ -62,6 +62,8 @@
         <span class="sl"></span><span class="st"><small>EMG</small><b>—</b><span class="sd">—</span></span></button>
       <button class="stile" id="stSync" data-go="syncCard" title="Time sync between board, DAQ and PC (click for detail)">
         <span class="sl"></span><span class="st"><small>Sync</small><b>—</b><span class="sd">—</span></span></button>
+      <button class="stile" id="stCam" data-go="drawerGopro" title="GoPro cameras: connected, battery, SD card (click for settings)">
+        <span class="sl"></span><span class="st"><small>Cameras</small><b>—</b><span class="sd">—</span></span></button>
     </div>
       <div class="flowrow setuprow">
       <section class="card stepcard" id="step2" data-step="2">
@@ -301,6 +303,10 @@
       <option value="ble">Bluetooth (start/stop only)</option></select></label>
     <div class="row">
       <label class="switch" title="Refuse to start the recording if any camera fails to start"><input type="checkbox" id="gpRequire"><span></span> Require all cameras</label>
+    </div>
+    <div class="row">
+      <button class="btn small" id="btnGpRescan" title="Look for cameras now and retry the ones that are offline">↻ Rescan</button>
+      <button class="btn small ghost" id="btnGpPair" title="Bluetooth: put the new camera in pairing mode first (Connections → Connect Device → Quik App)">Pair new camera</button>
     </div>
     <div class="camlist" id="gpList"></div>
     <p class="note" id="gpNote"></p>

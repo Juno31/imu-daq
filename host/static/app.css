@@ -282,7 +282,7 @@ input:disabled, select:disabled, textarea:disabled { opacity: .6; }
 .hint.bad { color: var(--bad); }
 
 /* ---------- status tiles ---------- */
-.statusrow { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; }
+.statusrow { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 12px; }
 .stile {
   display: flex; align-items: center; gap: 12px; text-align: left; cursor: pointer; font: inherit; color: inherit;
   background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); box-shadow: var(--shadow);
@@ -306,7 +306,8 @@ input:disabled, select:disabled, textarea:disabled { opacity: .6; }
 .stile.live .sl { animation: pulse 1.6s ease-in-out infinite; }
 @keyframes pulse { 50% { box-shadow: 0 0 0 7px transparent; } }
 @media (prefers-reduced-motion: reduce) { .stile.live .sl { animation: none; } }
-@media (max-width: 900px) { .statusrow { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (max-width: 1100px) { .statusrow { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+@media (max-width: 700px) { .statusrow { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
 @media (max-width: 420px) { .statusrow { grid-template-columns: 1fr; } }
 
 /* ---------- EMG ---------- */

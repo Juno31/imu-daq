@@ -164,6 +164,8 @@ class GoProRig:
         self.pool = ThreadPoolExecutor(max_workers=6, thread_name_prefix="gopro")
         self._stop = False
         self._reset = False                 # transport changed: the poller drops all cameras
+        self.action = ""                    # "rescan" / "pair" requested from the GUI
+        self.scan_s = 4.0                   # Bluetooth scan length
         threading.Thread(target=self._poller, name="gopro-poll", daemon=True).start()
 
     # ---------------- discovery / polling ----------------
@@ -183,7 +185,7 @@ class GoProRig:
         if self.ble:
             import gopro_ble
             try:
-                for addr, name in gopro_ble.scan():
+                for addr, name in gopro_ble.scan(self.scan_s):
                     self.ble_names[addr] = name
             except Exception as e:
                 if not getattr(self, "_scan_warned", False):
@@ -243,9 +245,9 @@ class GoProRig:
                 self.log("warn", f"{self.name_of(cam)} at {cam.ip} lost: {cam.error}", "gopro")
             elif self.ble and not getattr(cam, "warned", False) and cam.error != "waiting to retry":
                 cam.warned = True             # first failure only: the camera may be off or not paired
-                self.log("warn", f"{cam.serial or cam.ip}: Bluetooth connect failed ({cam.error}). "
-                                 "Turn the camera on; the first time, put it in pairing mode "
-                                 "(Connections > Connect Device > Quik App)", "gopro")
+                hint = ("" if "pairing mode" in cam.error else
+                        " - is the camera on? It is retried automatically, or press Rescan")
+                self.log("warn", f"{cam.serial or cam.ip}: Bluetooth connect failed ({cam.error}){hint}", "gopro")
 
     def _poller(self):
         last_disc = 0.0
@@ -255,14 +257,41 @@ class GoProRig:
                 self._drop_all()
                 self.ble_names, last_disc = {}, 0.0
             if self.cfg.get("enabled") and not self.busy.is_set():
+                act = self.action
                 now = time.time()
-                if now - last_disc > (15.0 if self.ble else 5.0):
+                if act or now - last_disc > (15.0 if self.ble else 5.0):
+                    before = {self.name_of(c) for c in self.online()}
+                    self.scan_s = 8.0 if act == "pair" else 4.0
                     self.discover()
                     last_disc = now
+                    if act:                   # retry every camera now, with fresh warnings
+                        with self.lock:
+                            for c in self.cams.values():
+                                c.last_try, c.warned = 0.0, False
                 with self.lock:
                     cams = list(self.cams.values())
                 list(self.pool.map(self._connect_one, cams))
+                if act:
+                    now_on = [self.name_of(c) for c in self.online()]
+                    new = [n for n in now_on if n not in before]
+                    off = [self.name_of(c) for c in cams if not c.online]
+                    self.log("info", f"GoPro {act}: {len(now_on)} connected"
+                                     + (f" (new: {', '.join(new)})" if new else "")
+                                     + (f"; not connected: {', '.join(off)}" if off else "")
+                                     + ("" if cams else "; no camera found - is it on"
+                                        + (" and in pairing mode?" if act == "pair" else "?")), "gopro")
+                    self.action = ""
             time.sleep(2.0)
+
+    def request(self, act):
+        """'rescan': look for cameras now. 'pair': longer Bluetooth scan, then pair any camera in pairing mode."""
+        if act not in ("rescan", "pair"):
+            raise ValueError(act)
+        if not self.cfg.get("enabled"):
+            raise RuntimeError("turn on Record video first")
+        if act == "pair" and not self.ble:
+            raise RuntimeError("pairing is for Bluetooth; USB cameras need no pairing")
+        self.action = act
 
     def online(self):
         with self.lock:
@@ -466,7 +495,7 @@ class GoProRig:
                         if isinstance(s.get(ST_SD_FREE_KB), (int, float)) else None,
                         "sd_status": s.get(ST_SD_STATUS), "video_s": s.get(ST_VIDEO_SECS),
                         "download": self.downloads.get(n)})
-        return {"cfg": self.cfg, "cams": out, "recording": bool(self.rec)}
+        return {"cfg": self.cfg, "cams": out, "recording": bool(self.rec), "action": self.action}
 
     def shutdown(self):
         self._stop = True

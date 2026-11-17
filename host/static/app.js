@@ -704,6 +704,25 @@ function applyTiles(s) {
   else if (lv.sync_hi > 1.0) tile("stSync", "warn", "Check SYNC wire", `ai0 not low while idle (${lv.sync_hi.toFixed(1)} V)`);
   else if (ls && ls.daq_sync && !ls.daq_sync.ok) tile("stSync", "bad", "Ready · last FAIL", pc + " · DAQ ready");
   else tile("stSync", "ok", "Ready", [pc, "DAQ ready", last].filter(Boolean).join(" · "));
+  // Cameras (GoPro)
+  const g = s.gopro;
+  if (g) {
+    const gc = g.cfg || {}, cams = g.cams || [], on = cams.filter((x) => x.online);
+    const via = gc.transport === "ble" ? "Bluetooth" : "USB";
+    const off = cams.filter((x) => !x.online).map((x) => x.name);
+    const low = on.filter((x) => (x.battery != null && x.battery < 20) || (x.sd_free_gb != null && x.sd_free_gb < 5))
+      .map((x) => `${x.name} ${x.battery != null && x.battery < 20 ? "battery " + x.battery + "%" : "SD " + x.sd_free_gb + " GB"}`);
+    const recN = on.filter((x) => x.encoding).length;
+    const bats = on.map((x) => x.battery).filter((x) => x != null), sds = on.map((x) => x.sd_free_gb).filter((x) => x != null);
+    const info = [via, bats.length ? `min battery ${Math.min(...bats)}%` : "", sds.length ? `SD ≥${Math.min(...sds).toFixed(0)} GB` : ""].filter(Boolean).join(" · ");
+    if (!gc.enabled) tile("stCam", "", "Off", "recordings without video");
+    else if (g.action) tile("stCam", "warn", g.action === "pair" ? "Pairing…" : "Searching…", via);
+    else if (!cams.length) tile("stCam", "bad", "None found", gc.transport === "ble" ? "turn the cameras on" : "plug in USB-C (GoPro Connect)");
+    else if (off.length) tile("stCam", "bad", `${on.length} / ${cams.length} on`, `offline: ${off.join(", ")}`);
+    else if (recN) tile("stCam", "ok", `${recN} recording`, info, true);
+    else if (low.length) tile("stCam", "warn", `${on.length} connected`, low.join(" · "));
+    else tile("stCam", "ok", `${on.length} connected`, info);
+  }
 }
 
 function drawSync() { drawScope(); drawStrip(); drawResid(); drawClock(); }
@@ -770,7 +789,7 @@ const pillMark = (id) => { const el = $(id); if (!el) return ["", ""];
 function updateStepSums() {
   if (![1, 2, 3, 4].every((n) => $("stepSum" + n))) return;
   // 1: device tiles
-  $("stepSum1").innerHTML = ["stDaq", "stImu", "stEmg", "stSync"].map((id) => {
+  $("stepSum1").innerHTML = ["stDaq", "stImu", "stEmg", "stSync", "stCam"].map((id) => {
     const t = $(id), c = /\bok\b/.test(t.className) ? "good" : /\bbad\b/.test(t.className) ? "bad" : /\bwarn\b/.test(t.className) ? "warn" : "";
     return `<span class="${c}">${esc(t.querySelector("small").textContent)} ${esc(t.querySelector("b").textContent)}</span>`;
   }).join("<i>·</i>");
@@ -821,6 +840,7 @@ function openDrawer(open) {
 
 function goTo(id) {
   if (id === "drawer") return openDrawer(true);
+  if (id === "drawerGopro") { openDrawer(true); setTimeout(() => $("goproCard").scrollIntoView({ behavior: "smooth", block: "start" }), 150); return; }
   const el = $(id);
   if (!el) return;
   if (el.classList.contains("fold")) setFold(el, true);
@@ -1105,6 +1125,11 @@ function applyGopro(g, st) {
   const ble = cfg.transport === "ble";
   if (document.activeElement !== $("gpTransport")) $("gpTransport").value = cfg.transport || "usb";
   for (const id of ["gpEnabled", "gpDownload", "gpRequire", "gpTransport"]) $(id).disabled = lock;
+  $("btnGpRescan").disabled = lock || !cfg.enabled || !!g.action;
+  $("btnGpPair").disabled = lock || !cfg.enabled || !ble || !!g.action;
+  $("btnGpPair").classList.toggle("hidden", !ble);
+  setText("btnGpRescan", g.action === "rescan" ? "Searching…" : "↻ Rescan");
+  setText("btnGpPair", g.action === "pair" ? "Pairing…" : "Pair new camera");
   $("gpDownloadSw").classList.toggle("hidden", ble);
   setText("gpHint", ble ? "Bluetooth" : "USB-C · GoPro Connect");
   setText("gpNote", ble
@@ -1565,7 +1590,7 @@ function applyFlow(s) {
   if (s.spine_cal_rev != null && spineRev != null && s.spine_cal_rev !== spineRev) { spineRev = s.spine_cal_rev; syncSpineCal(); }
   applyBend();
   checkEmgNorm();
-  const tiles = ["stDaq", "stImu", "stEmg", "stSync"].map((id) => $(id).className);
+  const tiles = ["stDaq", "stImu", "stEmg", "stSync", "stCam"].map((id) => $(id).className);
   const done = {
     1: tiles.every((c) => !/\b(bad|warn)\b/.test(c)) && !!s.port,
     2: !!$("subject").value.trim(),
@@ -1857,6 +1882,12 @@ function wire() {
   for (const id of ["daqEnabled", "daqDevice", "daqSync", "daqRate", "daqTerm", "daqRange", "daqExtra"])
     $(id).addEventListener("change", () => api("/api/daq", daqCfgFromForm()));
   $("btnImportVideo").onclick = importVideos;
+  $("btnGpRescan").onclick = async () => { const j = await api("/api/gopro/action", { action: "rescan" }); if (j.ok) toast("Looking for cameras…"); };
+  $("btnGpPair").onclick = async () => {
+    if (!confirm("Put the new camera in pairing mode first:\nConnections → Connect Device → Quik App\n\nThen press OK to pair.")) return;
+    const j = await api("/api/gopro/action", { action: "pair" });
+    if (j.ok) toast("Pairing: the result shows in the Event log");
+  };
   for (const id of ["gpEnabled", "gpDownload", "gpRequire", "gpTransport"])
     $(id).addEventListener("change", () => api("/api/gopro", { enabled: $("gpEnabled").checked,
       download: $("gpDownload").checked, require: $("gpRequire").checked, transport: $("gpTransport").value }));

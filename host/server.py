@@ -1023,6 +1023,11 @@ class Handler(BaseHTTPRequestHandler):
                 return self._json({"ok": True, "cfg": APP.daq_cfg})
             if path == "/api/gopro":
                 return self._json({"ok": True, "cfg": APP.set_gopro(body)})
+            if path == "/api/gopro/action":       # "rescan" or "pair" (Settings buttons)
+                if APP.state in ("recording", "starting", "stopping"):
+                    raise RuntimeError("stop the recording first")
+                APP.gopro.request(str(body.get("action", "")))
+                return self._json({"ok": True})
             if path == "/api/video_import":       # SD-card copies -> trial folders (dry run first)
                 return self._json({"ok": True, **APP.video_import(str(body.get("folder", "")).strip().strip('"'),
                                                                 bool(body.get("dry_run", True)))})

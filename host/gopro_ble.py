@@ -158,15 +158,30 @@ class BleGoPro:
             self.lock = asyncio.Lock()
         if self.client is not None and self.client.is_connected:
             return
-        c = BleakClient(self.ip, disconnected_callback=self._lost, timeout=15, pair=True)
+        old, self.client = self.client, None
+        if old is not None:                     # a dropped link: release it before reconnecting
+            try:
+                await old.disconnect()
+            except Exception:
+                pass
+        # fresh service discovery: a link left over from a killed server can have a stale GATT cache
+        c = BleakClient(self.ip, disconnected_callback=self._lost, timeout=15, pair=True,
+                        winrt={"use_cached_services": False})
         try:
             await c.connect()
         except (asyncio.TimeoutError, TimeoutError):
             raise RuntimeError("not paired with this PC: put the camera in pairing mode "
                                "(Connections > Connect Device > Quik App)") from None
-        for u in (CMD_RSP, SET_RSP, QRY_RSP):
-            self.rx[u] = Packets()
-            await c.start_notify(u, self._on_rx(u))
+        try:
+            for u in (CMD_RSP, SET_RSP, QRY_RSP):
+                self.rx[u] = Packets()
+                await c.start_notify(u, self._on_rx(u))
+        except Exception:
+            try:                                # half-made connection: drop it so the next try starts clean
+                await c.disconnect()
+            except Exception:
+                pass
+            raise
         self.client = c
 
     async def _request(self, char, rsp, data, timeout=4.0):
