@@ -128,6 +128,14 @@ picks up only ~13 µV (0.0004 %), so real EMG is not affected. The GUI marks suc
 (EMG light, EMG traces, calibration result) whenever a channel correlates with SYNC (r > 0.5). Connect the
 amplifier outputs, or remove unused channels in Settings → EMG / extra channels.
 
+### Planned wiring: Teensy 4.1, 7 IMUs, 3 GoPros
+
+Next hardware revision (not built yet): a Teensy 4.1 with an Ethernet kit streams 7 IMUs (one TCA9548A
+I2C mux, ch 0–6) to the PC over UDP, keeps the SYNC pulse to the USB-6363, and three GoPro HERO13 cameras
+connect through a powered USB 3 hub.
+
+![Planned wiring: Teensy 4.1, 7 IMUs, NI USB-6363, 3 GoPros](hardware/wiring/teensy41_wiring.png)
+
 ## How it works
 
 **Firmware** (`firmware/imu_daq/imu_daq.ino`):
