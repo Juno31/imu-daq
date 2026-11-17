@@ -14,5 +14,4 @@ dependencies:
   - pip:
       - nidaqmx>=1.0
       - bleak>=0.22
-      - imageio-ffmpeg>=0.5
       - manifold3d>=2.4

@@ -4,7 +4,6 @@ pandas>=2.0
 pyserial>=3.5
 nidaqmx>=1.0        # Python API; the NI-DAQmx driver itself is installed separately (see README)
 bleak>=0.22         # GoPro control over Bluetooth
-imageio-ffmpeg>=0.5 # ffmpeg binary for the GoPro live view
 
 # Hardware: calibration jig generator (hardware/jig/imu_jig.py)
 cadquery>=2.4       # reads the BNO085 STEP model (master reference)
