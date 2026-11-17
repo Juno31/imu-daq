@@ -114,15 +114,27 @@ class DaqRecorder:
             os.makedirs(self.out_dir, exist_ok=True)
         term = getattr(TerminalConfiguration, TERMINALS.get(self.terminal, "DIFF"))
         self.task = nidaqmx.Task("imu_daq_sync" if self.out_dir else "imu_daq_preview")
-        for ch in self.channels:
-            self.task.ai_channels.add_ai_voltage_chan(f"{self.device}/{ch}", terminal_config=term,
-                                                      min_val=-self.vrange, max_val=self.vrange)
-        self.task.timing.cfg_samp_clk_timing(self.rate, sample_mode=AcquisitionType.CONTINUOUS,
-                                             samps_per_chan=int(self.rate * 10))
-        self.reader = AnalogMultiChannelReader(self.task.in_stream)
-        if self.out_dir:
-            self.fh = open(os.path.join(self.out_dir, "daq_raw.f32"), "wb")
-        self.task.start()
+        try:
+            for ch in self.channels:
+                self.task.ai_channels.add_ai_voltage_chan(f"{self.device}/{ch}", terminal_config=term,
+                                                          min_val=-self.vrange, max_val=self.vrange)
+            self.task.timing.cfg_samp_clk_timing(self.rate, sample_mode=AcquisitionType.CONTINUOUS,
+                                                 samps_per_chan=int(self.rate * 10))
+            self.reader = AnalogMultiChannelReader(self.task.in_stream)
+            if self.out_dir:
+                self.fh = open(os.path.join(self.out_dir, "daq_raw.f32"), "wb")
+            self.task.start()
+        except Exception:
+            # release the device, or the next trial / the preview fails with "resource reserved"
+            try:
+                self.task.close()
+            except Exception:
+                pass
+            self.task = None
+            if self.fh:
+                self.fh.close()
+                self.fh = None
+            raise
         self.pc_start = pc_clock()
         self.stop_evt.clear()
         self.thread = threading.Thread(target=self._run, name="daq-reader", daemon=True)

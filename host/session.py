@@ -185,12 +185,21 @@ class Session:
                 pass
 
     # ---------------- finish ----------------
-    def finalize(self, clock_fit, frame_us, stop_info, daq_meta=None, daq_pulses=None, daq_align=None):
-        """clock_fit: function(list of (board_s, pc_mid_s, rtt_s)) -> ClockSync."""
+    def close(self):
+        """Flush and close the raw files (imu.csv, events.csv, clock_sync.csv). Safe to call twice."""
+        if self.closed:
+            return
         self.flush()
         for f in (self._imu, self._ev, self._pg):
-            f.close()
+            try:
+                f.close()
+            except Exception:
+                pass
         self.closed = True
+
+    def finalize(self, clock_fit, frame_us, stop_info, daq_meta=None, daq_pulses=None, daq_align=None):
+        """clock_fit: function(list of (board_s, pc_mid_s, rtt_s)) -> ClockSync."""
+        self.close()
         summary = {"session": self.name, "started": time.strftime("%Y-%m-%d %H:%M:%S",
                                                                   time.localtime(self.started_unix)),
                    "frames_received": self.frames, "first_frame": self.first_frame,

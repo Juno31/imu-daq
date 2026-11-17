@@ -507,7 +507,10 @@ class App:
         except Exception as e:
             self.log("error", f"start failed: {e}")
             if self.session and not self.session.closed:
-                self._finish(f"start failed: {e}", locked=True)
+                try:
+                    self._finish(f"start failed: {e}", locked=True)
+                except Exception:
+                    pass                         # already logged; report the start error below
             elif self.state == "starting":
                 self.state = "idle"
             raise
@@ -587,27 +590,36 @@ class App:
         time.sleep(0.4)                     # let the last pulses and lines arrive
         if reason:
             sess.event(self.unix(), "abort", reason)
-        daq_meta = pulses = align = None
-        if self.daq is not None:
-            d, self.daq = self.daq, None
-            daq_meta = d.stop()
-            if self.syncmon is not None:
-                self.syncmon.update(d, final=True)
-            pulses = list(d.edges.pulses)
-            frames_sent = int(self.stop_info.get("frames", sess.frames))
-            align = daqmod.align(pulses, d.rate, frames_sent, self.rec.get("frame_us", 10000))
-        if self.syncmon is not None and self.syncmon.active:
-            self.syncmon.update(None, final=True)
-        summary = sess.finalize(lambda s: ClockSync().fit_samples(s), self.rec.get("frame_us", 10000),
-                                self.stop_info, daq_meta, pulses, align)
-        summary["dir"] = sess.dir
-        if reason:
-            summary["aborted"] = reason
-        with self.lock:
-            self.last_summary = summary
-            self.session = None
-            self.stray_noted = False
-            self.state = "idle" if self.dev.connected and self.hello_at else "disconnected"
+        daq_meta = pulses = align = summary = None
+        # Whatever fails while saving, the DAQ is released and the app returns to idle,
+        # so the next trial can still start (the raw files stay in the trial folder).
+        try:
+            if self.daq is not None:
+                d, self.daq = self.daq, None
+                daq_meta = d.stop()
+                if self.syncmon is not None:
+                    self.syncmon.update(d, final=True)
+                pulses = list(d.edges.pulses)
+                frames_sent = int(self.stop_info.get("frames", sess.frames))
+                align = daqmod.align(pulses, d.rate, frames_sent, self.rec.get("frame_us", 10000))
+            if self.syncmon is not None and self.syncmon.active:
+                self.syncmon.update(None, final=True)
+            summary = sess.finalize(lambda s: ClockSync().fit_samples(s), self.rec.get("frame_us", 10000),
+                                    self.stop_info, daq_meta, pulses, align)
+            summary["dir"] = sess.dir
+            if reason:
+                summary["aborted"] = reason
+        except Exception as e:
+            self.log("error", f"saving {sess.name} failed: {e} - raw files kept in {sess.dir}")
+            raise
+        finally:
+            sess.close()
+            with self.lock:
+                if summary is not None:
+                    self.last_summary = summary
+                self.session = None
+                self.stray_noted = False
+                self.state = "idle" if self.dev.connected and self.hello_at else "disconnected"
         pods = ", ".join(f"{k} {v['fresh_pct']:.1f}%" for k, v in summary.get("pods", {}).items())
         ds = summary.get("daq_sync")
         sync = "" if ds is None else (" | SYNC PASS" if ds.get("ok") else f" | SYNC FAIL: {ds.get('reason')}")
