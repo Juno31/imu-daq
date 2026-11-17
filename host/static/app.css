@@ -521,6 +521,10 @@ input:disabled, select:disabled, textarea:disabled { opacity: .6; }
 .stepcard h2 .pill { margin-left: auto; }
 .stepcard label { margin: 0; }
 .stepcard .cap { margin: 0; }
+.applyrow { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+.applyrow .btn { flex: none; min-width: 84px; }
+.btn.dirty { background: var(--accent); color: #fff; border-color: transparent; }
+.btn.applied { color: var(--ok); }
 .stepcard.recbar { display: flex; }
 .recgrid { display: grid; grid-template-columns: 90px minmax(0, 1fr); gap: 10px; align-items: end; }
 .stepcard .markrow { margin: 0; }

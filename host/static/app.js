@@ -1826,6 +1826,38 @@ function pushHeight() {
   if (fr && fr.dataset.on === "1" && fr.contentWindow) fr.contentWindow.postMessage({ type: "spineopt", height: h }, location.origin);
 }
 
+// Participant card: Apply checks the fields, saves them and updates everything that depends on them
+const SUBJ_FIELDS = ["testDate", "subject", "heightCm", "notes"];
+function participantDirty(on) {
+  const b = $("btnSubjApply");
+  b.classList.toggle("dirty", on);
+  b.classList.toggle("applied", !on);
+  b.textContent = on ? "Apply" : "Applied ✓";
+}
+function applyParticipant() {
+  const subj = $("subject").value.trim();
+  if (!subj) { toast("Enter the subject first", true); $("subject").focus(); return; }
+  if ($("heightCm").value !== "" && heightVal() == null) { toast("Height must be 100–230 cm", true); $("heightCm").focus(); return; }
+  $("testDate").value = dateId($("testDate").value);
+  saveForm();
+  pushHeight();
+  refreshNextTrial();
+  checkEmgNorm();
+  if (S) { applyCalib(S); applyFlow(S); }
+  updateStepSums();
+  participantDirty(false);
+  const h = heightVal();
+  toast(`Participant: ${subjId(subj)} · ${$("testDate").value}` + (h ? ` · ${h} cm` : ""));
+}
+function wireParticipant() {
+  $("btnSubjApply").onclick = applyParticipant;
+  for (const id of SUBJ_FIELDS) {
+    $(id).addEventListener("input", () => participantDirty(true));
+    $(id).addEventListener("keydown", (e) => { if (e.key === "Enter") { e.preventDefault(); applyParticipant(); } });
+  }
+  participantDirty(!$("subject").value.trim());
+}
+
 function wireCalib() {
   $("btnCal").onclick = runCalibration;
   for (const b of $("calSecs").querySelectorAll("button")) {
@@ -1993,6 +2025,7 @@ function wire() {
   wireSetup();
   wireSpine();
   wireCalib();
+  wireParticipant();
   $("btnSettings").onclick = () => openDrawer(!$("drawer").classList.contains("open"));
   $("btnCloseDrawer").onclick = () => openDrawer(false);
   $("scrim").onclick = () => openDrawer(false);
