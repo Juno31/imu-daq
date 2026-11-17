@@ -11,7 +11,7 @@ svg{display:block;font-family:"Segoe UI",Arial,sans-serif}
 .ic.sm{width:20px;height:20px;font-size:17px}
 .ic-gray{color:#5F5E5A} .ic-teal{color:#0F6E56} .ic-coral{color:#993C1D}
 </style></head><body>
-<svg width="680" height="704" viewBox="0 0 680 704" xmlns="http://www.w3.org/2000/svg">
+<svg width="680" height="726" viewBox="0 0 680 726" xmlns="http://www.w3.org/2000/svg">
 <defs><marker id="ag" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M2 1L8 5L2 9" fill="none" stroke="#73726c" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></marker><marker id="ay" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M2 1L8 5L2 9" fill="none" stroke="#EF9F27" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></marker><marker id="at" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M2 1L8 5L2 9" fill="none" stroke="#1D9E75" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></marker></defs>
 <g class="c-gray"><rect x="200" y="40" width="280" height="56" rx="8" stroke-width="0.5"/><text class="th" x="244" y="58" dominant-baseline="central">PC · host/server.py</text><text class="ts" x="244" y="78" dominant-baseline="central">GUI 127.0.0.1:8765</text></g><foreignObject x="212" y="56.0" width="24" height="24"><div class="ic ic-gray"><i class="ti ti-device-desktop"></i></div></foreignObject>
 <path d="M200 68 L125 68 L125 208" stroke="#73726c" stroke-width="1.5" fill="none"/>
@@ -41,10 +41,11 @@ svg{display:block;font-family:"Segoe UI",Arial,sans-serif}
 <text class="ts" x="198" y="324" text-anchor="start">I2C 400 kHz</text>
 <g class="c-teal"><rect x="40" y="420" width="170" height="46" rx="8" stroke-width="0.5"/><text class="th" x="84" y="435" dominant-baseline="central">I2C mux A</text><text class="ts" x="84" y="453" dominant-baseline="central">TCA9548A · ch 0–3</text></g><foreignObject x="52" y="431.0" width="24" height="24"><div class="ic ic-teal"><i class="ti ti-arrows-split"></i></div></foreignObject>
 <g class="c-teal"><rect x="255" y="420" width="170" height="46" rx="8" stroke-width="0.5"/><text class="th" x="299" y="435" dominant-baseline="central">I2C mux B</text><text class="ts" x="299" y="453" dominant-baseline="central">TCA9548A · ch 0–2</text></g><foreignObject x="267" y="431.0" width="24" height="24"><div class="ic ic-teal"><i class="ti ti-arrows-split"></i></div></foreignObject>
-<g class="c-teal"><rect x="255" y="330" width="170" height="46" rx="8" stroke-width="0.5"/><text class="th" x="299" y="345" dominant-baseline="central">EMG amplifier</text><text class="ts" x="299" y="363" dominant-baseline="central">8 ch → AI16–23</text></g><foreignObject x="267" y="341.0" width="24" height="24"><div class="ic ic-teal"><i class="ti ti-activity-heartbeat"></i></div></foreignObject>
+<g class="c-teal"><rect x="255" y="330" width="170" height="46" rx="8" stroke-width="0.5"/><text class="th" x="299" y="345" dominant-baseline="central">MyoWare 2 × 8</text><text class="ts" x="299" y="363" dominant-baseline="central">RAW · Link Shield</text></g><foreignObject x="267" y="341.0" width="24" height="24"><div class="ic ic-teal"><i class="ti ti-activity-heartbeat"></i></div></foreignObject>
 <line x1="340" y1="330" x2="340" y2="270" stroke="#1D9E75" stroke-width="2" stroke-dasharray="5 3" marker-end="url(#at)"/>
-<text class="ts" x="348" y="292" text-anchor="start">Analog</text>
-<text class="ts" x="348" y="308" text-anchor="start">differential</text>
+<text class="ts" x="348" y="286" text-anchor="start">2× Cat6 FTP 10 m</text>
+<text class="ts" x="348" y="302" text-anchor="start">RJ45 adapters</text>
+<text class="ts" x="348" y="318" text-anchor="start">1 pair per sensor</text>
 <path d="M470 250 L455 250 L455 473" stroke="#73726c" stroke-width="1.5" fill="none"/>
 <path d="M455 353 L470 353" stroke="#73726c" stroke-width="1.5" fill="none"/>
 <path d="M455 413 L470 413" stroke="#73726c" stroke-width="1.5" fill="none"/>
@@ -83,6 +84,7 @@ svg{display:block;font-family:"Segoe UI",Arial,sans-serif}
 <line x1="40" y1="638" x2="70" y2="638" stroke="#EF9F27" stroke-width="2"/>
 <text class="ts" x="78" y="642" text-anchor="start">SYNC: 3.3 V pulse per frame, pin 2 → AI0+, GND → AI8 (DAQ samples it as analog)</text>
 <line x1="40" y1="660" x2="70" y2="660" stroke="#1D9E75" stroke-width="2" stroke-dasharray="5 3"/>
-<text class="ts" x="78" y="664" text-anchor="start">Analog EMG: 8 differential pairs, AI16–23 (+) / AI24–31 (−)</text>
+<text class="ts" x="78" y="664" text-anchor="start">EMG: MyoWare RAW → AI16–23 (+), sensor GND → AI24–31 (−); powered from the power bank</text>
 <text class="ts" x="40" y="686" text-anchor="start">Muxes A and B sit on separate I2C buses read in parallel: 200 frames/s, worst frame 4.7 of 5 ms (simulated)</text>
+<text class="ts" x="40" y="708" text-anchor="start">8 EMG pairs fill both Cat6 cables: SYNC and the bias ground (wearable GND → AI GND) need a third cable</text>
 </svg></body></html>
