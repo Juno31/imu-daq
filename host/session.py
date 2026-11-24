@@ -10,6 +10,7 @@
         daq_raw.f32       NI-DAQ samples (if the DAQ was recorded), see daq_meta.json
         daq_pulses.csv    detected SYNC pulses (rise time, width)
         imu_synced.csv    imu.csv + pc_unix_s (+ daq_time_s when the SYNC check passed)
+        emg.csv           every DAQ sample (SYNC + EMG, volts) with daq_time_s and imu_frame (emg_export.py)
         summary.json      quality report written at stop
 """
 import csv
@@ -125,6 +126,8 @@ class Session:
         self.markers = 0
         self.last_flush = time.time()
         self.closed = False
+        self._smp = None                 # imu_samples.csv, opened at the first S line (firmware >= 2.2)
+        self.sample_stats = {}           # (pod, sensor) -> [count, lost, last_seq, first_t_us, last_t_us]
         self.write_meta()
 
     # ---------------- writing ----------------
@@ -162,6 +165,28 @@ class Session:
             self.flush()
             self.last_flush = now
 
+    SAMPLE_KIND = {0x08: "quat", 0x05: "quat", 0x01: "acc", 0x02: "gyr", 0x03: "mag"}
+
+    def sample(self, pod, rid, seq, t_us, status, vals):
+        """One sensor sample (S line). Lost samples are counted from gaps in the IMU's 8-bit sequence number."""
+        if self.closed or not (0 <= pod < len(self.pod_names)):
+            return
+        kind = self.SAMPLE_KIND.get(rid, f"id{rid}")
+        name = self.pod_names[pod]
+        if self._smp is None:
+            self._smp = open(os.path.join(self.dir, "imu_samples.csv"), "w", newline="")
+            self._smp.write("t_us,pod,sensor,seq,status,v0,v1,v2,v3\n")
+        v = ",".join(f"{x:.5f}" for x in vals) + ("," if len(vals) == 3 else "")
+        self._smp.write(f"{t_us},{name},{kind},{seq},{status},{v}\n")
+        st = self.sample_stats.get((name, kind))
+        if st is None:
+            self.sample_stats[(name, kind)] = [1, 0, seq, t_us, t_us]
+            return
+        st[1] += (seq - st[2] - 1) % 256          # samples the IMU made that never reached us
+        st[0] += 1
+        st[2] = seq
+        st[4] = t_us
+
     def event(self, pc_unix, kind, detail="", board_t_us="", frame=""):
         if self.closed:
             return
@@ -178,11 +203,61 @@ class Session:
         self.ping_samples.append((board_us, send_unix, recv_unix))
 
     def flush(self):
-        for f in (self._imu, self._ev, self._pg):
+        for f in (self._imu, self._ev, self._pg) + ((self._smp,) if self._smp else ()):
             try:
                 f.flush()
             except Exception:
                 pass
+
+    def rebuild_from_sd(self, sd_path):
+        """Firmware >= 2.5: the SD file is the complete record. Keep the live (USB) files as *_live.csv and
+        write imu.csv / imu_samples.csv again from the SD file. Returns (frames, samples)."""
+        if self.closed:
+            raise RuntimeError("session already closed")
+        self._imu.close()
+        if self._smp is not None:
+            self._smp.close()
+            self._smp = None
+        for name in ("imu.csv", "imu_samples.csv"):
+            src = os.path.join(self.dir, name)
+            if os.path.exists(src):
+                os.replace(src, os.path.join(self.dir, name.replace(".csv", "_live.csv")))
+        self._imu = open(os.path.join(self.dir, "imu.csv"), "w", newline="")
+        self._imu.write(",".join(self.columns) + "\n")
+        self.frames, self.first_frame, self.last_frame, self.missing = 0, None, None, 0
+        self.sample_stats = {}
+        wrap, last_t, off = 1 << 32, None, 0      # board micros() wraps every 71.6 min
+        try:                                      # same 2^32 offset as the live frames (and the ping clock fit)
+            with open(os.path.join(self.dir, "imu_live.csv"), encoding="utf-8") as lf:
+                lf.readline()
+                first = lf.readline().split(",")
+                if len(first) > 1:
+                    off = (int(first[1]) // wrap) * wrap
+        except (OSError, ValueError):
+            pass
+
+        def unwrap(t):
+            nonlocal last_t, off
+            if last_t is not None and t + off < last_t - (1 << 31):
+                off += wrap
+            last_t = t + off
+            return t + off
+
+        nf = ns = 0
+        with open(sd_path, encoding="utf-8", errors="replace") as fh:
+            for line in fh:
+                if line.startswith("F,"):
+                    p = line.rstrip().split(",")
+                    self.frame(int(p[1]), unwrap(int(p[2])), [float(v) for v in p[3:]])
+                    nf += 1
+                elif line.startswith("S,"):
+                    p = line.rstrip().split(",")
+                    if len(p) in (9, 10):
+                        self.sample(int(p[1]), int(p[2]), int(p[3]), unwrap(int(p[4])), int(p[5]),
+                                    [float(v) for v in p[6:]])
+                        ns += 1
+        self.flush()
+        return nf, ns
 
     # ---------------- finish ----------------
     def close(self):
@@ -190,7 +265,7 @@ class Session:
         if self.closed:
             return
         self.flush()
-        for f in (self._imu, self._ev, self._pg):
+        for f in (self._imu, self._ev, self._pg) + ((self._smp,) if self._smp else ()):
             try:
                 f.close()
             except Exception:
@@ -207,6 +282,30 @@ class Session:
                    "markers": self.markers, "frame_us": frame_us, "board_stop": stop_info}
         frames_sent = int(stop_info.get("frames", self.frames)) if stop_info else self.frames
         summary["frames_sent_by_board"] = frames_sent
+        # Teensy firmware v2: I2C bus time per frame while recording (bench pass: busiest bus <= 8 ms)
+        buses = {}
+        for k, v in (stop_info or {}).items():
+            m = re.match(r"bus_(\w)_(avg_ms|max_ms|over8)$", k)
+            if m:
+                try:
+                    buses.setdefault(m.group(1).upper(), {})[m.group(2)] = float(v)
+                except ValueError:
+                    pass
+        if buses:
+            summary["i2c_buses"] = buses
+        # firmware >= 2.2: every sensor sample (imu_samples.csv). received_pct = received / (received + lost)
+        if self.sample_stats:
+            smp = {}
+            for (name, kind), (n, lost, _, t0, t1) in sorted(self.sample_stats.items()):
+                dur_s = (t1 - t0) / 1e6
+                smp.setdefault(name, {})[kind] = {
+                    "n": n, "lost": lost, "received_pct": round(100.0 * n / (n + lost), 3) if n + lost else None,
+                    "hz": round((n - 1) / dur_s, 2) if dur_s > 0 else None}
+            summary["samples"] = smp
+            try:
+                summary["samples_dropped_by_board"] = int((stop_info or {}).get("dropped_s", 0))
+            except ValueError:
+                pass
         try:
             import pandas as pd
             df = pd.read_csv(os.path.join(self.dir, "imu.csv"))
@@ -281,6 +380,13 @@ class Session:
                 w.writerow(["pulse", "rise_s", "width_ms"])
                 for k, (r, wd) in enumerate(daq_pulses):
                     w.writerow([k, f"{r / rate:.6f}", f"{wd / rate * 1e3:.3f}"])
+        if daq_meta is not None:
+            try:
+                from emg_export import export as export_emg
+                ft = daq_align[0] if daq_align is not None else None
+                summary["emg_csv"] = os.path.basename(export_emg(self.dir, ft) or "") or None
+            except Exception as e:
+                summary["emg_csv_error"] = str(e)
         with open(os.path.join(self.dir, "summary.json"), "w") as f:
             json.dump(summary, f, indent=2, default=float)
         return summary

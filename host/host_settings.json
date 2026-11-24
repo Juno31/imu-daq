@@ -1,0 +1,18 @@
+{
+  "quat_mode": "game",
+  "imu_mag": false,
+  "gopro": {
+    "enabled": true,
+    "transport": "usb",
+    "download": true,
+    "require": false,
+    "names": {},
+    "manual_ips": [],
+    "video": {
+      "2": 9,
+      "3": 2,
+      "121": 0,
+      "135": 0
+    }
+  }
+}

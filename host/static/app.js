@@ -660,7 +660,7 @@ function applyTiles(s) {
   // IMU
   const pods = s.pods || [];
   const fus = s.hello && s.hello.frame_us ? +s.hello.frame_us : 10000;
-  if (!s.port) tile("stImu", "bad", "Board offline", "Plug in the XIAO (USB)");
+  if (!s.port) tile("stImu", "bad", "Board offline", "Plug in the Teensy / XIAO (USB)");
   else if (!s.hello || !s.hello.board) tile("stImu", "warn", "Connecting…", s.port);
   else {
     const bad = pods.filter((p) => !p.ok || !p.live || (p.silent_s !== null && p.silent_s > 0.5));
@@ -1330,20 +1330,6 @@ function renderCalResult(box, c, cur, att) {
     }
     box.appendChild(t);
   }
-  const emg = Object.entries(res.emg || {}).filter(([, v]) => v && v.rms_mv != null);
-  if (emg.length) {
-    const top = emg.reduce((a, b) => (b[1].rms_mv > a[1].rms_mv ? b : a));
-    const lo = Math.min(...emg.map(([, v]) => v.rms_mv));
-    const high = top[1].rms_mv > 50;      // resting EMG should be well under 50 mV at the DAQ input
-    const fl = emg.filter(([, v]) => v.floating).map(([n]) => n);
-    box.appendChild(calRow(high ? "warn" : "ok", `${high ? "!" : "✓"} EMG rest`,
-      `RMS ${lo.toFixed(2)}–${top[1].rms_mv.toFixed(2)} mV · max ${top[0]}`,
-      emg.map(([n, v]) => `${n} ${v.rms_mv.toFixed(3)} mV`).join("\n") +
-      (high ? "\nUnconnected DAQ inputs pick up the SYNC pulses while recording (multiplexer crosstalk)." : "")));
-    if (fl.length) box.appendChild(calAlert("bad", `EMG not connected: ${fl.length === emg.length ? "all channels" : fl.join(", ")}`,
-      "These inputs copy the SYNC pulses, which only happens when nothing is connected to them. Connect the EMG amplifier outputs (or remove unused channels in Settings) and calibrate again."));
-    else if (high) box.appendChild(calAlert("warn", "EMG rest RMS too high: electrodes connected?"));
-  }
   const m = document.createElement("div");
   m.className = "meta";
   m.textContent = `${(res.when || "").slice(11, 16)} · ${res.subject || "no subject"} · ${res.seconds || ""} s · saved as ${res.session}`;
@@ -1392,7 +1378,11 @@ function applyCalToViews(cur) {
     sc.q0 = q0;
     sc.B = null; LS.set("bendRes", null);       // a new neutral pose: the flexion axis belongs to the old one, redo the forward bend
     const names = Object.keys(sc.q0);
-    if (!sc.map && names.length >= 2) sc.map = { T7: names[0], T12: names[1] };
+    if (!sc.map && names.length >= 2) {
+      sc.map = {};                                // pods named after their segment map to it
+      for (const s of ["T1", "T7", "T12", "L3", "L5", "S2"]) if (names.includes(s)) sc.map[s] = s;
+      if (!sc.map.T7 || !sc.map.T12) sc.map = { T7: names[0], T12: names[1] };
+    }
     sc.when = new Date().toISOString();
     localStorage.setItem("spineCal", JSON.stringify(sc));
     postSpineCal(sc);
@@ -1819,7 +1809,7 @@ async function loadPorts() {
     const r = await (await fetch("/api/ports")).json();
     const sel = $("portSel"), cur = S && S.want_port;
     sel.innerHTML = `<option value="">Auto (${r.guess || "none"})</option>` +
-      r.ports.map((p) => `<option value="${p.device}">${p.device} · ${p.espressif ? "XIAO" : p.description}</option>`).join("");
+      r.ports.map((p) => `<option value="${p.device}">${p.device} · ${p.board || (p.espressif ? "XIAO" : p.description)}</option>`).join("");
     sel.value = cur || "";
   } catch { }
 }

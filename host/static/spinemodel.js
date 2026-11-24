@@ -1,6 +1,6 @@
 // 3D spine model for the Review page: same OpenSim Gait2392 meshes and pose rules as the Spine view
-// (spine.js). Pose input: T7 and T12 orientations relative to standing, in the body frame
-// (X left, Y posterior, Z up). T12's motion is shared between pelvis and lumbar levels.
+// (spine.js). Pose input: each sensor's orientation relative to standing, in the body frame
+// (X left, Y posterior, Z up); see SENSOR_SEGS / jointsFromSensors.
 import * as THREE from "three";
 import { OrbitControls } from "three/addons/controls/OrbitControls.js";
 import { mergeVertices } from "three/addons/utils/BufferGeometryUtils.js";
@@ -38,6 +38,34 @@ const ORDER = ["pelvis", "L5", "L4", "L3", "L2", "L1", "T12", "T11", "T10", "T9"
 const idx = Object.fromEntries(ORDER.map((n, i) => [n, i]));
 const toOs = (q) => new THREE.Quaternion(-q[2], q[3], -q[1], q[0]);   // body frame -> OpenSim frame
 const MODEL_HEIGHT_CM = 180;
+
+// IMU placement (6 sensors). S2 sits on the sacrum, so it drives the pelvis segment.
+export const SENSOR_SEGS = ["T1", "T7", "T12", "L3", "L5", "S2"];
+export const NODE_OF = { S2: "pelvis" };
+const nodeOf = (s) => NODE_OF[s] || s;
+// segQ: {segment name: body-frame rotation from standing, or null}. Levels between two sensors share
+// the relative rotation equally; levels above the top sensor follow it. Without a pelvis (S2) sensor,
+// (1 - share) of the lowest sensor's rotation goes to the pelvis and the rest is spread up to it.
+export function jointsFromSensors(segQ, share = 0.7) {
+  const J = ORDER.map(() => [1, 0, 0, 0]);
+  const a = SENSOR_SEGS.filter((s) => segQ && segQ[s]).map((s) => [idx[nodeOf(s)], segQ[s]]).sort((x, y) => x[0] - y[0]);
+  if (!a.length) return J;
+  const [i0, q0] = a[0];
+  if (i0 === idx.pelvis) J[idx.pelvis] = q0;
+  else {
+    const pel = qpow(q0, 1 - share), step = qpow(qmul(qconj(pel), q0), 1 / (i0 - idx.pelvis));
+    J[idx.pelvis] = pel;
+    for (let k = idx.pelvis + 1; k <= i0; k++) J[k] = step;
+  }
+  for (let n = 1; n < a.length; n++) {
+    const [i, qa] = a[n - 1], [j, qb] = a[n];
+    if (j === i) continue;
+    const step = qpow(qmul(qconj(qa), qb), 1 / (j - i));
+    for (let k = i + 1; k <= j; k++) J[k] = step;
+  }
+  return J;
+}
+export const SENSOR_NODES = new Set(SENSOR_SEGS.map(nodeOf));
 
 export async function createSpine(host) {
   const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
@@ -79,7 +107,7 @@ export async function createSpine(host) {
     g.setAttribute("position", new THREE.Float32BufferAttribute(m.pos, 3));
     g.setIndex(m.idx);
     const geo = mergeVertices(g, 1e-3); geo.computeVertexNormals();
-    const isSensor = m.kind === "bone" && (m.segment === "T7" || m.segment === "T12");
+    const isSensor = m.kind === "bone" && SENSOR_NODES.has(m.segment);
     const mesh = new THREE.Mesh(geo, isSensor ? mats.sensorBone : mats[m.kind] || mats.bone);
     if (m.kind === "ribs") { ribs.push(mesh); mesh.renderOrder = 2; }
     nodes[i].holder.add(mesh);
@@ -117,15 +145,8 @@ export async function createSpine(host) {
     setView,
     setHeight(cm) { scale = cm >= 100 && cm <= 230 ? cm / MODEL_HEIGHT_CM : 1; root.scale.setScalar(scale); setView(view); },
     setRibs(on) { for (const r of ribs) r.visible = on; dirty = true; },
-    pose(qT7, qT12, share = 0.7) {          // null = neutral standing pose
-      const J = ORDER.map(() => [1, 0, 0, 0]);
-      if (qT7 && qT12) {
-        const pel = qpow(qT12, 1 - share), lumb = qpow(qmul(qconj(pel), qT12), 1 / (idx.T12 - idx.pelvis));
-        J[idx.pelvis] = pel;
-        for (let i = idx.L5; i <= idx.T12; i++) J[i] = lumb;
-        const thor = qpow(qmul(qconj(qT12), qT7), 1 / (idx.T7 - idx.T12));
-        for (let i = idx.T12 + 1; i <= idx.T7; i++) J[i] = thor;
-      }
+    pose(segQ, share = 0.7) {               // {segment: q}; null = neutral standing pose
+      const J = jointsFromSensors(segQ, share);
       nodes.forEach((nd, i) => nd.node.quaternion.copy(toOs(J[i])));
       dirty = true;
     },

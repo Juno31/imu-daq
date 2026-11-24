@@ -1,6 +1,6 @@
 // Review page: open a finished recording, plot IMU and EMG on one time axis, replay the spine model.
 // Data come from /api/review (host/review.py): IMU times are on the DAQ clock, so EMG and IMU line up.
-import { createSpine, segment, eulerXYZ, qmul, qconj } from "/static/spinemodel.js";
+import { createSpine, segment, eulerXYZ, qmul, qconj, SENSOR_SEGS } from "/static/spinemodel.js";
 
 const $ = (id) => document.getElementById(id);
 const RAD2DEG = 180 / Math.PI;
@@ -121,7 +121,8 @@ function renderInfo() {
 // ---------------- derived signals ----------------
 function calState() {
   const c = D.cal, names = D.imu ? Object.keys(D.imu.pods) : [];
-  const map = c && c.map && names.includes(c.map.T7) && names.includes(c.map.T12) ? c.map : { T7: names[0], T12: names[1] };
+  const map = c && c.map && names.includes(c.map.T7) && names.includes(c.map.T12) ? { ...c.map } : { T7: names[0], T12: names[1] };
+  for (const s of SENSOR_SEGS) if (!map[s] && names.includes(s)) map[s] = s;   // pods named after their segment
   const q0ok = !!(c && c.q0 && map.T7 && map.T12 && c.q0[map.T7] && c.q0[map.T12]);
   const B = c && c.B ? c.B : null;
   return { map, q0ok, B, live: q0ok && (!!B || anyway), names };
@@ -428,9 +429,10 @@ function updateSpine() {
     return;
   }
   const i = idxAt(D.imu.t, cur), B = cs.B || [1, 0, 0, 0];
-  const a = segment(D.imu.pods[cs.map.T7].q[i], D.cal.q0[cs.map.T7], B);
-  const b = segment(D.imu.pods[cs.map.T12].q[i], D.cal.q0[cs.map.T12], B);
-  if (spine) spine.pose(a, b);
+  const seg = (n) => (n && D.imu.pods[n] && D.cal.q0[n] ? segment(D.imu.pods[n].q[i], D.cal.q0[n], B) : null);
+  const segQ = Object.fromEntries(SENSOR_SEGS.map((s) => [s, seg(cs.map[s])]));
+  const a = segQ.T7, b = segQ.T12;
+  if (spine) spine.pose(a && b ? segQ : null);
   angleBox(a && b ? eulerXYZ(qmul(qconj(b), a)) : null);
 }
 function angleBox(a) {

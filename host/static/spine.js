@@ -1,4 +1,4 @@
-// Spine view: two IMUs (T7, T12) -> calibrated segment orientations -> 3D spine model.
+// Spine view: six IMUs (T1, T7, T12, L3, L5, S2) -> calibrated segment orientations -> 3D spine model.
 //
 // Conventions
 //  * Quaternions are [w, x, y, z]; an IMU quaternion q rotates sensor-frame vectors into the
@@ -12,6 +12,7 @@
 import * as THREE from "three";
 import { OrbitControls } from "three/addons/controls/OrbitControls.js";
 import { mergeVertices } from "three/addons/utils/BufferGeometryUtils.js";
+import { SENSOR_SEGS, SENSOR_NODES, jointsFromSensors } from "/static/spinemodel.js";
 
 const $ = (id) => document.getElementById(id);
 const D = 180 / Math.PI;
@@ -79,7 +80,8 @@ const hist = { t: [], a: [] };               // T7-vs-T12 angles
 function load(k) { try { return JSON.parse(localStorage.getItem(k)); } catch { return null; } }
 function save(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch { /* private mode */ } }
 
-function mapping() { return { T7: $("mapT7").value, T12: $("mapT12").value }; }
+function mapping() { return Object.fromEntries(SENSOR_SEGS.map((s) => [s, $("map" + s) ? $("map" + s).value : ""])); }
+function mappedNames(m = mapping()) { return SENSOR_SEGS.map((s) => m[s]).filter(Boolean); }
 
 function segment(name) {                     // body-frame rotation from standing, or null
   const q = live[name];
@@ -94,10 +96,12 @@ function setMsg(text, cls = "") { const m = $("calMsg"); m.textContent = text; m
 
 function startCapture(kind, secs) {
   const m = mapping();
-  if (!live[m.T7] || !live[m.T12]) { setMsg("No data from both sensors yet. Check the connection on the Acquisition page.", "warn"); return; }
-  if (m.T7 === m.T12) { setMsg("T7 and T12 must be different sensors.", "warn"); return; }
+  const names = mappedNames(m), missing = names.filter((n) => !live[n]);
+  if (names.length < 2 || !m.T7 || !m.T12) { setMsg("Assign at least the T7 and T12 sensors.", "warn"); return; }
+  if (missing.length) { setMsg(`No data from ${missing.join(", ")} yet. Check the connection on the Acquisition page.`, "warn"); return; }
+  if (new Set(names).size !== names.length) { setMsg("Each position needs a different sensor.", "warn"); return; }
   if (kind === "flex" && !cal.q0) { setMsg("Capture neutral first.", "warn"); return; }
-  capture = { kind, until: performance.now() + secs * 1000, secs, map: m, samples: { [m.T7]: [], [m.T12]: [] } };
+  capture = { kind, until: performance.now() + secs * 1000, secs, map: m, samples: Object.fromEntries(names.map((n) => [n, []])) };
   setMsg(kind === "neutral" ? "Hold still…" : "Bend forward slowly and come back up…", "busy");
 }
 
@@ -178,8 +182,8 @@ async function syncCal() {
 // the forward-bend body axes (B). Until then the model stays in a static pose behind a blurred gate.
 function neutralOk() {
   if (!cal.q0) return false;
-  const m = mapping(), names = [m.T7, m.T12].filter(Boolean);
-  return names.length === 2 ? names.every((n) => cal.q0[n]) : Object.keys(cal.q0).length >= 2;
+  const names = mappedNames();
+  return names.length >= 2 ? names.every((n) => cal.q0[n]) : Object.keys(cal.q0).length >= 2;
 }
 function isCalibrated() { return neutralOk() && !!cal.B; }
 
@@ -210,13 +214,18 @@ function updateCalUi() {
 // ---------------- UI ----------------
 function fillMap() {
   const saved = load("spineMap") || {};
-  for (const [id, seg, def] of [["mapT7", "T7", 0], ["mapT12", "T12", 1]]) {
-    const sel = $(id), cur = sel.value || saved[seg];
-    sel.innerHTML = podNames.map((n) => `<option>${n}</option>`).join("");
-    sel.value = podNames.includes(cur) ? cur : podNames[def] || podNames[0] || "";
+  const grid = $("mapGrid");
+  if (!grid.children.length) {
+    grid.innerHTML = SENSOR_SEGS.map((s) => `<label>${s} sensor<select id="map${s}"></select></label>`).join("");
+    for (const s of SENSOR_SEGS) $("map" + s).addEventListener("change", () => { save("spineMap", mapping()); updateGate(); });
   }
+  SENSOR_SEGS.forEach((seg, def) => {
+    const sel = $("map" + seg), cur = sel.value || saved[seg];
+    sel.innerHTML = `<option value="">— none —</option>` + podNames.map((n) => `<option>${n}</option>`).join("");
+    // a board pod named after the segment wins; then the saved choice
+    sel.value = podNames.includes(seg) ? seg : podNames.includes(cur) ? cur : "";
+  });
 }
-for (const id of ["mapT7", "mapT12"]) $(id).addEventListener("change", () => { save("spineMap", mapping()); updateGate(); });
 $("btnNeutral").onclick = () => startCapture("neutral", 3);
 $("btnFlex").onclick = () => startCapture("flex", 6);
 for (const id of ["showRibs", "showTrail"]) {          // shared with the main page's spine panel
@@ -312,8 +321,8 @@ function connect() {
 // Bone meshes: OpenSim 4.5 Gait2392 geometry (sacrum, hip bones, L5-C1 vertebrae with discs, ribs,
 // skull), prepared by models/build_model.py into static/models/spine_opensim.json. Frame = OpenSim
 // pelvis frame (X anterior, Y up, Z right), cm. Each segment rotates about the disc below it.
-// Two sensors only (T7, T12), no pelvis sensor: a fixed 70% of T12's rotation is spread over L5-T12,
-// the rest is pelvis tilt. Replaced by measured segments once all 7 IMUs are mapped.
+// Each mapped sensor sets its own segment (S2 -> pelvis); levels in between share the relative
+// rotation equally (jointsFromSensors in spinemodel.js).
 const LUMBAR_SHARE = 0.7;
 const ORDER = ["pelvis", "L5", "L4", "L3", "L2", "L1", "T12", "T11", "T10", "T9", "T8", "T7", "T6", "T5", "T4", "T3", "T2", "T1"];
 const idx = Object.fromEntries(ORDER.map((n, i) => [n, i]));
@@ -366,7 +375,7 @@ async function initThree() {
     g.setAttribute("position", new THREE.Float32BufferAttribute(m.pos, 3));
     g.setIndex(m.idx);
     const geo = mergeVertices(g, 1e-3); geo.computeVertexNormals();
-    const isSensor = m.kind === "bone" && (m.segment === "T7" || m.segment === "T12");
+    const isSensor = m.kind === "bone" && SENSOR_NODES.has(m.segment);
     const mesh = new THREE.Mesh(geo, isSensor ? mats.sensorBone : mats[m.kind] || mats.bone);
     if (m.kind === "ribs") { ribs.push(mesh); mesh.renderOrder = 2; }
     nodes[i].holder.add(mesh);
@@ -412,15 +421,8 @@ const wp = new THREE.Vector3();
 function updateModel() {
   const mp = mapping(), live3d = isCalibrated();       // not calibrated: static neutral model, no angles
   const qT7 = live3d ? segment(mp.T7) : null, qT12 = live3d ? segment(mp.T12) : null;
-  const share = LUMBAR_SHARE;
-  const J = ORDER.map(() => [1, 0, 0, 0]);       // joint rotation of each segment w.r.t. the one below
-  if (qT7 && qT12) {
-    const pel = qpow(qT12, 1 - share), lumb = qpow(qmul(qconj(pel), qT12), 1 / (idx.T12 - idx.pelvis));
-    J[idx.pelvis] = pel;
-    for (let i = idx.L5; i <= idx.T12; i++) J[i] = lumb;
-    const thor = qpow(qmul(qconj(qT12), qT7), 1 / (idx.T7 - idx.T12));
-    for (let i = idx.T12 + 1; i <= idx.T7; i++) J[i] = thor;
-  }
+  const segQ = live3d ? Object.fromEntries(SENSOR_SEGS.map((s) => [s, mp[s] ? segment(mp[s]) : null])) : null;
+  const J = jointsFromSensors(segQ, LUMBAR_SHARE);   // joint rotation of each segment w.r.t. the one below
   three.nodes.forEach((nd, i) => nd.node.quaternion.copy(toOs(J[i])));
   for (const r of three.ribs) r.visible = $("showRibs").checked;
   const t = three; t.trail.visible = $("showTrail").checked;

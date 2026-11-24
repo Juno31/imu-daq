@@ -33,6 +33,11 @@ share one time base (≈ 14 µs).
    arduino-cli lib install "SparkFun BNO080 Cortex Based IMU"
    arduino-cli compile --upload -p COM4 --fqbn esp32:esp32:XIAO_ESP32S3:USBMode=hwcdc firmware/imu_daq
    ```
+   **Teensy 4.1 (7 IMUs):** Boards Manager URL `https://www.pjrc.com/teensy/package_teensy_index.json`,
+   install **Teensy** (tested 1.62.0), board *Teensy 4.1*, USB Type *Serial*. No library to install: the
+   [teensy4_i2c](https://github.com/Richard-Gemmell/teensy4_i2c) driver is vendored in the sketch's `src/`.
+   Upload `firmware/imu_daq_teensy/imu_daq_teensy.ino`; the GUI finds the Teensy by itself.
+   Bench sketches for the Stage 1 wiring checks are in `firmware/bench/` (`i2c_map`, `imu7_bringup`).
 5. Optional desktop shortcut: right-click `make_shortcut.ps1` → *Run with PowerShell*.
 
 ## Use
@@ -135,6 +140,15 @@ UDP, keeps the SYNC pulse to the USB-6363, and three GoPro HERO13 cameras connec
 The IMUs sit on two TCA9548A muxes on two separate I2C buses: mux A on `Wire` (pins 18/19, IMUs 1–4) and
 mux B on `Wire1` (pins 17/16, IMUs 5–7). The two buses are read in parallel; a timing simulation gave
 200 frames/s with a worst frame of 4.7 of 5 ms, while one bus overran even at 100 frames/s.
+Firmware `firmware/imu_daq_teensy` (v2.0) implements this over USB serial for bench tests, with the same
+line protocol as the XIAO firmware; it reports each bus's time per frame in `status` and in `summary.json`
+(`i2c_buses`). The Ethernet/UDP link replaces USB later.
+
+Optional DAQ clock (v2.1): wire the DAQ counter output (PFI 12 by default on the USB-6363) to Teensy pin 4
+and D GND to GND. Then the command `clock ext` (or `"board_clock": "ext"` in `host/host_settings.json`)
+starts one frame per rising edge instead of using the Teensy timer. SYNC on pin 2 stays as it is. Pin 4 takes
+3.3 V at most, so a 5 V counter output needs a divider (1 kΩ series, 2 kΩ to GND). `status` prints
+`@CLOCK` (edges, period, glitches), and the board reports `clock_lost` / `clock_ok` events.
 
 ![Planned wiring: Teensy 4.1, 7 IMUs, NI USB-6363, 3 GoPros](hardware/wiring/teensy41_wiring.png)
 

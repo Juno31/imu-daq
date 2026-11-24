@@ -76,6 +76,7 @@ class App:
         self.lock = threading.RLock()
         self.perf0, self.unix0 = time.perf_counter(), time.time()
         self.dev = Device(self._on_frame, self._on_msg, self._on_pong, self._on_disconnect)
+        self.dev.on_sample = self._on_sample
         self.clock = ClockSync()
         self.frames = collections.deque(maxlen=120 * 200)   # (seq, row) row=[t_us, kind, num, *vals]
         self.fseq = 0
@@ -109,6 +110,14 @@ class App:
         self.quat_mode = load_host_settings().get("quat_mode", "game")
         if self.quat_mode not in QUAT_MODES:
             self.quat_mode = "game"
+        # frame clock on the board: "pit" (its own timer) or "ext" (DAQ counter output on Teensy pin 4).
+        # Set "board_clock" in host_settings.json; re-sent if the board resets.
+        self.board_clock = load_host_settings().get("board_clock", "pit")
+        if self.board_clock not in ("pit", "ext"):
+            self.board_clock = "pit"
+        # magnetometer reports on the IMUs ("imu_mag": false frees I2C time; the game rotation vector
+        # does not use them). Re-sent if the board resets. Needs imu_daq_teensy 2.1.3 or later.
+        self.imu_mag = bool(load_host_settings().get("imu_mag", False))
         self.daq_cfg = {"enabled": True, "device": "", "sync_chan": "ai0", "extra_chans": channels.DEFAULT_EXTRA,
                         "rate": 20000, "range": 5.0, "terminal": "DIFF", "require": False}
         self.daq_devices = daqmod.list_devices()
@@ -143,6 +152,11 @@ class App:
         return self.pod_live[name]
 
     # ---------------- device callbacks (reader thread) ----------------
+    def _on_sample(self, pod, rid, seq, t_us, status, vals):
+        sess = self.session
+        if sess is not None and not sess.closed:
+            sess.sample(pod, rid, seq, t_us, status, vals)
+
     def _on_frame(self, kind, num, t_us, vals, perf):
         with self.lock:
             self.fseq += 1
@@ -196,6 +210,14 @@ class App:
                                  "upload imu_daq v1.3 to use the rotation vector", "board")
             elif have != self.quat_mode and fields.get("rec") != "1":
                 self.dev.send(f"mode {self.quat_mode}")
+            clk = fields.get("clock")
+            if self.board_clock == "ext" and "clk_pin" not in fields:
+                self.log("warn", "this firmware has no DAQ clock input; upload imu_daq 2.1", "board")
+            elif clk in ("pit", "ext") and clk != self.board_clock and fields.get("rec") != "1":
+                self.dev.send(f"clock {self.board_clock}")
+            mag_ms = fields.get("mag_ms")
+            if mag_ms is not None and (mag_ms != "0") != self.imu_mag and fields.get("rec") != "1":
+                self.dev.send(f"mag {'on' if self.imu_mag else 'off'}")
         elif tag == "STATUS":
             self.fw_status = fields
         elif tag == "POD":
@@ -583,6 +605,30 @@ class App:
         finally:
             self.busy.release()
 
+    def _fetch_sd(self, sess):
+        """Firmware >= 2.5 records each trial to the Teensy SD card too. Copy that file into the trial folder
+        (imu_sd.csv) and rebuild imu.csv / imu_samples.csv from it; the USB copies stay as *_live.csv.
+        Returns a dict for summary.json, or None when there is no SD file."""
+        name = self.stop_info.get("sd_file", "-")
+        if name in ("", "-") or not self.dev.connected:
+            return None
+        note = {"file": name, "lines_on_card": int(self.stop_info.get("sd_lines", 0) or 0),
+                "overruns": int(self.stop_info.get("sd_overruns", 0) or 0),
+                "usb_skipped_frames": int(self.stop_info.get("usb_skip_f", 0) or 0),
+                "usb_skipped_samples": int(self.stop_info.get("usb_skip_s", 0) or 0)}
+        path = os.path.join(sess.dir, "imu_sd.csv")
+        t0 = time.time()
+        try:
+            self.log("info", f"downloading {name} from the Teensy SD card", "board")
+            n = self.dev.fetch_file(name, path, progress=lambda k: self.log("info", f"SD download: {k} lines", "board"))
+            nf, ns = sess.rebuild_from_sd(path)
+            note.update(downloaded_lines=n, frames=nf, samples=ns, seconds=round(time.time() - t0, 1), used=True)
+            self.log("info", f"{name}: {nf} frames, {ns} samples from the SD card ({note['seconds']} s)", "board")
+        except Exception as e:
+            note.update(used=False, error=str(e))
+            self.log("warn", f"SD card copy not used ({e}); keeping the live USB data", "board")
+        return note
+
     def _finish(self, reason, locked=False):
         """Stop the board and DAQ, write the session files. Returns the summary."""
         sess = self.session
@@ -621,9 +667,12 @@ class App:
                 align = daqmod.align(pulses, d.rate, frames_sent, self.rec.get("frame_us", 10000))
             if self.syncmon is not None and self.syncmon.active:
                 self.syncmon.update(None, final=True)
+            sd_note = self._fetch_sd(sess)
             summary = sess.finalize(lambda s: ClockSync().fit_samples(s), self.rec.get("frame_us", 10000),
                                     self.stop_info, daq_meta, pulses, align)
             summary["dir"] = sess.dir
+            if sd_note:
+                summary["sd_card"] = sd_note
             if reason:
                 summary["aborted"] = reason
         except Exception as e:
@@ -1090,7 +1139,7 @@ def main():
     ap = argparse.ArgumentParser(description="IMU DAQ acquisition server + browser GUI")
     ap.add_argument("--port", type=int, default=8765, help="web port (default 8765)")
     ap.add_argument("--data", default=DEFAULT_DATA, help="folder for recordings")
-    ap.add_argument("--serial", default=None, help="serial port (default: auto-detect the XIAO)")
+    ap.add_argument("--serial", default=None, help="serial port (default: auto-detect the Teensy or XIAO)")
     ap.add_argument("--no-browser", action="store_true")
     args = ap.parse_args()
     # Only one server may own the board: a second copy would fight over the COM port and reset
