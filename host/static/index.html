@@ -5,14 +5,14 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>IMU DAQ</title>
 <link rel="stylesheet" href="/static/app.css">
+<link rel="stylesheet" href="/static/workflow.css">
 </head>
 <body>
 <header class="topbar">
   <div class="brand"><span class="logo">◆</span> IMU DAQ</div>
   <div class="chip" id="connChip"><span class="dot" id="connDot"></span><span id="connText">Connecting…</span></div>
+  <nav class="flownav" id="flowNav" aria-label="Experiment steps"></nav>
   <div class="spacer"></div>
-  <a class="chip" href="/emg" style="text-decoration:none;color:inherit" title="Baseline offset and MVC / RVC of the EMG channels">EMG norm</a>
-  <a class="chip" href="/review" style="text-decoration:none;color:inherit" title="Open a finished recording: IMU, EMG and spine replay">Review</a>
   <a class="chip" href="/spine" style="text-decoration:none;color:inherit" title="Calibrated 3D spine view">Spine view</a>
   <button class="btn small ghost" id="btnKeys" title="Keyboard shortcuts (?)">⌨ Keys</button>
   <button class="btn small ghost" id="btnSettings" title="DAQ, time sync and board settings (S)">⚙ Settings</button>
@@ -21,7 +21,7 @@
 <div class="banner hidden" id="banner"></div>
 
 <div class="shell">
-<!-- Spine rendering (left side on wide screens) -->
+<!-- Spine rendering (left side on wide screens, Task recording page only) -->
 <aside class="spinepanel card" id="spinePanel">
   <div class="fileshead"><h2>Spine</h2><span class="hint" id="spineHint"></span><div class="spacer"></div>
     <a class="btn small ghost" href="/spine" title="Calibration, sensor placement and angles">Full view</a></div>
@@ -38,16 +38,8 @@
   </div>
 </aside>
 <main class="layout">
-  <!-- Setup: steps 1-3, done once per participant (minimize it while recording) -->
-  <section class="setupgroup" id="setupGroup">
-    <div class="setuphead" id="setupHead" tabindex="0" role="button" aria-expanded="true" title="Click to minimize / expand the setup">
-      <span class="chev stepchev">›</span><b>Setup</b><span class="hint setuphint">steps 1–3 · once per participant</span>
-      <span class="setupsum" id="setupSum"></span>
-      <span class="pill" id="setupPill">—</span>
-    </div>
-    <div class="setupbody">
-    <div class="stephead" id="step1" data-step="1"><span class="stepn">1</span><b>System check</b>
-      <span class="hint">all green before the participant arrives · click a tile for detail</span></div>
+  <!-- The live sections are kept here and moved into the slots of the page that shows them -->
+  <div class="parking hidden" id="parking">
     <div class="statusrow">
       <button class="stile" id="stDaq" data-go="drawer" title="NI DAQ: device found and reading (click for settings)">
         <span class="sl"></span><span class="st"><small>DAQ</small><b>—</b><span class="sd">—</span></span></button>
@@ -60,69 +52,6 @@
       <button class="stile" id="stCam" data-go="drawerGopro" title="GoPro cameras: connected, battery, SD card (click for settings)">
         <span class="sl"></span><span class="st"><small>Cameras</small><b>—</b><span class="sd">—</span></span></button>
     </div>
-      <div class="flowrow setuprow">
-      <section class="card stepcard" id="step2" data-step="2">
-        <h2><span class="stepn">2</span>Participant</h2>
-        <div class="pairrow">
-          <label>Test date<input id="testDate" placeholder="YYMMDD" maxlength="10" autocomplete="off" title="Folder for the day, e.g. 261113 (empty = today)"></label>
-          <label>Subject<input id="subject" placeholder="sub01" autocomplete="off" title="1, S01 or sub01 all become sub01"></label>
-        </div>
-        <div class="pairrow">
-          <label>Height (cm)<input id="heightCm" type="number" min="100" max="230" step="0.5" placeholder="e.g. 172" autocomplete="off"
-            title="Scales the spine model (height ÷ 180 cm) and is saved with every trial"></label>
-          <label>Notes<input id="notes" placeholder="optional" autocomplete="off" title="Saved with every trial"></label>
-        </div>
-        <div class="applyrow">
-          <p class="cap" id="subjHint">Attach the IMUs and EMG electrodes, then check the live signals below.</p>
-          <button class="btn small" id="btnSubjApply" title="Use these participant details for the next recordings (Enter in any field does the same)">Apply</button>
-        </div>
-      </section>
-
-      <section class="card stepcard" id="step3" data-step="3">
-        <h2><span class="stepn">3</span>Static calibration</h2>
-        <div class="substep" id="calStep">
-          <div class="subhead"><span class="subn">a</span><b>Still hold</b><span class="pill" id="calPill">NOT DONE</span></div>
-          <p class="cap">Participant stands still in the neutral posture: upright, looking ahead, arms relaxed.</p>
-          <div class="calrow">
-            <div class="seg" id="calSecs" title="Hold duration">
-              <button data-s="3">3 s</button><button data-s="5" class="on">5 s</button><button data-s="10">10 s</button>
-            </div>
-            <button class="btn calbtn" id="btnCal" title="Record a still hold and save it as the calibration (shortcut: C)">◎ Calibrate <kbd class="k">C</kbd></button>
-          </div>
-          <div class="calprog hidden" id="calProg"><div class="bar"><i id="calBar"></i></div><span id="calLeft">Hold still…</span></div>
-          <div class="calres" id="calRes"></div>
-        </div>
-        <div class="substep bendstep" id="bendStep">
-          <div class="subhead"><span class="subn">b</span><b>Forward bend</b><span class="pill" id="bendPill">NOT DONE</span></div>
-          <p class="cap">Sets the body's left–right axis for spine angles. Right after the still hold, without turning the feet: bend forward slowly (40° or more), then come back up.</p>
-          <button class="btn bendbtn" id="btnBend" title="Capture a forward bend for 6 s (shortcut: B)">↓ Forward bend · 6 s <kbd class="k">B</kbd></button>
-          <div class="calprog hidden" id="bendProg"><div class="bar"><i id="bendBar"></i></div><span id="bendLeft"></span></div>
-          <div class="calres" id="bendRes"></div>
-        </div>
-      </section>
-      </div>
-    </div>
-  </section>
-
-  <!-- Step 4: record trials (used during the whole session) -->
-  <section class="card stepcard recmain" id="step4" data-step="4">
-    <h2><span class="stepn">4</span>Record trials</h2>
-    <div class="rm-grid">
-      <div class="rm-col rm-task">
-        <div class="taskrow">
-          <label class="f-task">Task<select id="taskSel"></select></label>
-          <label class="f-trialn">Trial<input id="label" type="number" min="1" step="1" placeholder="1" autocomplete="off"></label>
-        </div>
-        <p class="cap taskinfo" id="taskInfo"></p>
-        <div class="takepath mono" id="takePath" title="Where the next trial is saved"></div>
-      </div>
-    </div>
-    <div class="camstrip" id="camStrip" title="GoPro cameras over USB: started and stopped with each recording (Settings → GoPro)"></div>
-  </section>
-
-  <!-- Live signals (used in steps 1-4) -->
-  <div class="divider"><span>Live signals</span></div>
-  <!-- 3. Detail sections (click a header to open / close) -->
   <section class="card fold" id="foldImu" data-fold="imu">
     <div class="foldhead" tabindex="0" role="button" aria-expanded="true">
       <span class="chev">›</span><h2>IMU</h2><span class="foldsum" id="sumImu"></span>
@@ -142,7 +71,6 @@
       <div class="pods" id="pods"></div>
     </div>
   </section>
-
   <section class="card fold emgcard" id="emgCard" data-fold="emg">
     <div class="foldhead" tabindex="0" role="button" aria-expanded="true">
       <span class="chev">›</span><h2>EMG</h2><span class="foldsum hint" id="emgHint"></span>
@@ -160,10 +88,6 @@
       <p class="cap" id="emgCap">Last 2 s per channel (min/max envelope) · RMS of the last 100 ms · left and right side by side.</p>
     </div>
   </section>
-
-  <!-- Step 5: review -->
-  <div class="stephead" id="step5" data-step="5"><span class="stepn">5</span><b>Review</b>
-    <span class="hint">after each trial: the banner above, SYNC result, log · saved files on the right</span></div>
   <section class="card fold syncmon" id="syncCard" data-fold="sync">
     <div class="foldhead" tabindex="0" role="button" aria-expanded="true">
       <span class="chev">›</span><h2>Sync detail</h2><span class="foldsum hint" id="smHint"></span>
@@ -207,7 +131,6 @@
       </div>
     </div>
   </section>
-
   <section class="card fold" id="foldLog" data-fold="log">
     <div class="foldhead" tabindex="0" role="button" aria-expanded="true">
       <span class="chev">›</span><h2>Event log</h2><span class="foldsum hint" id="sumLog"></span>
@@ -220,9 +143,262 @@
       <div class="log" id="log"></div>
     </div>
   </section>
+  </div>
+
+  <!-- ================= 1 · Session information ================= -->
+  <section class="view" data-view="session">
+    <div class="viewhead"><span class="stepn">1</span><h1>Session information</h1>
+      <span class="hint">who, where, when, conditions · saved in the subject folder and copied into every trial</span></div>
+    <div class="formgrid">
+      <section class="card stepcard">
+        <h2>Session</h2>
+        <div class="pairrow">
+          <label>Test date<input id="testDate" placeholder="YYMMDD" maxlength="10" autocomplete="off" title="Folder for the day, e.g. 261113 (empty = today)"></label>
+          <label>Subject ID<input id="subject" placeholder="sub01" autocomplete="off" title="1, S01 or sub01 all become sub01"></label>
+        </div>
+        <div class="pairrow">
+          <label>Start time<span class="inrow"><input id="si_start" type="time" autocomplete="off"><button class="btn small ghost" data-now="si_start" type="button">Now</button></span></label>
+          <label>End time<span class="inrow"><input id="si_end" type="time" autocomplete="off"><button class="btn small ghost" data-now="si_end" type="button">Now</button></span></label>
+        </div>
+        <div class="pairrow">
+          <label>Study / protocol<input id="si_protocol" placeholder="e.g. spine IMU-EMG study" autocomplete="off"></label>
+          <label>IRB / approval no.<input id="si_irb" placeholder="optional" autocomplete="off"></label>
+        </div>
+        <p class="cap mono" id="siFolder"></p>
+      </section>
+      <section class="card stepcard">
+        <h2>Location &amp; environment</h2>
+        <div class="pairrow">
+          <label>Location<input id="si_location" placeholder="e.g. university lab" autocomplete="off"></label>
+          <label>Room / area<input id="si_room" placeholder="e.g. motion lab, room 301" autocomplete="off"></label>
+        </div>
+        <div class="pairrow">
+          <label>Weather<select id="si_wcond">
+            <option value="">—</option><option>Clear</option><option>Partly cloudy</option><option>Cloudy</option>
+            <option>Rain</option><option>Snow</option><option>Fog</option><option>Windy</option></select></label>
+          <label>Outdoor °C · %RH<span class="inrow"><input id="si_wtemp" type="number" step="0.1" placeholder="°C"><input id="si_whum" type="number" min="0" max="100" placeholder="%RH"></span></label>
+        </div>
+        <div class="pairrow">
+          <label>Indoor °C · %RH<span class="inrow"><input id="si_itemp" type="number" step="0.1" placeholder="°C"><input id="si_ihum" type="number" min="0" max="100" placeholder="%RH"></span></label>
+          <label>Floor / surface<input id="si_surface" placeholder="e.g. concrete, force plate" autocomplete="off"></label>
+        </div>
+        <p class="cap">Temperature and humidity change skin impedance (EMG) and IMU warm-up drift.</p>
+      </section>
+      <section class="card stepcard wide">
+        <h2>Team &amp; roles <span class="hint">&nbsp;one row per person</span></h2>
+        <div class="team" id="siTeam"></div>
+        <div class="row"><button class="btn small" id="btnAddPerson" type="button">+ Add person</button>
+          <span class="hint">Names and roles are remembered for the next session.</span></div>
+        <datalist id="siRoles">
+          <option>Principal investigator</option><option>GUI operator</option><option>IMU placement</option>
+          <option>EMG placement</option><option>Participant instructions</option><option>Safety / spotter</option>
+          <option>Video / cameras</option><option>Note taker</option></datalist>
+      </section>
+      <section class="card stepcard wide">
+        <h2>Session notes</h2>
+        <textarea id="si_notes" rows="3" placeholder="Deviations from the protocol, equipment swaps, interruptions…"></textarea>
+        <div class="applyrow"><p class="cap" id="siState">Not saved yet.</p>
+          <button class="btn" id="btnSessSave">Save session</button></div>
+      </section>
+    </div>
+    <div class="viewnext"><a class="btn" href="#participant">Next: 2 · Participant ›</a></div>
+  </section>
+
+  <!-- ================= 2 · Participant information ================= -->
+  <section class="view" data-view="participant">
+    <div class="viewhead"><span class="stepn">2</span><h1>Participant information</h1>
+      <span class="hint" id="piWho"></span></div>
+    <div class="formgrid">
+      <section class="card stepcard" id="step2" data-step="2">
+        <h2>Anthropometrics</h2>
+        <div class="pairrow">
+          <label>Age (years)<input id="pi_age" type="number" min="1" max="120" autocomplete="off"></label>
+          <label>Sex<select id="pi_sex"><option value="">—</option><option>Female</option><option>Male</option><option>Other / not stated</option></select></label>
+        </div>
+        <div class="pairrow">
+          <label>Height (cm)<input id="heightCm" type="number" min="100" max="230" step="0.5" placeholder="e.g. 172" autocomplete="off"
+            title="Scales the spine model (height ÷ 180 cm) and is saved with every trial"></label>
+          <label>Weight (kg)<input id="pi_weight" type="number" min="20" max="250" step="0.1" autocomplete="off"></label>
+        </div>
+        <div class="pairrow">
+          <label>BMI<input id="pi_bmi" readonly tabindex="-1" placeholder="from height and weight"></label>
+          <label>Waist (cm)<input id="pi_waist" type="number" min="30" max="200" step="0.5" placeholder="optional"></label>
+        </div>
+        <div class="pairrow">
+          <label>Dominant hand<select id="pi_hand"><option value="">—</option><option>Right</option><option>Left</option><option>Both</option></select></label>
+          <label>Dominant leg<select id="pi_leg"><option value="">—</option><option>Right</option><option>Left</option></select></label>
+        </div>
+      </section>
+      <section class="card stepcard">
+        <h2>Health &amp; eligibility</h2>
+        <div class="pairrow">
+          <label>Group<input id="pi_group" placeholder="e.g. healthy, LBP" autocomplete="off" list="piGroups"></label>
+          <label>Activity level<select id="pi_activity"><option value="">—</option><option>Sedentary</option><option>Light</option><option>Moderate</option><option>Vigorous</option></select></label>
+        </div>
+        <datalist id="piGroups"><option>Healthy</option><option>Chronic low back pain</option><option>Acute low back pain</option></datalist>
+        <div class="pairrow">
+          <label>Low back pain<select id="pi_lbp"><option value="">—</option><option>None</option><option>Current</option><option>Past (resolved)</option></select></label>
+          <label>Pain today (NRS 0–10)<input id="pi_nrs" type="number" min="0" max="10" step="1" autocomplete="off"></label>
+        </div>
+        <label>Medical history, surgery, medication<textarea id="pi_history" rows="2" placeholder="optional"></textarea></label>
+        <div class="checks">
+          <label class="ck"><input type="checkbox" id="pi_consent"> Informed consent signed</label>
+          <label class="ck"><input type="checkbox" id="pi_eligible"> Inclusion / exclusion criteria checked</label>
+          <label class="ck"><input type="checkbox" id="pi_clothing"> Clothing gives access to the back and abdomen</label>
+        </div>
+      </section>
+      <section class="card stepcard wide">
+        <h2>Trial notes <span class="hint">&nbsp;saved with every trial</span></h2>
+        <input id="notes" placeholder="optional" autocomplete="off" title="Saved with every trial">
+        <div class="applyrow">
+          <p class="cap" id="subjHint">Saved in the subject folder as participant.json.</p>
+          <button class="btn" id="btnSubjApply" title="Use these participant details for the next recordings">Save participant</button>
+        </div>
+      </section>
+    </div>
+    <div class="viewnext"><a class="btn ghost" href="#session">‹ 1 · Session</a><a class="btn" href="#equip-jig">Next: 3 · Equipment ›</a></div>
+  </section>
+
+  <!-- ================= 3 · Equipment configuration ================= -->
+  <section class="view" data-view="equip">
+    <div class="viewhead"><span class="stepn">3</span><h1>Equipment configuration</h1>
+      <nav class="esubs" id="equipSubs"></nav></div>
+
+    <!-- 3a: IMU jig -->
+    <div class="sub" data-sub="equip-jig">
+      <div class="formgrid">
+        <section class="card stepcard">
+          <h2>Global orientation in the jig <span class="pill" id="jigPill">NOT DONE</span></h2>
+          <p class="cap">All IMUs sit in the jig with the <b>same orientation</b>, jig still on a level table. The capture averages
+            each IMU's quaternion and compares it with the reference IMU. With the game rotation vector the heading is set
+            when an IMU starts: <b>do not restart the IMUs</b> between this capture and the recordings.</p>
+          <div class="calrow">
+            <label class="inl">Reference<select id="jigRef"></select></label>
+            <div class="seg" id="jigSecs" title="Capture duration">
+              <button data-s="3">3 s</button><button data-s="5" class="on">5 s</button><button data-s="10">10 s</button></div>
+            <button class="btn calbtn" id="btnJigCap">◎ Capture jig orientation</button>
+          </div>
+          <div class="calprog hidden" id="jigProg"><div class="bar"><i id="jigBar"></i></div><span id="jigLeft">Keep the jig still…</span></div>
+          <div class="restable" id="jigRes"></div>
+        </section>
+        <section class="card stepcard">
+          <h2>Six-face sensor calibration <span class="hint">&nbsp;optional · per board</span></h2>
+          <p class="cap">Accelerometer bias, scale and axis alignment, gyroscope bias. Warm up 10–15 min, then record the jig on
+            each of its 6 faces, still for ≥ 15 s per face (any order). Stop, then analyse.</p>
+          <div class="row">
+            <button class="btn" id="btnJigRec">● Record 6-face jig trial</button>
+            <button class="btn ghost" id="btnJigAnalyze">Analyse latest</button>
+          </div>
+          <p class="cap mono" id="jigRecInfo"></p>
+          <div class="restable" id="jigCalRes"></div>
+        </section>
+      </div>
+      <div class="slot" data-slot="imu"></div>
+    </div>
+
+    <!-- 3b: IMU attachment -->
+    <div class="sub" data-sub="equip-imu">
+      <div class="formgrid">
+        <section class="card stepcard">
+          <h2>IMU attachment &amp; data quality <span class="pill" id="imuChkPill">—</span></h2>
+          <p class="cap">Body segment comes from the Spine view's sensor placement. Tick each IMU when attached and secured;
+            the live columns must be green before you continue.</p>
+          <div class="restable" id="imuCheck"></div>
+          <div class="applyrow"><p class="cap" id="imuChkState"></p><button class="btn small" id="btnImuChkSave">Save checklist</button></div>
+        </section>
+      <section class="card stepcard" id="step3" data-step="3">
+        <h2>Static calibration <span class="hint">&nbsp;after the IMUs are attached</span></h2>
+        <div class="substep" id="calStep">
+          <div class="subhead"><span class="subn">a</span><b>Still hold</b><span class="pill" id="calPill">NOT DONE</span></div>
+          <p class="cap">Participant stands still in the neutral posture: upright, looking ahead, arms relaxed.</p>
+          <div class="calrow">
+            <div class="seg" id="calSecs" title="Hold duration">
+              <button data-s="3">3 s</button><button data-s="5" class="on">5 s</button><button data-s="10">10 s</button>
+            </div>
+            <button class="btn calbtn" id="btnCal" title="Record a still hold and save it as the calibration (shortcut: C)">◎ Calibrate <kbd class="k">C</kbd></button>
+          </div>
+          <div class="calprog hidden" id="calProg"><div class="bar"><i id="calBar"></i></div><span id="calLeft">Hold still…</span></div>
+          <div class="calres" id="calRes"></div>
+        </div>
+        <div class="substep bendstep" id="bendStep">
+          <div class="subhead"><span class="subn">b</span><b>Forward bend</b><span class="pill" id="bendPill">NOT DONE</span></div>
+          <p class="cap">Sets the body's left–right axis for spine angles. Right after the still hold, without turning the feet: bend forward slowly (40° or more), then come back up.</p>
+          <button class="btn bendbtn" id="btnBend" title="Capture a forward bend for 6 s (shortcut: B)">↓ Forward bend · 6 s <kbd class="k">B</kbd></button>
+          <div class="calprog hidden" id="bendProg"><div class="bar"><i id="bendBar"></i></div><span id="bendLeft"></span></div>
+          <div class="calres" id="bendRes"></div>
+        </div>
+      </section>
+      </div>
+      <div class="slot" data-slot="imu"></div>
+    </div>
+
+    <!-- 3c: EMG attachment -->
+    <div class="sub" data-sub="equip-emg">
+      <div class="formgrid">
+        <section class="card stepcard wide">
+          <h2>EMG attachment &amp; data quality <span class="pill" id="emgChkPill">—</span></h2>
+          <p class="cap">Prepare the skin (shave, abrade, alcohol), place the electrodes along the fibres, then check each channel
+            at rest (low RMS, no clipping, not floating) and with a short contraction (clear burst).</p>
+          <div class="row"><button class="btn small" id="btnEmgRest" title="Average each channel's RMS for 5 s while the participant relaxes">Measure rest noise · 5 s</button>
+            <span class="hint" id="emgRestState"></span></div>
+          <div class="restable" id="emgCheck"></div>
+          <div class="applyrow"><p class="cap" id="emgChkState"></p><button class="btn small" id="btnEmgChkSave">Save checklist</button></div>
+        </section>
+      </div>
+      <div class="slot" data-slot="emg"></div>
+    </div>
+
+    <!-- 3d: DAQ connection & time sync -->
+    <div class="sub" data-sub="equip-daq">
+      <div class="stephead" id="step1" data-step="1"><b>Devices</b>
+        <span class="hint">all green before the participant arrives · click a tile for detail</span></div>
+      <div class="slot" data-slot="tiles"></div>
+      <div class="formgrid">
+        <section class="card stepcard wide">
+          <h2>Time sync test <span class="pill" id="syncTestPill">NOT RUN</span></h2>
+          <p class="cap">Records a short test trial (task <span class="mono">synctest</span>) with every device, then checks that
+            every IMU frame has exactly one SYNC pulse on the DAQ.</p>
+          <div class="row">
+            <div class="seg" id="syncSecs"><button data-s="5">5 s</button><button data-s="10" class="on">10 s</button><button data-s="30">30 s</button></div>
+            <button class="btn calbtn" id="btnSyncTest">▶ Run sync test</button>
+            <span class="hint" id="syncTestLeft"></span>
+          </div>
+          <div class="restable" id="syncTestRes"></div>
+        </section>
+      </div>
+      <div class="slot" data-slot="sync"></div>
+      <div class="slot" data-slot="log"></div>
+    </div>
+    <div class="viewnext" id="equipNext"></div>
+  </section>
+
+  <!-- ================= 5 · Task recording ================= -->
+  <section class="view" data-view="record">
+    <div class="slot" data-slot="tiles"></div>
+  <section class="card stepcard recmain" id="step4" data-step="4">
+    <h2><span class="stepn">5</span>Record trials</h2>
+    <div class="rm-grid">
+      <div class="rm-col rm-task">
+        <div class="taskrow">
+          <label class="f-task">Task<select id="taskSel"></select></label>
+          <label class="f-trialn">Trial<input id="label" type="number" min="1" step="1" placeholder="1" autocomplete="off"></label>
+        </div>
+        <p class="cap taskinfo" id="taskInfo"></p>
+        <div class="takepath mono" id="takePath" title="Where the next trial is saved"></div>
+      </div>
+    </div>
+    <div class="camstrip" id="camStrip" title="GoPro cameras over USB: started and stopped with each recording (Settings → GoPro)"></div>
+  </section>
+    <div class="divider"><span>Live signals</span></div>
+    <div class="slot" data-slot="imu"></div>
+    <div class="slot" data-slot="emg"></div>
+    <div class="slot" data-slot="sync"></div>
+    <div class="slot" data-slot="log"></div>
+    <div class="viewnext"><a class="btn ghost" href="/emg">‹ 4 · MVC / RVC</a><a class="btn" href="/review">Next: 6 · Data review ›</a></div>
+  </section>
 </main>
 
-<!-- Saved recordings (right side on wide screens, below on narrow ones) -->
+<!-- Saved recordings (right side on wide screens, Task recording page only) -->
 <aside class="files card" id="filesPanel">
   <div class="fileshead">
     <h2>Saved recordings</h2><span class="hint" id="filesCount"></span>
@@ -393,6 +569,8 @@
 </template>
 
 <script src="/static/stream.js"></script>
+<script src="/static/nav.js"></script>
 <script src="/static/app.js"></script>
+<script src="/static/workflow.js"></script>
 </body>
 </html>

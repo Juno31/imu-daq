@@ -58,6 +58,23 @@ Closing the browser does not stop a recording; closing the server window does (i
 
 All pages open in the same browser tab and share one live-data connection, so several tabs can stay open.
 
+**Experiment workflow** (step bar at the top of every page):
+
+| Step | Page | What you do |
+|---|---|---|
+| 1 · Session | `/#session` | test date, subject ID, start / end time, protocol, IRB no., location, weather and indoor climate, team names and roles, notes → `session_info.json` |
+| 2 · Participant | `/#participant` | age, sex, height, weight (BMI), dominant side, group, back pain, consent and eligibility → `participant.json` |
+| 3a · IMU jig | `/#equip-jig` | all IMUs in the jig with one orientation: averaged quaternion per IMU, tilt and heading vs the reference IMU → `jig_alignment.json`; optional 6-face sensor calibration (records task `jigcal`, runs `jig_calibration.py`) |
+| 3b · IMU attach | `/#equip-imu` | attachment checklist per IMU with live status, static calibration (still hold + forward bend) |
+| 3c · EMG attach | `/#equip-emg` | skin prep / electrode checklist per channel, live RMS, 5 s rest-noise measurement → `setup_check.json` |
+| 3d · DAQ & sync | `/#equip-daq` | device tiles, time sync test (short `synctest` recording, PASS when every frame has one SYNC pulse), Sync detail |
+| 4 · MVC / RVC | `/emg` | EMG normalization (below) |
+| 5 · Task recording | `/#record` | task trials, live signals, spine view, saved recordings |
+| 6 · Data review | `/review` | finished recordings |
+
+The info files are saved in `data/<date>/<subject>/` and copied into every trial recorded afterwards.
+A step shows ✓ when it is done for the current date and subject.
+
 **Main page** (`/`)
 
 | Part | What it shows |
@@ -222,6 +239,7 @@ A repeat of an existing trial number is saved as `…_trial<NN>_2`; nothing is o
 | `spine_cal.json` | spine calibration used (neutral quaternions, body axes, sensor map, height) |
 | `calibration.json` | static calibration used (still hold results) |
 | `emg_norm.json` | EMG normalization used (offset, noise, MVC / RVC per channel), if made |
+| `session_info.json`, `participant.json`, `jig_alignment.json`, `setup_check.json` | experiment information from steps 1–3, if saved |
 
 Read the DAQ file in Python:
 ```python
