@@ -12,6 +12,7 @@ let windowSec = LS.get("window", 10);
 const pods = new Map();       // name -> pod view
 const MAXKEEP = 35;           // seconds of samples kept per pod
 let lastLogLevelFilter = "all";
+let FRAME_HOOK = null;         // workflow.js: jig capture (pod view, quaternion valid)
 
 // ---------------- math ----------------
 function qmul(a, b) {
@@ -96,6 +97,7 @@ function addFrames(rows) {
         p.s.push(null); p.x = null; p.hz = null;
       }
       p.dirty = true;
+      if (FRAME_HOOK) FRAME_HOOK(p, !!r[o]);
     }
   }
   for (const p of pods.values()) {
@@ -1084,6 +1086,7 @@ function applyStatus(s) {
   applyGopro(s.gopro, st);
   // summary banner after a recording
   if (prevState === "stopping" && st !== "stopping" && s.last_summary) { showSummary(s.last_summary); loadSessions(true); }
+  if (window.onWorkflowStatus) onWorkflowStatus(s, prevState);
 }
 
 // GoPro videos copied from the SD cards -> trial folders (dry run, confirm, then copy in the background)
@@ -1278,6 +1281,7 @@ function addLog(items) {
 }
 
 // ---------------- static calibration (step 3) ----------------
+let calShown = false;
 let calSecs = +LS.get("calSecs", 5), calApplied = LS.get("calApplied", ""), calRenderKey = "";
 
 async function runCalibration() {
@@ -1416,8 +1420,8 @@ function applyCalib(s) {
   const c = s.calib || {}, cur = c.current, att = c.attempt;
   const subj = $("subject").value.trim();
   $("calProg").classList.toggle("hidden", !c.running);
-  if (c.running && $("step3").classList.contains("min")) setStep(3, false);   // show the countdown
-  if (c.running && $("setupGroup").classList.contains("min")) setSetup(false);
+  if (c.running && !calShown && window.showRoute) showRoute("equip-imu");   // show the countdown once
+  calShown = !!c.running;
   if (c.running) {
     const f = c.seconds ? 1 - c.remaining_s / c.seconds : 0;
     $("calBar").style.width = `${Math.max(0, Math.min(100, f * 100)).toFixed(0)}%`;
@@ -1474,8 +1478,7 @@ function runBend() {
   const names = sc.map ? [sc.map.T6, sc.map.T11] : Object.keys(sc.q0).slice(0, 2);
   if (!names.every((n) => sc.q0[n] && pods.has(n) && pods.get(n).q)) { toast("No live data from both IMUs", true); return; }
   bend = { until: performance.now() + BEND_SECS * 1000, samples: Object.fromEntries(names.map((n) => [n, []])) };
-  if ($("step3").classList.contains("min")) setStep(3, false);
-  if ($("setupGroup").classList.contains("min")) setSetup(false);
+  if (window.showRoute) showRoute("equip-imu");
   $("bendProg").classList.remove("hidden");
   $("btnBend").disabled = true;
   applyBend();
@@ -1802,7 +1805,7 @@ function wireCalib() {
 async function startRec() {
   saveForm();
   if (!$("subject").value.trim() || !$("taskSel").value) {
-    toast(!$("subject").value.trim() ? "Enter the subject first (step 2)" : "Pick a task first", true);
+    toast(!$("subject").value.trim() ? "Enter the subject first (1 · Session)" : "Pick a task first (5 · Task recording)", true);
     return;
   }
   const t = TASKS.find((x) => x.key === $("taskSel").value) || {};
@@ -1938,8 +1941,6 @@ function wire() {
   }
   for (const t of document.querySelectorAll(".stile")) t.onclick = () => goTo(t.dataset.go);
   wireFolds();
-  wireSteps();
-  wireSetup();
   wireSpine();
   wireCalib();
   wireParticipant();
@@ -1972,9 +1973,11 @@ function wireSpine() {
   syncSpineCal();
   const mq = matchMedia("(min-width: 1780px)"), fr = $("spineFrame");
   const apply = () => {
-    if (mq.matches && fr.dataset.on !== "1") { fr.dataset.on = "1"; fr.src = "/spine?embed=1"; }
-    else if (!mq.matches && fr.dataset.on === "1") { fr.dataset.on = "0"; fr.src = "about:blank"; }
+    const want = mq.matches && document.body.dataset.route === "record";   // only on the Task recording page
+    if (want && fr.dataset.on !== "1") { fr.dataset.on = "1"; fr.src = "/spine?embed=1"; }
+    else if (!want && fr.dataset.on === "1") { fr.dataset.on = "0"; fr.src = "about:blank"; }
   };
+  window.spineApply = apply;
   mq.addEventListener("change", apply);
   apply();
   // model options (same controls as the Spine view's "Model" card), sent to the embedded view

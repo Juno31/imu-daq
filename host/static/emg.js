@@ -634,7 +634,7 @@ $("egSave").onclick = async () => {
   const w = who();
   const j = await api("/api/emgcal/save", { date: w.date, subject: w.subject, analysis: { win_s: opt.win, hold: opt.hold, band_pass: opt.filter, own_group_only: opt.own },
     channels: clean(REFS) });
-  if (j.ok) { NORM = j.norm; toast("Saved " + j.path); render(); }
+  if (j.ok) { NORM = j.norm; toast("Saved " + j.path); render(); if (window.FlowNav) FlowNav.mark("mvc", true); }
 };
 document.addEventListener("keydown", (e) => { if (e.key === "Escape" && running) $("egAbort").click(); });
 // a capture is stopped by this page's timer: leaving now would leave the server recording

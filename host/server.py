@@ -36,6 +36,7 @@ import calibration as calmod              # noqa: E402
 from device import Device, guess_port, list_serial_ports   # noqa: E402
 from gopro import GoProRig                # noqa: E402
 from session import Session               # noqa: E402
+import expinfo                            # noqa: E402
 
 APP_VERSION = "1.1.0"
 STATIC = os.path.join(HERE, "static")
@@ -509,6 +510,7 @@ class App:
                         shutil.copy2(norm, os.path.join(sess.dir, "emg_norm.json"))
                     except OSError:
                         pass
+            expinfo.copy_into(sess.dir)                         # session / participant / jig / checklist info
             cur = self.calib.get("current")
             if cur and meta.get("kind") != "static_calibration":
                 calmod.save(sess.dir, cur)                      # the calibration this trial relies on
@@ -1083,6 +1085,10 @@ class Handler(BaseHTTPRequestHandler):
                 return self._json({"ok": True, **review.load(full, root)})
             if path == "/api/spine_cal":
                 return self._json({"ok": True, "cal": APP.spine_cal, "rev": APP.spine_cal_rev})
+            if path == "/api/expinfo":           # session / participant / jig / checklist info of one date + subject
+                from urllib.parse import parse_qs
+                q = {k: v[0] for k, v in parse_qs(urlparse(self.path).query).items()}
+                return self._json({"ok": True, **expinfo.load(APP.data_dir, q.get("date"), q.get("subject"))})
             if path == "/api/stream":
                 return self._stream()
             self._json({"error": "not found"}, 404)
@@ -1188,6 +1194,25 @@ class Handler(BaseHTTPRequestHandler):
             if path == "/api/spine_cal":          # calibration from the main page or the Spine view
                 cal, kept = APP.set_spine_cal(body if isinstance(body, dict) else {})
                 return self._json({"ok": True, "cal": cal, "rev": APP.spine_cal_rev, "kept_axis": kept})
+            if path == "/api/expinfo":
+                if not str(body.get("subject", "")).strip():
+                    return self._json({"ok": False, "error": "enter the subject first (Session page)"}, 400)
+                p, saved = expinfo.save(APP.data_dir, body.get("date"), body["subject"], str(body.get("kind", "")),
+                                        body.get("data"))
+                APP.log("info", f"{body.get('kind')} saved: {os.path.relpath(p, APP.data_dir)}", "user")
+                return self._json({"ok": True, "path": os.path.relpath(p, APP.data_dir).replace(os.sep, "/"), "data": saved})
+            if path == "/api/jigcal":            # six-face jig calibration of the newest 'jigcal' recording
+                import jig_calibration as jc
+                if APP.state != "idle":
+                    raise RuntimeError(f"wait until the recorder is idle ({APP.state})")
+                rec = expinfo.latest_trial(APP.data_dir, body.get("date"), body.get("subject", ""), "jigcal")
+                if not rec:
+                    return self._json({"ok": False, "error": "no finished jig recording for this date / subject"}, 404)
+                out = jc.analyze(rec, jc.local_gravity())
+                jc.write(out, rec)
+                APP.log("info" if out.get("ok") else "warn", f"jig calibration {os.path.basename(rec)}: " +
+                        ("OK" if out.get("ok") else "; ".join(out.get("problems", [])) or "not complete"), "user")
+                return self._json({"ok": True, "result": out, "rel": os.path.relpath(rec, APP.data_dir)})
             if path == "/api/emgcal/save":
                 import emgnorm
                 if not body.get("subject") or not body.get("channels"):

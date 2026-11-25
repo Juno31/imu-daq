@@ -1,0 +1,94 @@
+/* Experiment workflow: step strip in the top bar, one view per step, dense panels and tables.
+   Layout follows the usual conventions of motion-capture suites: workflow tabs across the top,
+   compact panel headers, tabular device / quality readouts, transport bar at the bottom. */
+
+/* ---------- workflow strip (top bar, every page) ---------- */
+.flownav { display: flex; align-items: center; gap: 2px; min-width: 0; overflow-x: auto; scrollbar-width: none;
+  background: var(--surface-2); border: 1px solid var(--border); border-radius: 10px; padding: 3px; margin-left: 6px; }
+.flownav::-webkit-scrollbar { display: none; }
+.fstep { display: inline-flex; align-items: center; gap: 7px; padding: 5px 11px 5px 6px; border-radius: 7px; white-space: nowrap;
+  color: var(--text-2); text-decoration: none; font-size: 12.5px; font-weight: 550; transition: background .12s, color .12s; }
+.fstep:hover { background: var(--surface); color: var(--text); }
+.fstep .fn { display: inline-grid; place-items: center; width: 19px; height: 19px; border-radius: 5px; font: 700 10.5px var(--mono);
+  background: var(--surface); border: 1px solid var(--border-strong); color: var(--text-3); }
+.fstep.done .fn { background: var(--ok); border-color: var(--ok); color: #fff; }
+.fstep.cur { background: var(--accent); color: #fff; box-shadow: 0 1px 3px rgba(0, 0, 0, .18); }
+.fstep.cur .fn { background: rgba(255, 255, 255, .2); border-color: rgba(255, 255, 255, .35); color: #fff; }
+.fstep.cur.done .fn { background: #fff; color: var(--accent); border-color: #fff; }
+.fstep .fp { font: 600 10.5px var(--mono); color: var(--text-3); }
+.fstep.cur .fp { color: rgba(255, 255, 255, .8); }
+.fsep { color: var(--border-strong); font-style: normal; font-size: 12px; padding: 0 1px; }
+@media (max-width: 1400px) { .fstep .fl { display: none; } .fstep.cur .fl { display: inline; } }
+@media (max-width: 760px) { .topbar { flex-wrap: wrap; } .flownav { order: 10; width: 100%; margin: 0; } }
+
+/* ---------- views ---------- */
+.view, .sub { display: none; }
+.view.on, .sub.on { display: flex; flex-direction: column; gap: 14px; min-width: 0; }
+.parking { display: none !important; }
+.slot:empty { display: none; }
+.slot { display: flex; flex-direction: column; gap: 14px; min-width: 0; }
+.viewhead { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; padding: 2px 2px 0; }
+.viewhead h1 { font-size: 18px; font-weight: 650; letter-spacing: -.005em; margin: 0; }
+.viewhead .stepn { width: 26px; height: 26px; border-radius: 7px; font-size: 12px; }
+.viewnext { display: flex; justify-content: space-between; gap: 10px; padding-top: 4px; }
+.viewnext .btn:only-child { margin-left: auto; }
+.viewnext a.btn { text-decoration: none; }
+a.btn:not(.ghost) { background: var(--accent); color: #fff; border-color: transparent; }
+a.btn:not(.ghost):hover { background: color-mix(in srgb, var(--accent) 88%, #000); }
+
+/* equipment sub-tabs */
+.esubs { display: flex; gap: 0; margin-left: auto; border: 1px solid var(--border); border-radius: 9px; overflow: hidden; background: var(--surface-2); }
+.esub { display: inline-flex; align-items: center; gap: 7px; padding: 6px 13px; font-size: 12.5px; font-weight: 550; color: var(--text-2);
+  text-decoration: none; border-right: 1px solid var(--border); white-space: nowrap; }
+.esub:last-child { border-right: 0; }
+.esub:hover { background: var(--surface); color: var(--text); }
+.esub .fn { font: 700 10.5px var(--mono); color: var(--text-3); }
+.esub.done .fn { color: var(--ok); }
+.esub.cur { background: var(--surface); color: var(--text); box-shadow: inset 0 -2px 0 var(--accent); }
+@media (max-width: 900px) { .esubs { margin-left: 0; width: 100%; overflow-x: auto; } }
+
+/* ---------- forms ---------- */
+.formgrid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; align-items: start; }
+.formgrid > .wide { grid-column: 1 / -1; }
+@media (max-width: 900px) { .formgrid { grid-template-columns: 1fr; } }
+.formgrid .stepcard h2 { font-size: 11.5px; text-transform: uppercase; letter-spacing: .07em; color: var(--text-2); font-weight: 700; }
+.formgrid .stepcard h2 .hint { text-transform: none; letter-spacing: 0; font-weight: 400; }
+.inrow { display: flex; gap: 6px; }
+.inrow .btn { flex: none; }
+label.inl { flex-direction: row; align-items: center; gap: 8px; margin: 0; }
+label.inl select { width: auto; min-width: 90px; }
+.checks { display: flex; flex-direction: column; gap: 6px; }
+label.ck { flex-direction: row; align-items: center; gap: 8px; font-size: 13px; color: var(--text); margin: 0; cursor: pointer; }
+label.ck input, .ckc input { width: 16px; height: 16px; accent-color: var(--accent); margin: 0; }
+input[readonly] { background: transparent; border-style: dashed; color: var(--text-2); }
+
+.team { display: flex; flex-direction: column; gap: 6px; }
+.teamrow { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.1fr) minmax(0, 1fr) auto; gap: 6px; align-items: center; }
+@media (max-width: 640px) { .teamrow { grid-template-columns: 1fr 1fr auto; } .teamrow .tc { display: none; } }
+
+/* ---------- data tables (results, checklists) ---------- */
+.restable { overflow-x: auto; min-width: 0; }
+.restable:empty { display: none; }
+.restable table { width: 100%; border-collapse: collapse; font-size: 12.5px; }
+.restable th { text-align: left; font-size: 10.5px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; color: var(--text-3);
+  padding: 6px 8px; border-bottom: 1px solid var(--border-strong); white-space: nowrap; background: var(--surface-2); }
+.restable tbody th { background: transparent; border-bottom: 1px solid var(--border); width: 130px; }
+.restable td { padding: 6px 8px; border-bottom: 1px solid var(--border); white-space: nowrap; }
+.restable tbody tr:hover td { background: color-mix(in srgb, var(--accent-soft) 45%, transparent); }
+.restable td.ckc { text-align: center; }
+.restable th:nth-child(n) { position: sticky; top: 0; }
+.restable .st { font: 700 10.5px var(--mono); letter-spacing: .05em; }
+.restable .good, .cap .good { color: var(--ok); }
+.restable .warn, .cap .warn, a.warn { color: var(--warn); }
+.restable .bad, .cap .bad { color: var(--bad); }
+.restable .cap { margin-top: 8px; }
+.btn.stop { background: var(--bad); color: #fff; border-color: transparent; }
+
+/* the status tiles and live sections inside equipment pages */
+.sub .statusrow, .view .statusrow { margin: 0; }
+.view[data-view="record"] .divider { margin-top: 4px; }
+#step1.stephead { margin-bottom: -6px; }
+
+/* panels are only on the recording page */
+body:not([data-route="record"]) #spinePanel,
+body:not([data-route="record"]) #filesPanel { display: none !important; }
