@@ -12,11 +12,13 @@ import time
 import numpy as np
 
 import channels
+import sidlab_link
 
 try:
     import nidaqmx
     from nidaqmx.constants import AcquisitionType, TerminalConfiguration
-    from nidaqmx.stream_readers import AnalogMultiChannelReader
+    from nidaqmx.stream_readers import AnalogMultiChannelReader, DigitalSingleChannelReader
+    from nidaqmx.constants import LineGrouping
     HAVE_NIDAQMX = True
     _IMPORT_ERROR = ""
 except Exception as e:          # pragma: no cover - depends on the PC
@@ -81,7 +83,7 @@ class EdgeDetector:
 
 class DaqRecorder:
     def __init__(self, out_dir, device, sync_chan="ai0", extra_chans=(), rate=20000.0,
-                 vrange=5.0, terminal="DIFF"):
+                 vrange=5.0, terminal="DIFF", data_line=""):
         self.out_dir = out_dir
         self.device = device
         self.sync_chan = sync_chan
@@ -103,6 +105,16 @@ class DaqRecorder:
         self.ring_lock = threading.Lock()
         self.ch_stats = []          # per extra channel, last 50 ms: (sd_V, absmax_V)
         self.sync_hi = 0.0          # max SYNC level in the last 50 ms
+        # SID Lab firmware: IMU data packets on a digital line (e.g. "port0/line0" = P0.0), sampled at
+        # sidlab_link.DI_FS on the analog task's start trigger (same clock, same time zero)
+        self.data_line = (data_line or "").strip()
+        self.di_task = None
+        self.di_thread = None
+        self.decoder = sidlab_link.Decoder()
+        self.packets = []           # decoded packets (recording); preview keeps only the last few
+        self.pkt_count = 0
+        self.last_packet = None
+        self.di_error = ""
 
     @property
     def channels(self):
@@ -121,16 +133,27 @@ class DaqRecorder:
             self.task.timing.cfg_samp_clk_timing(self.rate, sample_mode=AcquisitionType.CONTINUOUS,
                                                  samps_per_chan=int(self.rate * 10))
             self.reader = AnalogMultiChannelReader(self.task.in_stream)
+            if self.data_line:
+                self.di_task = nidaqmx.Task("imu_daq_data" if self.out_dir else "imu_daq_data_preview")
+                self.di_task.di_channels.add_di_chan(f"{self.device}/{self.data_line}",
+                                                     line_grouping=LineGrouping.CHAN_PER_LINE)
+                self.di_task.timing.cfg_samp_clk_timing(sidlab_link.DI_FS, sample_mode=AcquisitionType.CONTINUOUS,
+                                                        samps_per_chan=sidlab_link.DI_FS * 4)
+                self.di_task.triggers.start_trigger.cfg_dig_edge_start_trig(f"/{self.device}/ai/StartTrigger")
+                self.di_reader = DigitalSingleChannelReader(self.di_task.in_stream)
+                self.di_task.start()            # waits for the analog start trigger
             if self.out_dir:
                 self.fh = open(os.path.join(self.out_dir, "daq_raw.f32"), "wb")
             self.task.start()
         except Exception:
             # release the device, or the next trial / the preview fails with "resource reserved"
-            try:
-                self.task.close()
-            except Exception:
-                pass
-            self.task = None
+            for t in (self.task, self.di_task):
+                try:
+                    if t is not None:
+                        t.close()
+                except Exception:
+                    pass
+            self.task = self.di_task = None
             if self.fh:
                 self.fh.close()
                 self.fh = None
@@ -139,6 +162,26 @@ class DaqRecorder:
         self.stop_evt.clear()
         self.thread = threading.Thread(target=self._run, name="daq-reader", daemon=True)
         self.thread.start()
+        if self.di_task is not None:
+            self.di_thread = threading.Thread(target=self._run_di, name="daq-data-line", daemon=True)
+            self.di_thread.start()
+
+    def _run_di(self):
+        n = sidlab_link.DI_FS // 20                # 50 ms chunks
+        buf = np.zeros(n, dtype=np.uint32)
+        while not self.stop_evt.is_set():
+            try:
+                self.di_reader.read_many_sample_port_uint32(buf, number_of_samples_per_channel=n, timeout=2.0)
+            except Exception as e:
+                if not self.stop_evt.is_set():
+                    self.di_error = f"data line read error: {e}"
+                break
+            rows = self.decoder.feed((buf != 0).astype(np.int8))
+            if rows:
+                self.pkt_count += len(rows)
+                self.last_packet = rows[-1]
+                if self.out_dir:
+                    self.packets.extend(rows)
 
     def _run(self):
         n = max(10, int(self.rate / 20))          # 50 ms chunks
@@ -165,19 +208,22 @@ class DaqRecorder:
 
     def stop(self):
         self.stop_evt.set()
-        try:
-            if self.task:
-                self.task.stop()
-        except Exception:
-            pass
-        if self.thread:
-            self.thread.join(timeout=3)
-        try:
-            if self.task:
-                self.task.close()
-        except Exception:
-            pass
-        self.task = None
+        for t in (self.task, self.di_task):
+            try:
+                if t:
+                    t.stop()
+            except Exception:
+                pass
+        for th in (self.thread, self.di_thread):
+            if th:
+                th.join(timeout=3)
+        for t in (self.task, self.di_task):
+            try:
+                if t:
+                    t.close()
+            except Exception:
+                pass
+        self.task = self.di_task = None
         if self.fh:
             self.fh.close()
             self.fh = None
@@ -188,6 +234,10 @@ class DaqRecorder:
                 "pc_start_s": self.pc_start, "dtype": "float32", "layout": "sample-major (n_samples x n_channels)",
                 "file": "daq_raw.f32", "error": self.error,
                 "channel_labels": [channels.label(c, self.sync_chan) for c in self.channels]}
+        if self.data_line:
+            meta["data_line"] = {"line": self.data_line, "rate_hz": sidlab_link.DI_FS, "baud": sidlab_link.BAUD,
+                                 "packets": len(self.packets), "bad_checksums": self.decoder.bad,
+                                 "error": self.di_error, "file": "imu_daq.csv"}
         with open(os.path.join(self.out_dir, "daq_meta.json"), "w") as f:
             json.dump(meta, f, indent=2)
         return meta
@@ -237,7 +287,20 @@ class DaqRecorder:
         return {"samples": self.n_samples, "seconds": self.n_samples / self.rate if self.rate else 0,
                 "pulses": len(self.edges.pulses), "last_v": self.last_v, "sync_hi": self.sync_hi,
                 "error": self.error, "extra": ex, "range_v": self.vrange,
+                "data_line": self.data_line_live(),
                 "running": bool(self.thread and self.thread.is_alive())}
+
+
+    def data_line_live(self):
+        """Data-line state for the GUI: packets so far, bad checksums, newest frame and its age."""
+        if not self.data_line:
+            return None
+        lp = self.last_packet
+        now_s = self.n_samples / self.rate if self.rate else 0
+        return {"line": self.data_line, "packets": self.pkt_count, "bad": self.decoder.bad, "error": self.di_error,
+                "last_frame": lp["frame"] if lp else None,
+                "last_ok_bits": lp["ok"] if lp else None,
+                "silent_s": round(now_s - lp["start"] / sidlab_link.DI_FS, 2) if lp else None}
 
 
 def align(pulses, rate, n_frames, frame_us):

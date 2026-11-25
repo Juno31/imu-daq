@@ -121,9 +121,9 @@ function renderInfo() {
 // ---------------- derived signals ----------------
 function calState() {
   const c = D.cal, names = D.imu ? Object.keys(D.imu.pods) : [];
-  const map = c && c.map && names.includes(c.map.T7) && names.includes(c.map.T12) ? { ...c.map } : { T7: names[0], T12: names[1] };
+  const map = c && c.map && names.includes(c.map.T6) && names.includes(c.map.T11) ? { ...c.map } : { T6: names[0], T11: names[1] };
   for (const s of SENSOR_SEGS) if (!map[s] && names.includes(s)) map[s] = s;   // pods named after their segment
-  const q0ok = !!(c && c.q0 && map.T7 && map.T12 && c.q0[map.T7] && c.q0[map.T12]);
+  const q0ok = !!(c && c.q0 && map.T6 && map.T11 && c.q0[map.T6] && c.q0[map.T11]);
   const B = c && c.B ? c.B : null;
   return { map, q0ok, B, live: q0ok && (!!B || anyway), names };
 }
@@ -144,10 +144,10 @@ function derive() {
     der.pods[name] = { ang: a, ref: cs.q0ok && D.cal.q0[name] ? (B ? "body axes, from standing" : "sensor axes, from standing") : "from the first frame" };
   }
   if (cs.live) {
-    const A = D.imu.pods[cs.map.T7].q, Bq = D.imu.pods[cs.map.T12].q, B = cs.B || [1, 0, 0, 0];
+    const A = D.imu.pods[cs.map.T6].q, Bq = D.imu.pods[cs.map.T11].q, B = cs.B || [1, 0, 0, 0];
     const r = [[], [], []];
     for (let i = 0; i < n; i++) {
-      const a = segment(A[i], D.cal.q0[cs.map.T7], B), b = segment(Bq[i], D.cal.q0[cs.map.T12], B);
+      const a = segment(A[i], D.cal.q0[cs.map.T6], B), b = segment(Bq[i], D.cal.q0[cs.map.T11], B);
       const e = a && b ? eulerXYZ(qmul(qconj(b), a)) : [NaN, NaN, NaN];
       r[0].push(e[0]); r[1].push(e[1]); r[2].push(e[2]);
     }
@@ -322,7 +322,7 @@ function buildTracks() {
   const cs = D.imu ? calState() : null;
   if (emgOnly) { /* hidden for EMG normalization captures */ }
   else if (D.imu && der.rel) {
-    seriesTrack($("rvSpineTracks"), "T7–T12", cs.B ? "body axes" : "sensor axes", (k) => der.rel[k], "°", (v) => isFinite(v) ? v.toFixed(1) + "°" : "—", 10);
+    seriesTrack($("rvSpineTracks"), "T6–T11", cs.B ? "body axes" : "sensor axes", (k) => der.rel[k], "°", (v) => isFinite(v) ? v.toFixed(1) + "°" : "—", 10);
     axisTrack($("rvSpineTracks"));
   } else {
     $("rvSpineTracks").innerHTML = `<div class="emgempty">Needs the static calibration with a forward bend: see the spine model.</div>`;
@@ -332,7 +332,7 @@ function buildTracks() {
   else if (D.imu) {
     const names = Object.keys(D.imu.pods);
     for (const n of names) {
-      const p = D.imu.pods[n], role = cs && cs.map.T7 === n ? "T7" : cs && cs.map.T12 === n ? "T12" : "";
+      const p = D.imu.pods[n], role = cs && cs.map.T6 === n ? "T6" : cs && cs.map.T11 === n ? "T11" : "";
       if (imuMode === "ang" && der.pods[n]) {
         seriesTrack($("rvImuTracks"), n, `${role ? role + " · " : ""}${der.pods[n].ref}`, (k) => der.pods[n].ang[k], "°", (v) => isFinite(v) ? v.toFixed(1) + "°" : "—", 10);
       } else if (imuMode !== "ang" && p[imuMode]) {
@@ -431,7 +431,7 @@ function updateSpine() {
   const i = idxAt(D.imu.t, cur), B = cs.B || [1, 0, 0, 0];
   const seg = (n) => (n && D.imu.pods[n] && D.cal.q0[n] ? segment(D.imu.pods[n].q[i], D.cal.q0[n], B) : null);
   const segQ = Object.fromEntries(SENSOR_SEGS.map((s) => [s, seg(cs.map[s])]));
-  const a = segQ.T7, b = segQ.T12;
+  const a = segQ.T6, b = segQ.T11;
   if (spine) spine.pose(a && b ? segQ : null);
   angleBox(a && b ? eulerXYZ(qmul(qconj(b), a)) : null);
 }

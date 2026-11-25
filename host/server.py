@@ -26,7 +26,9 @@ from urllib.parse import urlparse
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, HERE)
 
+import numpy as np                        # noqa: E402
 import daq as daqmod                      # noqa: E402
+import sidlab_link                        # noqa: E402
 from clocksync import ClockSync           # noqa: E402
 from syncmon import SyncMonitor           # noqa: E402
 import channels                           # noqa: E402
@@ -118,8 +120,9 @@ class App:
         # magnetometer reports on the IMUs ("imu_mag": false frees I2C time; the game rotation vector
         # does not use them). Re-sent if the board resets. Needs imu_daq_teensy 2.1.3 or later.
         self.imu_mag = bool(load_host_settings().get("imu_mag", False))
-        self.daq_cfg = {"enabled": True, "device": "", "sync_chan": "ai0", "extra_chans": channels.DEFAULT_EXTRA,
-                        "rate": 20000, "range": 5.0, "terminal": "DIFF", "require": False}
+        self.daq_cfg = {"enabled": True, "device": "", "sync_chan": channels.SYNC_CHAN,
+                        "extra_chans": channels.DEFAULT_EXTRA, "rate": 20000, "range": 5.0,
+                        "terminal": channels.TERMINAL, "data_line": channels.DATA_LINE, "require": False}
         self.daq_devices = daqmod.list_devices()
         if self.daq_devices["devices"]:
             self.daq_cfg["device"] = self.daq_devices["devices"][0]["name"]
@@ -143,6 +146,11 @@ class App:
             self.logbuf.append((self.lseq, {"t": round(time.time(), 3), "level": level,
                                             "src": source, "text": text}))
         print(f"[{time.strftime('%H:%M:%S')}] {level.upper():5s} {source}: {text}", flush=True)
+
+    @property
+    def sidlab(self):
+        """The board runs the SID Lab spine-brace firmware (teensy_spine_imu): see device.py."""
+        return self.dev.proto == "sidlab"
 
     def _pod(self, name):
         if name not in self.pod_live:
@@ -174,6 +182,11 @@ class App:
                 if rec:
                     p["rec_frames"] += 1
                     p["rec_fresh"] += fresh
+            if rec and self.state == "starting" and self.sidlab:
+                self.rec["board_start_t_us"] = t_us        # SID Lab firmware: the first frame after 'g' = start
+                self.state = "recording"
+                self.session.event(self.unix(perf), "start", f"first frame {num}", t_us, num)
+                self.start_evt.set()
             if rec:
                 self.session.frame(num, t_us, vals)
                 if self.syncmon is not None:
@@ -200,8 +213,13 @@ class App:
                 if self.state in ("connecting", "disconnected"):
                     self.state = "idle"
             self.log("info", f"{fields.get('fw', '?')} {fields.get('ver', '?')} on {fields.get('board', '?')}, "
-                             f"{1000 / max(1, int(fields.get('report_ms', 10))):.0f} Hz, pods {fields.get('pods', '')}",
+                             f"{1e6 / max(1, int(fields.get('frame_us') or 1000 * int(fields.get('report_ms', 10)))):.0f} Hz, pods {fields.get('pods', '')}",
                      "board")
+            if fields.get("proto") == "sidlab":
+                self.dev.recording = False
+                self.dev.send("verbose")             # frame lines on (another tool may have sent 'q')
+                self.dev.send("clock_go")            # frame clock running (it stays stopped after a 'p')
+                return
             if fields.get("rec") == "1" and self.session is None:
                 threading.Thread(target=self._stop_stray, daemon=True).start()
             have = fields.get("quat")
@@ -261,6 +279,11 @@ class App:
             self.log("info", f"orientation: {QUAT_MODES.get(fields.get('quat'), fields.get('quat'))}", "board")
         elif tag == "ACK":
             pass
+        elif tag == "SIDSTATUS":                     # SID Lab firmware, every 2 s: rates, I2C errors, bus load
+            if text.startswith("Hz:"):
+                self.fw_status = {"status": text}
+                for name, hz in self.dev.hz.items():
+                    self.fw_pods[name] = {"name": name, "hz": hz, "live": "1" if hz > 0 else "0"}
         elif tag == "#":
             if not text.startswith("columns:"):
                 self.log("info", text, "board")
@@ -410,7 +433,7 @@ class App:
             try:
                 r = daqmod.DaqRecorder(None, cfg["device"], cfg["sync_chan"],
                                        [c.strip() for c in str(cfg["extra_chans"]).split(",") if c.strip()],
-                                       cfg["rate"], cfg["range"], cfg["terminal"])
+                                       cfg["rate"], cfg["range"], cfg["terminal"], cfg.get("data_line", ""))
                 r.start(self.unix)
                 self.preview, self.preview_err = r, ""
             except Exception as e:
@@ -477,7 +500,7 @@ class App:
                          "orientation_mode": hello.get("quat", "game"),
                          "orientation_mode_name": QUAT_MODES.get(hello.get("quat", "game"), "")})
             sensors = "acc" in str(hello.get("sensors", ""))
-            sess = Session(self.data_dir, meta, self.dev.pod_names, sensors=sensors)
+            sess = Session(self.data_dir, meta, self.dev.pod_names, sensors=sensors, ages=self.sidlab)
             save_spine_cal(sess.dir, getattr(self, "spine_cal", None))
             if not str(meta.get("task", "")).startswith("emg_"):   # the EMG normalization this trial relies on
                 norm = os.path.join(os.path.dirname(sess.dir), "emg_norm.json")
@@ -504,6 +527,11 @@ class App:
                     sess.event(self.unix(), "gopro_start", ", ".join(ok) or "none started")
                     sess.write_meta({"gopro": {n: {k: r.get(k) for k in ("serial", "model", "ok", "settings")}
                                                for n, r in gp.items()}})
+            if self.sidlab:
+                # SID Lab firmware: stop its frame clock; after 0.5 s without frames it closes the SD file, and
+                # the next 'g' starts a new SD file at frame 0 (with the 4 ms SYNC marker)
+                self.dev.send("clock_stop")
+                time.sleep(0.7)
             # DAQ next, so it sees the frame-0 pulse
             self.daq = None
             cfg = self.daq_cfg
@@ -518,7 +546,8 @@ class App:
                     try:
                         d = daqmod.DaqRecorder(sess.dir, cfg["device"], cfg["sync_chan"],
                                                [c.strip() for c in str(cfg["extra_chans"]).split(",") if c.strip()],
-                                               cfg["rate"], cfg["range"], cfg["terminal"])
+                                               cfg["rate"], cfg["range"], cfg["terminal"],
+                                               cfg.get("data_line", ""))
                         d.start(self.unix)
                         self.daq = d
                         self.log("info", f"DAQ {cfg['device']} recording {', '.join(d.channels)} at "
@@ -532,9 +561,16 @@ class App:
                         self.log("error", msg + " — recording IMU only", "daq")
             self.syncmon = SyncMonitor(frame_us, self.daq.rate if self.daq else None)
             self.start_evt.clear()
-            self.dev.send("start")
-            if not self.start_evt.wait(3.0):
-                raise RuntimeError("board did not confirm start (@START)")
+            if self.sidlab:
+                self.dev.sd = {}
+                self.dev.recording = True
+                self.dev.send("clock_go")
+                if not self.start_evt.wait(3.0):
+                    raise RuntimeError("no frames from the board after starting its frame clock ('g')")
+            else:
+                self.dev.send("start")
+                if not self.start_evt.wait(3.0):
+                    raise RuntimeError("board did not confirm start (@START)")
             self.log("info", "recording")
             return {"session": sess.name, "dir": sess.dir}
         except Exception as e:
@@ -637,7 +673,21 @@ class App:
         self.state = "stopping"
         self.stop_evt.clear()
         self.stop_info = {}
-        if self.dev.connected:
+        if self.dev.connected and self.sidlab:
+            try:
+                self.dev.send("clock_stop")          # frames stop; 0.5 s later the board closes the SD file
+                end = time.time() + 2.0
+                while time.time() < end and "closed" not in self.dev.sd:
+                    time.sleep(0.05)
+                sd = dict(self.dev.sd)
+                self.stop_info = {"frames": sd.get("frames", sess.frames), "sd_file": sd.get("closed", "-"),
+                                  "sd_lines": sd.get("frames", 0),
+                                  "sd_missed_edges": sd.get("missed_edges", ""), "sd_overruns": sd.get("overruns", "")}
+                sess.event(self.unix(), "stop", "frame clock stopped ('p')", "", sess.last_frame)
+            except Exception as e:
+                self.log("warn", f"stop command failed: {e}")
+            self.dev.recording = False
+        elif self.dev.connected:
             try:
                 self.dev.send("stop")
                 if not self.stop_evt.wait(3.0):
@@ -664,7 +714,10 @@ class App:
                     self.syncmon.update(d, final=True)
                 pulses = list(d.edges.pulses)
                 frames_sent = int(self.stop_info.get("frames", sess.frames))
-                align = daqmod.align(pulses, d.rate, frames_sent, self.rec.get("frame_us", 10000))
+                if self.sidlab:
+                    align = self._align_sidlab(sess, d, pulses)
+                else:
+                    align = daqmod.align(pulses, d.rate, frames_sent, self.rec.get("frame_us", 10000))
             if self.syncmon is not None and self.syncmon.active:
                 self.syncmon.update(None, final=True)
             sd_note = self._fetch_sd(sess)
@@ -673,6 +726,9 @@ class App:
             summary["dir"] = sess.dir
             if sd_note:
                 summary["sd_card"] = sd_note
+            if getattr(self, "_data_line_note", None):
+                summary["daq_data_line"] = self._data_line_note
+                self._data_line_note = None
             if reason:
                 summary["aborted"] = reason
         except Exception as e:
@@ -680,6 +736,11 @@ class App:
             raise
         finally:
             sess.close()
+            if self.sidlab and self.dev.connected:
+                try:
+                    self.dev.send("clock_go")        # frames again for the live view
+                except Exception:
+                    pass
             with self.lock:
                 if summary is not None:
                     self.last_summary = summary
@@ -693,6 +754,44 @@ class App:
                  f"saved {sess.name}: {summary.get('frames_received')} frames, "
                  f"{summary.get('missing_frames')} missing, {summary.get('duration_s', 0)} s, {pods}{sync}")
         return summary
+
+    def _align_sidlab(self, sess, d, pulses):
+        """SID Lab firmware: DAQ time of every frame. First choice: the frame-coded SYNC pulses (each pulse names
+        its frame). The IMU packets on the DAQ data line (P0.0) are saved as imu_daq.csv; when SYNC cannot be
+        read, their DAQ times are used instead."""
+        frame_us = self.rec.get("frame_us", 8333)
+        seen = list(range(sess.first_frame, sess.last_frame + 1)) if sess.first_frame is not None else []
+        frame_times, rep = sidlab_link.align_coded(pulses, d.rate, seen, frame_us)
+        self._data_line_note = None
+        if not d.data_line:
+            return frame_times, rep
+        note = {"line": d.data_line, "bad_checksums": d.decoder.bad, "error": d.di_error}
+        self._data_line_note = note
+        if not d.packets:
+            note["packets"] = 0
+            self.log("warn", f"no IMU packets on the DAQ data line ({d.data_line}): check Teensy pin 1 -> "
+                             "terminal 65 and GND -> 82", "daq")
+            return frame_times, rep
+        note.update(sidlab_link.write_packets(os.path.join(sess.dir, "imu_daq.csv"), d.packets, sess.pod_names))
+        note["file"] = "imu_daq.csv"
+        if frame_times is not None and rep.get("ok"):
+            return frame_times, rep
+        tab = sidlab_link.frame_time_table(d.packets)
+        top = max([f for f in tab if f >= 0] + [sess.last_frame or 0])
+        ft = np.full(top + 1, np.nan)
+        for f, t in tab.items():
+            if f >= 0:
+                ft[f] = t
+        if frame_times is not None:                   # SYNC times where SYNC could be read
+            n = min(len(ft), len(frame_times))
+            m = np.isfinite(frame_times[:n])
+            ft[:n][m] = frame_times[:n][m]
+        miss = int(np.isnan(ft[seen]).sum()) if seen else 0
+        rep.update(method="data-line packets (P0.0)" + (" + SYNC" if frame_times is not None else ""),
+                   sync_reason=rep.pop("reason", None), frames_without_time=miss, ok=miss == 0)
+        if miss:
+            rep["reason"] = f"{miss} received frames have neither a SYNC pulse nor a data packet"
+        return ft, rep
 
     def shutdown(self):
         if self.session and not self.session.closed:

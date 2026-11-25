@@ -152,6 +152,25 @@ starts one frame per rising edge instead of using the Teensy timer. SYNC on pin 
 
 ![Planned wiring: Teensy 4.1, 7 IMUs, NI USB-6363, 3 GoPros](hardware/wiring/teensy41_wiring.png)
 
+### SID Lab spine-brace firmware (senior's handover, 2026-11-25)
+
+The GUI also runs the brace with the senior's firmware `teensy_spine_imu.ino` (8 × BNO086 on two muxes, 120 Hz),
+uploaded unchanged. The host detects it by itself (`proto=sidlab` in the board info) and switches to its protocol.
+
+| | SID Lab firmware | how the GUI uses it |
+|---|---|---|
+| IMUs | C7 T3 T6 T9 (mux A, Wire1) · T11 L1 L3 S1 (mux B, Wire) | 8 pods; spine angles use **T6 relative to T11** |
+| USB | `F` lines all the time (+ `age_us` per pod), `#` status, one-letter commands | live view; **Start** = `p`, wait 0.7 s, `g` → new SD file at frame 0; **Stop** = `p`, then `D` copies the SD file, then `g` |
+| SYNC | pin 2 → **AI31** (terminal 59); pulse width encodes the frame number | each pulse is read as its own frame number (`daq_sync.method = frame-coded SYNC`) |
+| Data line | pin 1 (TX1, 230400 baud) → **P0.0** (terminal 65), one 110-byte packet per frame | sampled at 2 MHz with the EMG; saved as `imu_daq.csv`; used for frame times when SYNC cannot be read |
+| EMG | 6 ch, **RSE** ±5 V, AI16–AI21 (R/L longissimus, multifidus, iliocostalis) | default DAQ settings (`host/channels.py`) |
+| Ground | Teensy GND → D GND (terminal 82) | required for SYNC and P0.0 |
+
+Because that firmware reads commands one character at a time, the host sends it only `h v g p D`
+(a word like `start` would run `r` = restart pods). There is no ping, so `pc_unix_s` is not written; frames get
+their DAQ time from SYNC or the data line. Test without hardware: `python host/tests/test_sidlab_link.py`,
+or `python host/tests/run_fake_board.py` for the GUI on a fake board (http://127.0.0.1:8766).
+
 ## How it works
 
 **Firmware** (`firmware/imu_daq/imu_daq.ino`):

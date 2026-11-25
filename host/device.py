@@ -1,9 +1,17 @@
-"""Serial link to the imu_daq firmware (Teensy 4.1: firmware/imu_daq_teensy; XIAO ESP32S3 / ESP32C3:
-firmware/imu_daq). Both speak the same line protocol.
+"""Serial link to the board firmware. Two protocols are understood:
 
-Parses the firmware's line protocol (see firmware/imu_daq/imu_daq.ino) and hands parsed items to
-callbacks. Runs one reader thread; reads in large chunks so the PC never makes the board wait.
+  "imu_daq"  firmware/imu_daq_teensy and firmware/imu_daq (XIAO): @HELLO / @START / @STOP, text commands.
+  "sidlab"   the SID Lab spine-brace firmware (teensy_spine_imu.ino, handover of 2026-11-25):
+             frame lines run all the time ("F,frame,t_us, 8 x ok,fresh,w,x,y,z, 8 x age_us"), '#' status lines,
+             and one-letter commands (p = stop the frame clock, g = start it, q / v = frame lines off / on,
+             h = column header, s = status, r = restart pods, D = send the last SD file).
+             The firmware reads commands one character at a time, so a word like "start" would run
+             s, t, a, r(estart pods), t. send() therefore only passes the commands listed in SIDLAB_CMDS.
+
+Hands parsed items to callbacks. Runs one reader thread; reads in large chunks so the PC never makes the
+board wait.
 """
+import re
 import threading
 import time
 
@@ -14,6 +22,10 @@ ESPRESSIF_VID = 0x303A
 PJRC_VID = 0x16C0          # Teensy
 BOARD_VIDS = {PJRC_VID: "Teensy", ESPRESSIF_VID: "XIAO"}
 WRAP = 1 << 32
+
+# host command -> SID Lab firmware characters (commands not listed are dropped for that firmware)
+SIDLAB_CMDS = {"hello": "h", "header": "h", "clock_stop": "p", "clock_go": "g", "quiet": "q", "verbose": "v",
+               "sdump": "D", "restart": "r", "status_full": "s"}
 
 
 def list_serial_ports():
@@ -94,6 +106,16 @@ class Device:
         self.hello = {}
         self.pod_names = []
         self.bad_lines = 0
+        self.proto = None          # None until the board identifies itself, then "imu_daq" or "sidlab"
+        self.recording = False     # sidlab: frame lines count as recorded frames ("F") only while this is set
+        self.ages = []             # sidlab: age_us per pod of the last frame
+        self.pod_where = {}        # sidlab: pod -> "A0" (mux bus + channel), from the start-up lines
+        self.sd = {}               # sidlab: last "# SD:" facts (recording / closed file, frames)
+        self.hz = {}               # sidlab: pod -> report rate from the "# Hz:" line
+        self.status_line = ""      # sidlab: last "# Hz:" line
+        self._dt = []              # sidlab: frame intervals for the frame period estimate
+        self._last_t = None
+        self.dumping = False
 
     @property
     def connected(self):
@@ -110,6 +132,8 @@ class Device:
         self.ser, self.port = ser, port
         self.unwrap.reset()
         self.hello, self.pod_names, self.bad_lines = {}, [], 0
+        self.proto, self.recording, self.ages, self.pod_where, self.sd, self.hz = None, False, [], {}, {}, {}
+        self._dt, self._last_t, self.dumping, self.status_line = [], None, False, ""
         self.stop_evt.clear()
         self.thread = threading.Thread(target=self._reader, name="serial-reader", daemon=True)
         self.thread.start()
@@ -128,10 +152,31 @@ class Device:
         self.ser = None
 
     def send(self, cmd):
+        """Send a host command. For the SID Lab firmware it is translated (SIDLAB_CMDS) or dropped.
+        Before the board has identified itself only "hello" goes out: "ping 1" would stop the SID Lab clock.
+        Returns True when something was sent."""
+        if not self.connected:
+            raise RuntimeError("not connected")
+        if self.proto != "imu_daq":
+            word = cmd.split()[0] if cmd.split() else ""
+            if self.proto is None and word != "hello":
+                return False
+            if self.proto == "sidlab":
+                c = SIDLAB_CMDS.get(word)
+                if c is None:
+                    return False
+                return self.send_raw(c)
+        with self.wlock:
+            self.ser.write((cmd + "\n").encode())
+        return True
+
+    def send_raw(self, chars):
+        """Write characters as they are (SID Lab one-letter commands)."""
         if not self.connected:
             raise RuntimeError("not connected")
         with self.wlock:
-            self.ser.write((cmd + "\n").encode())
+            self.ser.write(chars.encode())
+        return True
 
     # ---------------- reader ----------------
     def _reader(self):
@@ -172,7 +217,7 @@ class Device:
         fh = open(path, "w", newline="")
         self.dump_fh = fh
         try:
-            self.send(f"sdget {name}")
+            self.send("sdump" if self.proto == "sidlab" else f"sdget {name}")
             last, last_n, last_report = time.time(), 0, time.time()
             while not self.dump_done.wait(0.5):
                 if self.dump_error:
@@ -193,6 +238,8 @@ class Device:
         return self.dump_lines
 
     def _handle(self, line, perf):
+        if self.proto != "imu_daq" and self._handle_sidlab(line, perf):
+            return
         c = line[0]
         if c == "D" and len(line) > 1 and line[1] == ",":
             fh = self.dump_fh
@@ -222,6 +269,8 @@ class Device:
             self.on_sample(int(parts[1]), int(parts[2]), int(parts[3]), self.unwrap(int(parts[4])),
                            int(parts[5]), [float(v) for v in parts[6:]])
         elif c == "@":
+            if self.proto is None:
+                self.proto = "imu_daq"
             tag, _, rest = line[1:].partition(" ")
             if tag == "PONG":
                 tok, _, t = rest.partition(" ")
@@ -252,3 +301,103 @@ class Device:
             self.on_message("#", line[1:].strip(), {}, perf)
         else:
             self.bad_lines += 1
+
+    # ---------------- SID Lab firmware (teensy_spine_imu) ----------------
+    SD_REC = re.compile(r"# SD: recording (\S+)")
+    SD_CLOSED = re.compile(r"# SD: (\S+) closed: (\d+) frames, (\d+) missed edges, (\d+) buffer overruns")
+    POD_OK = re.compile(r"# (\w+): OK \(mux (\w) ch(\d)")
+
+    def _sidlab_hello(self, perf):
+        """The board runs the SID Lab firmware: report it like an @HELLO so the server goes idle."""
+        self.proto = "sidlab"
+        frame_us = int(self.hello.get("frame_us", 8333))
+        f = {"fw": "teensy_spine_imu", "board": "Teensy41", "link": "usb", "proto": "sidlab",
+             "ver": "(SID Lab)",
+             # mux bus + channel: from the start-up lines if seen, else the firmware's fixed order (A ch0-3, B ch0-3)
+             "pods": ",".join(f"{p}:{self.pod_where.get(p) or ('AB'[i // 4] + str(i % 4) if i < 8 else '')}"
+                              for i, p in enumerate(self.pod_names)),
+             "frame_us": str(frame_us), "report_ms": str(max(1, round(frame_us / 1000))), "rec": "0",
+             "quat": "game", "data_line": "P0.0"}
+        self.hello = f
+        self.on_message("HELLO", " ".join(f"{k}={v}" for k, v in f.items()), dict(f), perf)
+
+    def _handle_sidlab(self, line, perf):
+        """True when the line was handled as SID Lab firmware output."""
+        if self.dumping:                                     # 'D': raw file lines between DUMP BEGIN / END
+            if line.startswith("# DUMP END"):
+                self.dumping = False
+                self.dump_done.set()
+            elif self.dump_fh is not None:
+                self.dump_fh.write(line + "\n")
+                self.dump_lines += 1
+            return True
+        if line.startswith("#"):
+            if line.startswith("# columns:"):
+                cols = line[len("# columns: "):].split(",")
+                if not any(c.endswith("_age_us") for c in cols):
+                    return False                             # an imu_daq header: not ours
+                self.pod_names = [c[:-3] for c in cols[3:] if c.endswith("_ok")]
+                if self.proto is None:
+                    self._sidlab_hello(perf)
+                return True
+            if self.proto is None:
+                if line.startswith("# SID Lab"):
+                    self.send_raw("h")                       # ask for the column header (pod names)
+                else:
+                    return False
+            if line.startswith("# DUMP BEGIN"):
+                if self.dump_fh is not None:
+                    self.dumping = True
+                return True
+            if self.dump_fh is not None and line.startswith("# SD:") and (
+                    "nothing to dump" in line or "cannot open" in line):
+                self.dump_error = line[2:]
+                self.dump_done.set()
+            m = self.POD_OK.match(line)
+            if m:
+                self.pod_where[m.group(1)] = f"{m.group(2)}{m.group(3)}"
+            m = self.SD_REC.match(line)
+            if m:
+                self.sd = {"recording": m.group(1)}
+            m = self.SD_CLOSED.match(line)
+            if m:
+                self.sd = {"closed": m.group(1), "frames": int(m.group(2)), "missed_edges": int(m.group(3)),
+                           "overruns": int(m.group(4))}
+            if line.startswith("# Hz:"):
+                self.status_line = line[2:]
+                body = line[5:].split("|")[0].split()
+                try:
+                    self.hz = {body[i]: float(body[i + 1]) for i in range(0, len(body) - 1, 2)}
+                except ValueError:
+                    pass
+            tag = "SIDSTATUS" if line.startswith(("# Hz:", "# DAQ clock:")) else "#"
+            self.on_message(tag, line[1:].strip(), {}, perf)
+            return True
+        if line.startswith("F,"):
+            parts = line.split(",")
+            npod = len(self.pod_names)
+            if not npod:
+                if self.proto is None and len(parts) > 10 and (len(parts) - 3) % 7 == 0:
+                    self.send_raw("h")                       # SID Lab frame without a header yet: ask for it
+                    return True
+                return False
+            if len(parts) != 3 + 7 * npod:
+                if self.proto is None:
+                    return False
+                self.bad_lines += 1
+                return True
+            if self.proto is None:
+                self._sidlab_hello(perf)
+            num = int(parts[1])
+            t_us = self.unwrap(int(parts[2]))
+            vals = [float(v) for v in parts[3:3 + 6 * npod]]
+            self.ages = [int(v) for v in parts[3 + 6 * npod:]]
+            if self._last_t is not None and len(self._dt) < 200 and 0 < t_us - self._last_t < 100000:
+                self._dt.append(t_us - self._last_t)
+                if len(self._dt) in (20, 200):
+                    d = sorted(self._dt)
+                    self.hello["frame_us"] = str(int(round(d[len(d) // 2])))
+            self._last_t = t_us
+            self.on_frame("F" if self.recording else "P", num, t_us, vals + self.ages, perf)
+            return True
+        return False
