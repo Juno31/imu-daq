@@ -1,4 +1,6 @@
-// Stage 4 - SYNC-only test. Board: Teensy 4.1. Pin 2 -> DAQ AI0, Teensy GND -> AI8.
+// Stage 4 - SYNC-only test. Board: Teensy 4.1.
+// Wiring as on the brace (hardware/wiring/teensy41_wiring.html): pin 2 -> USB-6363 terminal 59 (AI31),
+// Teensy GND -> terminal 82 (D GND). In the GUI set the SYNC channel to ai31, terminal config RSE.
 // One pulse per 10 ms frame: 3 ms for frame 0, 1 ms for every later frame (imu_daq convention).
 // Send 's' to start and 'x' to stop over the serial monitor; the sketch prints how many pulses it sent.
 #include <IntervalTimer.h>

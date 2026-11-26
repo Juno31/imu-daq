@@ -9,14 +9,17 @@
 //           The SparkFun BNO080 library is not used; the small SHTP driver below replaces it.
 //  BOARD:   Tools > Board > Teensyduino > Teensy 4.1, USB Type: Serial.
 //
-//  WIRING (bench guide Stage 1)
-//    v2.4 (decided with the senior, 2026-11-19): 6 IMUs, 2 muxes, 2 I2C buses, 3 IMUs per mux.
-//    Bus A = LPI2C1 "Wire":  SDA 18,  SCL 19  -> mux A (0x70) ch 0-2 = T1, T7, T12
-//    Bus B = LPI2C3 "Wire1": SDA1 17, SCL1 16 -> mux B (0x70) ch 0-2 = L3, L5, S2
-//    IMUs at 0x4B (0x4A also accepted). MUXED = false + a third bus = the daisy-chain variant (v2.3).
-//    SYNC: pin 2 -> DAQ AI0 (AI0+), GND -> AI8 (AI0-)
-//    DAQ CLOCK IN (optional, "clock ext"): DAQ counter output -> pin 4, DAQ GND -> Teensy GND.
-//      Pin 4 takes 3.3 V at most: a 5 V TTL counter output needs a divider (e.g. 1k series, 2k to GND).
+//  WIRING - the brace now uses the senior's wiring and firmware (teensy_spine_imu, 2026-11-25);
+//  pin-level drawing in hardware/wiring/teensy41_wiring.html:
+//    Wire1: SDA1 17, SCL1 16 -> Mux A (0x70) ch 0-3 = C7, T3, T6, T9
+//    Wire:  SDA 18,  SCL 19  -> Mux B (0x70) ch 0-3 = T11, L1, L3, S1      (all BNO086 at 0x4B)
+//    SYNC: pin 2 -> USB-6363 terminal 59 (AI31, RSE); GND -> terminal 82 (D GND)
+//    pin 1 (TX1) -> terminal 65 (P0.0): used by teensy_spine_imu only, this firmware sends nothing there
+//    DAQ CLOCK IN (optional, "clock ext"): DAQ counter output -> pin 4. Pin 4 takes 3.3 V at most:
+//      a 5 V counter output needs a divider (1 kOhm PFI -> pin 4, 2 kOhm pin 4 -> GND).
+//  NOTE: this sketch (v2.4) was not changed to that map. Its pod table below still reads 6 pods:
+//    "Wire" ch 0-2 = T1, T7, T12 and "Wire1" ch 0-2 = L3, L5, S2, so on the brace each name lands on
+//    a different spine level and pods on ch3 are not read. Use teensy_spine_imu on the brace.
 //
 //  TIMING
 //    A PIT timer (IntervalTimer) ticks every frame period ("clock pit", default), or each rising edge on
