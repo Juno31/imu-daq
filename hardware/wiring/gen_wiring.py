@@ -1,7 +1,7 @@
 """Generates teensy41_wiring.html: pin-level wiring of the SID Lab spine brace, taken from the senior's
 handover (SID_Lab_handover 2026-11-25: PIN_DIAGRAM.svg, SETUP.md section 2, teensy_spine_imu.ino header).
 8 BNO086 on 2 Qwiic muxes (bus A = Wire1 16/17, bus B = Wire 19/18), Teensy -> NI USB-6363 (GND 82,
-TX1 -> P0.0 65, SYNC -> AI31 59), 6 EMG RSE on AI16-21.  Run:  python gen_wiring.py
+TX1 -> P0.0 65, SYNC -> AI31 59), 8 EMG RSE on AI16-23 (EMG7/8 on AI22/AI23, terminals 55/58, added 2026-11-26).  Run:  python gen_wiring.py
 """
 import pathlib
 
@@ -150,21 +150,22 @@ def figure():
     # EMG (bottom edge): signal straight up, reference rail under the sources -> AI GND
     by = DY + 130
     emg = [("33", "AI16", "R-LG"), ("36", "AI17", "L-LG"), ("39", "AI18", "R-MF"),
-           ("42", "AI19", "L-MF"), ("49", "AI20", "R-IL"), ("52", "AI21", "L-IL")]
+           ("42", "AI19", "L-MF"), ("49", "AI20", "R-IL"), ("52", "AI21", "L-IL"),
+           ("55", "AI22", "R-EO"), ("58", "AI23", "L-EO")]
     for k, (num, ai, site) in enumerate(emg):
-        x = 560 + k * 85
+        x = 500 + k * 76
         b += term(x, by, num, ai, "te", top=False)
-        b += [R(x - 14, 890, 64, 40, "part", 3), T(x + 18, 906, f"EMG{k + 1}", "pin8 b", "middle"),
-              T(x + 18, 920, site, "pin8", "middle"),
-              C(x, 890, 4, "pad fe"), C(x + 30, 930, 4, "pad fg")]
+        b += [R(x - 14, 890, 60, 40, "part", 3), T(x + 16, 906, f"EMG{k + 1}", "pin8 b", "middle"),
+              T(x + 16, 920, site, "pin8", "middle"),
+              C(x, 890, 4, "pad fe"), C(x + 28, 930, 4, "pad fg")]
         b.append(W([(x, 890), (x, by + 9)], "we"))
-        b.append(W([(x + 30, 930), (x + 30, 948)], "wg"))
-    gx_ = 560 + 6 * 85
+        b.append(W([(x + 28, 930), (x + 28, 948)], "wg"))
+    gx_ = 500 + 8 * 76
     b += term(gx_, by, "AI GND", "EMG ref", "", top=False)
-    b.append(W([(560 + 30, 948), (gx_, 948), (gx_, by + 9)], "wg"))
+    b.append(W([(500 + 28, 948), (gx_, 948), (gx_, by + 9)], "wg"))
     b.append(T(150, 910, "EMG out → terminal; reference → AI GND", "s"))
     b.append(T(150, 926, "twisted pair (signal + GND) for any lead over ~1 m", "s"))
-    return svg(1220, 970, "Pin-level wiring of the SID Lab spine brace: Teensy 4.1, two Qwiic muxes, eight BNO086, NI USB-6363 and six EMG inputs", b)
+    return svg(1220, 970, "Pin-level wiring of the SID Lab spine brace: Teensy 4.1, two Qwiic muxes, eight BNO086, NI USB-6363 and eight EMG inputs", b)
 
 
 CSS = """
@@ -217,7 +218,7 @@ page = f"""<!doctype html>
 <html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
 <title>SID Lab spine brace wiring</title><style>{CSS}</style></head><body><main>
 <h1>SID Lab spine brace wiring · pin level</h1>
-<p>From the senior's handover (2026-11-25): firmware <code>teensy_spine_imu.ino</code>, PIN_DIAGRAM, SETUP.md §2.</p>
+<p>From the senior's handover (2026-11-25): firmware <code>teensy_spine_imu.ino</code>, PIN_DIAGRAM, SETUP.md §2; EMG7/8 on AI22/AI23 added 2026-11-26.</p>
 {LEGEND}
 <div class="dia">{figure()}</div>
 <p>Teensy on USB to the PC (power + status). FRAME_CLOCK 2 (normal): Teensy makes its own 120 Hz frames, pin 4 stays unconnected.</p>

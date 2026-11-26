@@ -1,5 +1,6 @@
 """Generates emg_wiring.html: pin-level EMG wiring for the senior's SID Lab map (SETUP.md, 2026-11-25).
-6 MyoWare 2.0 (Link Shield TRS -> TRRS breakout), hub R and hub L, one Cat6 per side, NI USB-6363 RSE AI16-AI21.
+8 MyoWare 2.0 (Link Shield TRS -> TRRS breakout), hub R and hub L, one Cat6 per side, NI USB-6363 RSE AI16-AI23.
+EMG7/8 (external oblique, AI22/AI23, terminals 55/58) were added on 2026-11-26 following the senior's pattern.
 Run:  python gen_emg_wiring.py
 """
 import pathlib
@@ -34,8 +35,8 @@ def dot(x, y, cls):
 
 # channel: (EMG no., site, AI, DAQ terminal, colour class, Cat6 pin)
 SIDE = {
-    "R": [(1, "R-LG", "AI16", 33, "e1", 1), (3, "R-MF", "AI18", 39, "e3", 3), (5, "R-IL", "AI20", 49, "e5", 4)],
-    "L": [(2, "L-LG", "AI17", 36, "e2", 1), (4, "L-MF", "AI19", 42, "e4", 3), (6, "L-IL", "AI21", 52, "e6", 4)],
+    "R": [(1, "R-LG", "AI16", 33, "e1", 1), (3, "R-MF", "AI18", 39, "e3", 3), (5, "R-IL", "AI20", 49, "e5", 4), (7, "R-EO", "AI22", 55, "e7", 5)],
+    "L": [(2, "L-LG", "AI17", 36, "e2", 1), (4, "L-MF", "AI19", 42, "e4", 3), (6, "L-IL", "AI21", 52, "e6", 4), (8, "L-EO", "AI23", 58, "e8", 5)],
 }
 GND_TERM = {"R": 35, "L": 38}
 CAT_GND = 2
@@ -77,19 +78,19 @@ def stack(sx, y0, n, site, ai, cls):
 
 
 def hub(x0, y0, side):
-    out = [R(x0 - 40, y0 - 34, 500, 334, "zone", 10),
+    out = [R(x0 - 40, y0 - 34, 580, 334, "zone", 10),
            T(x0 - 30, y0 - 14, f"Hub {side} · {'right' if side == 'R' else 'left'} side of the back · Cat6 {side}", "b")]
     bus5, busg = y0 + 180, y0 + 196
-    out.append(W(f"M{x0 + 10} {bus5} H{x0 + 400}", "w5")); out.append(T(x0 + 404, bus5 + 4, "+5 V", "pin8 b t5"))
-    out.append(W(f"M{x0 + 10} {busg} H{x0 + 425}", "wg")); out.append(T(x0 + 429, busg + 4, "GND", "pin8 b"))
+    out.append(W(f"M{x0 + 10} {bus5} H{x0 + 480}", "w5")); out.append(T(x0 + 484, bus5 + 4, "+5 V", "pin8 b t5"))
+    out.append(W(f"M{x0 + 10} {busg} H{x0 + 505}", "wg")); out.append(T(x0 + 509, busg + 4, "GND", "pin8 b"))
     used = {CAT_GND: "fg"}
     for (_, _, _, _, cls, pin) in SIDE[side]:
         used[pin] = f"f{cls}"
     rj, pin = rj45_row(x0 + 120, y0 + 250, f"hub RJ45 {side}", used)
     out += rj
-    midy = [y0 + 222, y0 + 222, y0 + 232]
+    midy = [y0 + 222, y0 + 222, y0 + 230, y0 + 240]
     for k, (n, site, ai, term, cls, cpin) in enumerate(SIDE[side]):
-        sx = x0 + k * 170
+        sx = x0 + k * 130
         p, pd = stack(sx, y0, n, site, ai, cls)
         out += p
         (tx, ty), (rx, ry), (gx, gy) = pd["T"], pd["R"], pd["S"]
@@ -108,19 +109,21 @@ def body_map():
            '<path class="spine" d="M120 92 V378"/>']
     for lvl, y in (("L1", 236), ("L2", 262), ("L5", 330)):
         out.append(f'<path class="tick" d="M114 {y} H126"/>'); out.append(T(111, y + 3.5, lvl, "pin8", "end"))
-    sites = {"R-LG": (152, 236), "L-LG": (88, 236), "R-IL": (166, 262), "L-IL": (74, 262), "R-MF": (138, 330), "L-MF": (102, 330)}
+    sites = {"R-LG": (152, 236), "L-LG": (88, 236), "R-IL": (166, 262), "L-IL": (74, 262), "R-MF": (138, 330), "L-MF": (102, 330),
+             "R-EO": (174, 200), "L-EO": (66, 200)}
     for side in "RL":
         for (n, site, _, _, cls, _) in SIDE[side]:
             x, y = sites[site]
             out.append(C(x, y, 8, f"pad f{cls}")); out.append(T(x, y + 4, str(n), "pl", "middle"))
     out.append(T(120, 400, "LG = longissimus · MF = multifidus", "pin8", "middle"))
-    out.append(T(120, 413, "IL = iliocostalis", "pin8", "middle"))
+    out.append(T(120, 413, "IL = iliocostalis · EO = ext. oblique", "pin8", "middle"))
     return out
 
 
 TERMS = [(33, "AI16"), (34, "AI24"), (35, "AI GND"), (36, "AI17"), (37, "AI25"), (38, "AI GND"), (39, "AI18"), (40, "AI26"),
          (41, "AI GND"), (42, "AI19"), (43, "AI27"), (44, "AI GND"), None, (49, "AI20"), (50, "AI28"), (51, "AI GND"),
-         (52, "AI21"), (53, "AI29"), (54, "AI GND")]
+         (52, "AI21"), (53, "AI29"), (54, "AI GND"), (55, "AI22"), (56, "AI30"), (57, "AI GND"),
+         (58, "AI23"), (59, "AI31 · SYNC")]
 
 
 def build():
@@ -174,10 +177,11 @@ def build():
         my = ay + 91
         b.append(f'<path class="cab" d="M{cab[0]} {cab[1]} H{cx} V{my} H1060"/>')
         b.append(T(cab[0] + 20, cab[1] - 10, f"Cat6 {side} · 10 m", "s"))
-        # wires: pin order 1 (LG), 2 (GND), 3 (MF), 4 (IL)
+        # wires: pin order 1 (LG), 2 (GND), 3 (MF), 4 (IL), 5 (EO)
         order = [(1, SIDE[side][0][3], SIDE[side][0][4]), (2, GND_TERM[side], "g"),
-                 (3, SIDE[side][1][3], SIDE[side][1][4]), (4, SIDE[side][2][3], SIDE[side][2][4])]
-        lanes = [1170, 1155, 1140, 1125] if side == "R" else [1190, 1205, 1220, 1235]
+                 (3, SIDE[side][1][3], SIDE[side][1][4]), (4, SIDE[side][2][3], SIDE[side][2][4]),
+                 (5, SIDE[side][3][3], SIDE[side][3][4])]
+        lanes = [1170, 1155, 1140, 1125, 1110] if side == "R" else [1190, 1205, 1220, 1235, 1250]
         for (pin, term, cls), lx in zip(order, lanes):
             px, py = pr(pin)
             b.append(W(f"M{px} {py} H{lx} V{ty[term]} H1284", f"w{cls}"))
@@ -185,18 +189,18 @@ def build():
     b.append(T(30, 840, "TRS cable, Link Shield jack → breakout:  T tip = EMG signal (RAW, ≈ 2.5 V offset)  ·  R ring = +5 V  ·  S sleeve = GND.   "
                "Link Shield: PWR ON, OUTPUT RAW.  Cable Shield: MID + END on the muscle, REF on bone.", "s"))
     body = "\n".join(b)
-    return (f'<svg viewBox="0 0 1500 860" role="img" aria-label="Pin-level EMG wiring: six MyoWare 2 in hub R and hub L, '
+    return (f'<svg viewBox="0 0 1500 860" role="img" aria-label="Pin-level EMG wiring: eight MyoWare 2 in hub R and hub L, '
             f'TRS tip ring sleeve, Cat6 to NI USB-6363 terminals" xmlns="http://www.w3.org/2000/svg">\n{body}\n</svg>')
 
 
 CSS = """
 :root { --bg:#f6f7f6; --surface:#ffffff; --ink:#17201d; --muted:#5b6662; --line:#d5dcd9; --accent:#0b6870; --accent-soft:#e0eff0;
-  --w5:#db7f12; --wg:#27302d; --e1:#12925e; --e2:#0b8ea3; --e3:#cc3f7a; --e4:#8a5a2b; --e5:#6d8b0f; --e6:#4f5bd5; }
+  --w5:#db7f12; --wg:#27302d; --e1:#12925e; --e2:#0b8ea3; --e3:#cc3f7a; --e4:#8a5a2b; --e5:#6d8b0f; --e6:#4f5bd5; --e7:#b8860b; --e8:#a03fbf; }
 @media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
   --bg:#111615; --surface:#1a201e; --ink:#e5ebe8; --muted:#9ba8a3; --line:#2e3835; --accent:#52b8c1; --accent-soft:#15302f;
-  --w5:#f0a24a; --wg:#cfd6d3; --e1:#4cc98d; --e2:#4cc3d6; --e3:#f07aa8; --e4:#c9945e; --e5:#a8c94a; --e6:#8e97f2; } }
+  --w5:#f0a24a; --wg:#cfd6d3; --e1:#4cc98d; --e2:#4cc3d6; --e3:#f07aa8; --e4:#c9945e; --e5:#a8c94a; --e6:#8e97f2; --e7:#e0b84a; --e8:#d08ae8; } }
 :root[data-theme="dark"] { --bg:#111615; --surface:#1a201e; --ink:#e5ebe8; --muted:#9ba8a3; --line:#2e3835; --accent:#52b8c1; --accent-soft:#15302f;
-  --w5:#f0a24a; --wg:#cfd6d3; --e1:#4cc98d; --e2:#4cc3d6; --e3:#f07aa8; --e4:#c9945e; --e5:#a8c94a; --e6:#8e97f2; }
+  --w5:#f0a24a; --wg:#cfd6d3; --e1:#4cc98d; --e2:#4cc3d6; --e3:#f07aa8; --e4:#c9945e; --e5:#a8c94a; --e6:#8e97f2; --e7:#e0b84a; --e8:#d08ae8; }
 html, body { margin:0; background:var(--bg); color:var(--ink); font:14px/1.45 "Segoe UI", system-ui, sans-serif; }
 main { max-width:1500px; margin:0 auto; padding:16px; }
 h1 { font-size:20px; margin:0 0 4px; } p { margin:0 0 8px; color:var(--muted); }
@@ -209,7 +213,7 @@ svg text.pin8.b, svg text.pin.b { font-weight:700; fill:var(--ink); } svg text.i
 svg text.pl { fill:var(--surface); font-weight:700; font-size:11.5px; }
 svg text.t5 { fill:var(--w5); } svg text.tg { fill:var(--ink); }
 svg text.te1 { fill:var(--e1); } svg text.te2 { fill:var(--e2); } svg text.te3 { fill:var(--e3); }
-svg text.te4 { fill:var(--e4); } svg text.te5 { fill:var(--e5); } svg text.te6 { fill:var(--e6); }
+svg text.te4 { fill:var(--e4); } svg text.te5 { fill:var(--e5); } svg text.te6 { fill:var(--e6); } svg text.te7 { fill:var(--e7); } svg text.te8 { fill:var(--e8); }
 .pcb { fill:var(--bg); stroke:var(--ink); stroke-width:1.4; } .part { fill:var(--surface); stroke:var(--muted); stroke-width:1.1; }
 .part.fa { fill:var(--accent-soft); stroke:var(--accent); stroke-width:1.5; } .pad { stroke:var(--surface); stroke-width:1.2; }
 .zone { fill:none; stroke:var(--line); stroke-width:1.2; stroke-dasharray:6 4; }
@@ -218,11 +222,11 @@ svg text.te4 { fill:var(--e4); } svg text.te5 { fill:var(--e5); } svg text.te6 {
 .body { fill:var(--accent-soft); stroke:var(--muted); stroke-width:1.2; } .spine { stroke:var(--muted); stroke-width:1.5; stroke-dasharray:4 3; fill:none; }
 .tick { stroke:var(--muted); stroke-width:1.5; }
 .f5 { fill:var(--w5); } .fg { fill:var(--wg); } .fe1 { fill:var(--e1); } .fe2 { fill:var(--e2); } .fe3 { fill:var(--e3); }
-.fe4 { fill:var(--e4); } .fe5 { fill:var(--e5); } .fe6 { fill:var(--e6); }
-.lever.f5, .lever.fg, .lever.fe1, .lever.fe2, .lever.fe3, .lever.fe4, .lever.fe5, .lever.fe6 { stroke:none; }
+.fe4 { fill:var(--e4); } .fe5 { fill:var(--e5); } .fe6 { fill:var(--e6); } .fe7 { fill:var(--e7); } .fe8 { fill:var(--e8); }
+.lever.f5, .lever.fg, .lever.fe1, .lever.fe2, .lever.fe3, .lever.fe4, .lever.fe5, .lever.fe6, .lever.fe7, .lever.fe8 { stroke:none; }
 .w { fill:none; stroke-width:2.4; stroke-linecap:round; stroke-linejoin:round; }
 .w5 { stroke:var(--w5); } .wg { stroke:var(--wg); } .we1 { stroke:var(--e1); } .we2 { stroke:var(--e2); } .we3 { stroke:var(--e3); }
-.we4 { stroke:var(--e4); } .we5 { stroke:var(--e5); } .we6 { stroke:var(--e6); }
+.we4 { stroke:var(--e4); } .we5 { stroke:var(--e5); } .we6 { stroke:var(--e6); } .we7 { stroke:var(--e7); } .we8 { stroke:var(--e8); }
 .trs { fill:none; stroke:var(--muted); stroke-width:5; stroke-linecap:round; }
 .cab { fill:none; stroke:var(--muted); stroke-width:7; stroke-linecap:round; stroke-linejoin:round; }
 """
@@ -231,7 +235,7 @@ page = f"""<!doctype html>
 <html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
 <title>EMG pin wiring</title><style>{CSS}</style></head><body><main>
 <h1>EMG wiring · pin level</h1>
-<p>Senior's SID Lab map (SETUP.md, 2026-11-25): 6 × MyoWare 2, NI USB-6363 single-ended (RSE), ±5 V, 4 kS/s.</p>
+<p>Senior's SID Lab map (SETUP.md, 2026-11-25) + EMG7/8 on AI22/AI23 (2026-11-26): 8 × MyoWare 2, NI USB-6363 single-ended (RSE), ±5 V, 4 kS/s.</p>
 <div class="dia">{build()}</div>
 </main></body></html>
 """

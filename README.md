@@ -1,6 +1,6 @@
 # IMU DAQ — IMU + EMG acquisition with DAQ time sync
 
-SID Lab spine brace: 8 BNO086 IMUs on a Teensy 4.1 (senior's `teensy_spine_imu` firmware) and 6 EMG
+SID Lab spine brace: 8 BNO086 IMUs on a Teensy 4.1 (senior's `teensy_spine_imu` firmware) and 8 EMG
 channels on an NI USB-6363, recorded from one browser GUI. The Teensy sends each IMU frame to the DAQ as a
 data packet (TX1 → P0.0) and a SYNC pulse (pin 2 → AI31), so IMU and EMG share the DAQ time base.
 
@@ -9,7 +9,7 @@ data packet (TX1 → P0.0) and a SYNC pulse (pin 2 → AI31), so IMU and EMG sha
                                                         │ USB (status, frames)
                                                         │ TX1 → P0.0 · SYNC → AI31 · GND → D GND
    ▼                                                    ▼
- PC: host/server.py ◄─────────────────────────── NI USB-6363 (AI16–21 = EMG1–6, RSE)
+ PC: host/server.py ◄─────────────────────────── NI USB-6363 (AI16–23 = EMG1–8, RSE)
    │ HTTP + live stream
    ▼
  Browser GUI  http://127.0.0.1:8765
@@ -108,7 +108,7 @@ Wiring of the SID Lab spine brace, reset to the senior's handover (2026-11-25: `
 `SETUP.md` §2, `teensy_spine_imu.ino`). Pin-level drawing: [hardware/wiring/teensy41_wiring.html](hardware/wiring/teensy41_wiring.html)
 (regenerate with `python hardware/wiring/gen_wiring.py`).
 
-![SID Lab spine brace wiring: Teensy 4.1, 2 Qwiic muxes, 8 BNO086, NI USB-6363, 6 EMG](hardware/wiring/teensy41_wiring.png)
+![SID Lab spine brace wiring: Teensy 4.1, 2 Qwiic muxes, 8 BNO086, NI USB-6363, 8 EMG](hardware/wiring/teensy41_wiring.png)
 
 **Teensy pins are 3.3 V only. Never put 5 V on any pin or on the Qwiic red wire.**
 
@@ -145,6 +145,11 @@ All BNO086 at **0x4B** (ADR jumper open). IMU number = packet slot.
 | 4 | 42 | AI19 | L multifidus (L-MF) |
 | 5 | 49 | AI20 | R iliocostalis (R-IL) |
 | 6 | 52 | AI21 | L iliocostalis (L-IL) |
+| 7 | 55 | AI22 | R external oblique (R-EO) |
+| 8 | 58 | AI23 | L external oblique (L-EO) |
+
+EMG 1–6 are the senior's map; EMG 7–8 were added on 2026-11-26 in the same pattern.
+MyoWare 2 hubs, Cat6 and AI GND terminals: [hardware/wiring/emg_wiring.html](hardware/wiring/emg_wiring.html).
 
 **Unconnected EMG inputs copy SYNC.** The USB-6363 measures its channels one after another with one
 converter. An input with nothing connected cannot drive it, so it repeats the channel scanned just
