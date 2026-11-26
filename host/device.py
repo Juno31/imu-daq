@@ -116,6 +116,10 @@ class Device:
         self._dt = []              # sidlab: frame intervals for the frame period estimate
         self._last_t = None
         self.dumping = False
+        self.pod_diag = {}         # sidlab: pod -> {"state", "text", "t"} from the firmware's per-pod lines
+        self.bus = {}              # sidlab: "A"/"B" -> I2C errors, read time, busy %, pause notice (Hz line)
+        self.scan_t = None         # sidlab: time.time() of the last start-up / 'r' pod scan seen
+        self.sid_banner = False    # sidlab: start-up banner seen before the board was identified
 
     @property
     def connected(self):
@@ -134,6 +138,7 @@ class Device:
         self.hello, self.pod_names, self.bad_lines = {}, [], 0
         self.proto, self.recording, self.ages, self.pod_where, self.sd, self.hz = None, False, [], {}, {}, {}
         self._dt, self._last_t, self.dumping, self.status_line = [], None, False, ""
+        self.pod_diag, self.bus, self.scan_t, self.sid_banner = {}, {}, None, False
         self.stop_evt.clear()
         self.thread = threading.Thread(target=self._reader, name="serial-reader", daemon=True)
         self.thread.start()
@@ -306,6 +311,61 @@ class Device:
     SD_REC = re.compile(r"# SD: recording (\S+)")
     SD_CLOSED = re.compile(r"# SD: (\S+) closed: (\d+) frames, (\d+) missed edges, (\d+) buffer overruns")
     POD_OK = re.compile(r"# (\w+): OK \(mux (\w) ch(\d)")
+    # per-pod lines of the start-up / 'r' scan and of the running loop -> link state for the Connections view
+    POD_DIAG = [
+        (re.compile(r"# (\w+): OK \(mux (\w) ch(\d)"), "ok", True),
+        (re.compile(r"# (\w+): mux (\w) did not answer"), "no_mux", True),
+        (re.compile(r"# (\w+): no BNO086 on mux (\w) ch(\d)"), "no_imu", True),
+        (re.compile(r"# (\w+): answered but sent no quaternion"), "no_quat", True),
+        (re.compile(r"# (\w+): no answer \((\d+) errors"), "lost", False),
+        (re.compile(r"# (\w+): answering again"), "ok", False),
+    ]
+    POD_STAT = re.compile(r"# (\w+) ok=(\d) updates=(\d+) empty_reads=(\d+) fresh_frames=([\d.]+)%")
+    BUS_PAUSE = re.compile(r"# bus (\w): (\d+) errors in a row")
+    HZ_BUS = re.compile(r"I2C err A (\d+) B (\d+) \| read A (\d+) us B (\d+) us \| bus busy A (\d+)% B (\d+)%")
+
+    def _sidlab_diag(self, line):
+        """Keep the firmware's per-pod and per-bus connection facts (see POD_DIAG)."""
+        now = time.time()
+        for rx, state, scan in self.POD_DIAG:
+            m = rx.match(line)
+            if m:
+                name = m.group(1)
+                if name not in self.pod_names and self.pod_names:
+                    return
+                if state == "no_mux":
+                    bus = m.group(2)
+                    self.bus.setdefault(bus, {})["mux"] = "no answer at 0x70"
+                    self.bus[bus]["mux_t"] = now
+                elif scan:
+                    bus = line.split("mux ")[1][0] if "mux " in line else None
+                    if bus and state in ("ok", "no_imu", "no_quat"):
+                        self.bus.setdefault(bus, {})["mux"] = "ok"
+                        self.bus[bus]["mux_t"] = now
+                if scan:
+                    self.scan_t = now
+                self.pod_diag[name] = {"state": state, "text": line[2:].strip(), "t": now}
+                return
+        m = self.POD_STAT.match(line)
+        if m:
+            d = self.pod_diag.get(m.group(1))
+            if m.group(2) == "0" and (d is None or d["state"] == "ok"):
+                self.pod_diag[m.group(1)] = {"state": "down", "text": line[2:].strip(), "t": now}
+            return
+        m = self.BUS_PAUSE.match(line)
+        if m:
+            b = self.bus.setdefault(m.group(1), {})
+            b["paused"] = line[2:].strip()
+            b["paused_t"] = now
+            return
+        m = self.HZ_BUS.search(line)
+        if m:
+            v = [int(x) for x in m.groups()]
+            for i, bus in enumerate("AB"):
+                b = self.bus.setdefault(bus, {})
+                prev = b.get("errors")
+                b["err_new"] = 0 if prev is None else max(0, v[i] - prev)
+                b["errors"], b["read_us"], b["busy_pct"], b["t"] = v[i], v[2 + i], v[4 + i], now
 
     def _sidlab_hello(self, perf):
         """The board runs the SID Lab firmware: report it like an @HELLO so the server goes idle."""
@@ -343,7 +403,8 @@ class Device:
             if self.proto is None:
                 if line.startswith("# SID Lab"):
                     self.send_raw("h")                       # ask for the column header (pod names)
-                else:
+                    self.sid_banner = True                   # the pod scan lines follow before the header
+                elif not self.sid_banner:
                     return False
             if line.startswith("# DUMP BEGIN"):
                 if self.dump_fh is not None:
@@ -356,6 +417,7 @@ class Device:
             m = self.POD_OK.match(line)
             if m:
                 self.pod_where[m.group(1)] = f"{m.group(2)}{m.group(3)}"
+            self._sidlab_diag(line)
             m = self.SD_REC.match(line)
             if m:
                 self.sd = {"recording": m.group(1)}

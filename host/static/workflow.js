@@ -1,14 +1,15 @@
 "use strict";
 // Experiment workflow on the main page: one view per step, chosen by the URL hash.
-//   #session  #participant  #equip-jig  #equip-imu  #equip-emg  #equip-daq  #record
+//   #session  #participant  #equip-conn  #equip-jig  #equip-imu  #equip-emg  #equip-daq  #record
 // MVC / RVC (/emg) and Data review (/review) are their own pages; nav.js draws the bar for all of them.
 // The live sections (status tiles, IMU, EMG, Sync detail, Event log) exist once; each view has empty
 // "slots" and the router moves the sections into the slots of the view on screen.
 // Uses app.js globals: $, S, LS, api, toast, pods, setFold, FOLD_DEFAULT, applyParticipant, ...
 
-const ROUTES = ["session", "participant", "equip-jig", "equip-imu", "equip-emg", "equip-daq", "record"];
-const EQUIP = ["equip-jig", "equip-imu", "equip-emg", "equip-daq"];
-const EQUIP_NAME = { "equip-jig": "3a · IMU jig", "equip-imu": "3b · IMU attachment", "equip-emg": "3c · EMG attachment", "equip-daq": "3d · DAQ & sync" };
+const ROUTES = ["session", "participant", "equip-conn", "equip-jig", "equip-imu", "equip-emg", "equip-daq", "record"];
+const EQUIP = ["equip-conn", "equip-jig", "equip-imu", "equip-emg", "equip-daq"];
+const EQUIP_NAME = { "equip-conn": "3a · Connections", "equip-jig": "3b · IMU jig", "equip-imu": "3c · IMU attachment",
+  "equip-emg": "3d · EMG attachment", "equip-daq": "3e · DAQ & sync" };
 const SLOT_EL = {};                   // slot name -> live section element
 let ROUTE = null;
 let INFO = {};                        // /api/expinfo for the current date + subject
@@ -46,7 +47,7 @@ function showRoute(r, push = true) {
   const i = EQUIP.indexOf(r);
   if (i >= 0) {
     const prev = i ? `<a class="btn ghost" href="#${EQUIP[i - 1]}">‹ ${EQUIP_NAME[EQUIP[i - 1]]}</a>` : `<a class="btn ghost" href="#participant">‹ 2 · Participant</a>`;
-    const next = i < 3 ? `<a class="btn" href="#${EQUIP[i + 1]}">Next: ${EQUIP_NAME[EQUIP[i + 1]]} ›</a>` : `<a class="btn" href="/emg">Next: 4 · MVC / RVC ›</a>`;
+    const next = i < EQUIP.length - 1 ? `<a class="btn" href="#${EQUIP[i + 1]}">Next: ${EQUIP_NAME[EQUIP[i + 1]]} ›</a>` : `<a class="btn" href="/emg">Next: 4 · MVC / RVC ›</a>`;
     $("equipNext").innerHTML = prev + next;
   }
   if (push && location.hash !== "#" + r) history.replaceState(null, "", "#" + r);
@@ -188,7 +189,7 @@ function loadInfo(force) {
   }, 200);
 }
 
-// ---------------- 3a · jig: global orientation ----------------
+// ---------------- 3b · jig: global orientation ----------------
 let jigCap = null, jigSecs = +LS.get("jigSecs", 5);
 const qn = (q) => { const n = Math.hypot(...q) || 1; return q.map((v) => v / n); };
 const angDeg = (a, b) => Math.acos(Math.max(-1, Math.min(1, a[0] * b[0] + a[1] * b[1] + a[2] * b[2]))) * D;
@@ -285,7 +286,7 @@ function renderJig(o) {
     (o.ok ? "" : ' · <span class="warn">tilt ≥ 3° or the jig moved: check the boards sit flat, capture again</span>') + "</p>";
 }
 
-// ---------------- 3a · jig: six-face calibration recording ----------------
+// ---------------- 3b · jig: six-face calibration recording ----------------
 let special = null;                    // {task, session, stopAt}
 async function startSpecial(task, name, secs) {
   const w = who();
@@ -317,7 +318,7 @@ async function jigAnalyze() {
     ` · faces ${wesc((o.poses_found || []).join(" "))}${pairs ? " · sensor-to-sensor: " + pairs : ""} · <span class="mono">${wesc(j.rel)}/jig_calibration.json</span></p>`;
 }
 
-// ---------------- 3b / 3c · attachment checklists ----------------
+// ---------------- 3c / 3d · attachment checklists ----------------
 let CHK = { imu: {}, emg: {} }, chkBuilt = { imu: "", emg: "" }, emgRest = null;
 function segOf() {
   let m = null; try { m = JSON.parse(localStorage.getItem("spineMap") || "null"); } catch { }
@@ -381,7 +382,7 @@ function renderEmgCheck() {
   const ch = (S && S.emg && S.emg.chans) || [];
   if (!ch.length) {
     chkBuilt.emg = "";
-    $("emgCheck").innerHTML = `<p class="cap">No live EMG. ${S && S.daq && !S.daq.preview_on && S.state !== "recording" ? "Press <b>Preview</b> in the EMG section below." : "Check the DAQ (3d)."}</p>`;
+    $("emgCheck").innerHTML = `<p class="cap">No live EMG. ${S && S.daq && !S.daq.preview_on && S.state !== "recording" ? "Press <b>Preview</b> in the EMG section below." : "Check the DAQ (3a · Connections)."}</p>`;
     $("emgChkPill").textContent = "NO SIGNAL"; $("emgChkPill").className = "pill bad";
     return false;
   }
@@ -429,12 +430,13 @@ async function saveChecklist() {
   if (j) { chkDirty.imu = chkDirty.emg = false; toast("Checklist saved: " + j.path); }
 }
 function renderChecks() {
+  if (ROUTE === "equip-conn" && window.connRender) connRender();
   if (ROUTE === "equip-imu") renderImuCheck();
   if (ROUTE === "equip-emg") renderEmgCheck();
   if (ROUTE === "equip-jig") jigRefOptions();
 }
 
-// ---------------- 3d · time sync test ----------------
+// ---------------- 3e · time sync test ----------------
 let syncSecs = +LS.get("syncSecs", 10);
 function renderSyncResult(r) {
   const p = $("syncTestPill");
@@ -494,7 +496,7 @@ window.onWorkflowStatus = (s, prev) => {
         LS.set("syncTest", r);
         renderSyncResult(r);
         setText("syncTestLeft", "");
-        toast(ok ? "Sync test PASS" : "Sync test FAIL: see 3d · DAQ & sync", ok ? undefined : true);
+        toast(ok ? "Sync test PASS" : "Sync test FAIL: see 3e · DAQ & sync", ok ? undefined : true);
       } else if (special.task === "jigcal") {
         setText("jigRecInfo", `saved ${sm.session} · ${sm.duration_s ?? 0} s · press Analyse latest`);
       }

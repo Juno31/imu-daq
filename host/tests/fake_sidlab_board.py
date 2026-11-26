@@ -35,12 +35,7 @@ class FakeSidlabSerial:
         self.last_frame_t = time.perf_counter()
         self._stop = threading.Event()
         self._emit("# SID Lab Teensy 4.1 spine IMU logger (8 pods, 2 muxes)")
-        for i, p in enumerate(PODS):
-            if p == self.missing:
-                self._emit(f"# {p}: no BNO086 on mux {'AB'[i // 4]} ch{i % 4}")
-            else:
-                self._emit(f"# {p}: OK (mux {'AB'[i // 4]} ch{i % 4}, report every 7 ms)")
-        self._emit("# columns: " + self.header())
+        self._scan()
         self.th = threading.Thread(target=self._run, daemon=True)
         self.th.start()
 
@@ -76,6 +71,15 @@ class FakeSidlabSerial:
         self._stop.set()
 
     # ---- firmware behaviour ----
+    def _scan(self):
+        """startPods(): one line per pod, then the column header (as at power-up and after 'r')."""
+        for i, p in enumerate(PODS):
+            if p == self.missing:
+                self._emit(f"# {p}: no BNO086 on mux {'AB'[i // 4]} ch{i % 4}")
+            else:
+                self._emit(f"# {p}: OK (mux {'AB'[i // 4]} ch{i % 4}, report every 7 ms)")
+        self._emit("# columns: " + self.header())
+
     def header(self):
         cols = ["F", "frame", "t_us"]
         for p in PODS:
@@ -102,9 +106,12 @@ class FakeSidlabSerial:
         elif c == "h":
             self._emit("# columns: " + self.header())
         elif c == "s":
+            for p in PODS:
+                ok = int(p != self.missing)
+                self._emit(f"# {p} ok={ok} updates={self.frame * ok} empty_reads=0 fresh_frames={100.0 * ok:.1f}%")
             self._emit(f"# frames={self.frame} late_resyncs=0 I2C_HZ=400000 REPORT_MS=7 (frame {FRAME_US} us)")
         elif c == "r":
-            self._emit("# (restart pods)")
+            self._scan()
         elif c == "D":
             if self.trial_open or not self.last_closed:
                 self._emit("# SD: nothing to dump (recording, or no file closed yet)")

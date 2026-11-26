@@ -13,7 +13,8 @@ import device                       # noqa: E402
 import server                       # noqa: E402
 from fake_sidlab_board import FakeSidlabSerial   # noqa: E402
 
-device.serial.Serial = lambda *a, **k: FakeSidlabSerial(sd=True)
+# FAKE_MISSING=T6: that pod does not answer (to try the Connections view)
+device.serial.Serial = lambda *a, **k: FakeSidlabSerial(sd=True, missing_pod=os.environ.get("FAKE_MISSING") or None)
 server.guess_port = lambda: "FAKE"
 if "--port" not in sys.argv:
     sys.argv += ["--port", "8766"]

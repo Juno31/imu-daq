@@ -5,8 +5,9 @@
   const STEPS = [
     { key: "session", n: 1, label: "Session", href: "/#session" },
     { key: "participant", n: 2, label: "Participant", href: "/#participant" },
-    { key: "equip", n: 3, label: "Equipment", href: "/#equip-jig",
-      subs: [["equip-jig", "a", "IMU jig"], ["equip-imu", "b", "IMU attach"], ["equip-emg", "c", "EMG attach"], ["equip-daq", "d", "DAQ & sync"]] },
+    { key: "equip", n: 3, label: "Equipment", href: "/#equip-conn",
+      subs: [["equip-conn", "a", "Connections"], ["equip-jig", "b", "IMU jig"], ["equip-imu", "c", "IMU attach"],
+        ["equip-emg", "d", "EMG attach"], ["equip-daq", "e", "DAQ & sync"]] },
     { key: "mvc", n: 4, label: "MVC / RVC", href: "/emg" },
     { key: "record", n: 5, label: "Task recording", href: "/#record" },
     { key: "review", n: 6, label: "Data review", href: "/review" },

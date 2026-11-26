@@ -863,7 +863,7 @@ class App:
             rate = (len(t) - 1) / ((t[-1] - t[0]) / 1e6) if len(t) > 10 and t[-1] > t[0] else 0.0
             now_perf = time.perf_counter()
             pods = []
-            for name in self.dev.pod_names:
+            for k, name in enumerate(self.dev.pod_names):
                 p = self._pod(name)
                 fr = p["fresh"]
                 fw = self.fw_pods.get(name, {})
@@ -879,6 +879,10 @@ class App:
                     "head_acc_deg": float(fw["head_acc_deg"]) if fw.get("head_acc_deg") not in (None, "", "-1.0") else None,
                     "stalls": p["stalls"], "restarts": p["restarts"],
                     "rec_fresh": round(100.0 * p["rec_fresh"] / p["rec_frames"], 1) if p["rec_frames"] else None,
+                    "where": self.dev.pod_where.get(name, ""),
+                    "hz": self.dev.hz.get(name),
+                    "diag": self.dev.pod_diag.get(name),
+                    "age_us": self.dev.ages[k] if k < len(self.dev.ages) else None,
                 })
             sess = self.session
             rec = None
@@ -899,6 +903,11 @@ class App:
                 "last_summary": self.last_summary, "data_dir": self.data_dir,
                 "bad_lines": self.dev.bad_lines,
                 "spine_cal_rev": self.spine_cal_rev,
+                # Connections view: firmware facts about the I2C buses / muxes and the last pod scan
+                "links": {"proto": self.dev.proto, "bus": self.dev.bus, "scan_t": self.dev.scan_t,
+                          "status_line": self.dev.status_line, "now": time.time(),
+                          "status_age_s": round(time.time() - self.dev.bus["A"]["t"], 1)
+                          if self.dev.bus.get("A", {}).get("t") else None},
             }
         # sync monitor + clock plot (outside the main lock: the frame reader must not wait on it)
         if sm is not None:
@@ -1158,6 +1167,11 @@ class Handler(BaseHTTPRequestHandler):
                 return self._json({"ok": True})
             if path == "/api/restart":
                 APP.send_simple("restart")
+                return self._json({"ok": True})
+            if path == "/api/podstatus":          # SID Lab 's': one line per pod (ok, updates, fresh frames)
+                if not APP.dev.connected:
+                    raise RuntimeError("board not connected")
+                APP.dev.send("status_full")
                 return self._json({"ok": True})
             if path == "/api/quatmode":
                 APP.set_quat_mode(str(body.get("mode", "")))

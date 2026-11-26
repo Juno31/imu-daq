@@ -6,6 +6,7 @@
 <title>IMU DAQ</title>
 <link rel="stylesheet" href="/static/app.css">
 <link rel="stylesheet" href="/static/workflow.css">
+<link rel="stylesheet" href="/static/connections.css">
 </head>
 <body>
 <header class="topbar">
@@ -256,7 +257,7 @@
         </div>
       </section>
     </div>
-    <div class="viewnext"><a class="btn ghost" href="#session">‹ 1 · Session</a><a class="btn" href="#equip-jig">Next: 3 · Equipment ›</a></div>
+    <div class="viewnext"><a class="btn ghost" href="#session">‹ 1 · Session</a><a class="btn" href="#equip-conn">Next: 3 · Equipment ›</a></div>
   </section>
 
   <!-- ================= 3 · Equipment configuration ================= -->
@@ -264,7 +265,32 @@
     <div class="viewhead"><span class="stepn">3</span><h1>Equipment configuration</h1>
       <nav class="esubs" id="equipSubs"></nav></div>
 
-    <!-- 3a: IMU jig -->
+    <!-- 3a: live connections (pin-out) -->
+    <div class="sub" data-sub="equip-conn">
+      <section class="card stepcard cx-card">
+        <h2>Connections · live pin-out <span class="pill" id="connPill">—</span>
+          <span class="spacer"></span>
+          <span class="hint" id="connScan"></span>
+          <button class="btn small" id="btnConnScan" title="Firmware 'r': restarts every IMU and prints, per IMU, OK or why not (keeps the heading; idle only)">↻ Re-scan IMUs</button>
+          <button class="btn small ghost" id="btnConnStatus" title="Firmware 's': one status line per IMU in the event log">Firmware status</button>
+          <button class="btn small ghost" id="btnConnPreview" title="The DAQ preview checks SYNC, the data line and the EMG inputs">DAQ preview</button></h2>
+        <div class="cx-grid">
+          <div class="cx-map" id="connMap"></div>
+          <aside class="cx-side">
+            <div class="cx-detail hidden" id="connDetail"></div>
+            <h3>Check first</h3>
+            <ul class="cx-probs" id="connProblems"></ul>
+            <div class="cx-legend">
+              <span><i class="sw st-ok"></i>working</span><span><i class="sw st-warn"></i>marginal</span>
+              <span><i class="sw st-bad"></i>broken</span><span><i class="sw st-unk"></i>no evidence yet</span>
+            </div>
+            <p class="hint">Click a wire or part for its evidence. Mux B is drawn above Mux A (pin order on the Teensy). All pins 3.3 V only.</p>
+          </aside>
+        </div>
+      </section>
+    </div>
+
+    <!-- 3b: IMU jig -->
     <div class="sub" data-sub="equip-jig">
       <div class="formgrid">
         <section class="card stepcard">
@@ -296,7 +322,7 @@
       <div class="slot" data-slot="imu"></div>
     </div>
 
-    <!-- 3b: IMU attachment -->
+    <!-- 3c: IMU attachment -->
     <div class="sub" data-sub="equip-imu">
       <div class="formgrid">
         <section class="card stepcard">
@@ -332,7 +358,7 @@
       <div class="slot" data-slot="imu"></div>
     </div>
 
-    <!-- 3c: EMG attachment -->
+    <!-- 3d: EMG attachment -->
     <div class="sub" data-sub="equip-emg">
       <div class="formgrid">
         <section class="card stepcard wide">
@@ -348,7 +374,7 @@
       <div class="slot" data-slot="emg"></div>
     </div>
 
-    <!-- 3d: DAQ connection & time sync -->
+    <!-- 3e: DAQ connection & time sync -->
     <div class="sub" data-sub="equip-daq">
       <div class="stephead" id="step1" data-step="1"><b>Devices</b>
         <span class="hint">all green before the participant arrives · click a tile for detail</span></div>
@@ -571,6 +597,7 @@
 <script src="/static/stream.js"></script>
 <script src="/static/nav.js"></script>
 <script src="/static/app.js"></script>
+<script src="/static/connections.js"></script>
 <script src="/static/workflow.js"></script>
 </body>
 </html>
