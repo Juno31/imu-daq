@@ -61,6 +61,23 @@ Closing the browser does not stop a recording; closing the server window does (i
 
 All pages open in the same browser tab and share one live-data connection, so several tabs can stay open.
 
+**Experiment workflow** (step bar at the top of every page):
+
+| Step | Page | What you do |
+|---|---|---|
+| 1 · Session | `/#session` | test date, subject ID, start / end time, protocol, IRB no., location, weather and indoor climate, team names and roles, notes → `session_info.json` |
+| 2 · Participant | `/#participant` | age, sex, height, weight (BMI), dominant side, group, back pain, consent and eligibility → `participant.json` |
+| 3a · IMU jig | `/#equip-jig` | all IMUs in the jig with one orientation: averaged quaternion per IMU, tilt and heading vs the reference IMU → `jig_alignment.json`; optional 6-face sensor calibration (records task `jigcal`, runs `jig_calibration.py`) |
+| 3b · IMU attach | `/#equip-imu` | attachment checklist per IMU with live status, static calibration (still hold + forward bend) |
+| 3c · EMG attach | `/#equip-emg` | skin prep / electrode checklist per channel, live RMS, 5 s rest-noise measurement → `setup_check.json` |
+| 3d · DAQ & sync | `/#equip-daq` | device tiles, time sync test (short `synctest` recording, PASS when every frame has one SYNC pulse), Sync detail |
+| 4 · MVC / RVC | `/emg` | EMG normalization (below) |
+| 5 · Task recording | `/#record` | task trials, live signals, spine view, saved recordings |
+| 6 · Data review | `/review` | finished recordings |
+
+The info files are saved in `data/<date>/<subject>/` and copied into every trial recorded afterwards.
+A step shows ✓ when it is done for the current date and subject.
+
 **Main page** (`/`)
 
 | Part | What it shows |
@@ -159,6 +176,25 @@ picks up only ~13 µV (0.0004 %), so real EMG is not affected. The GUI marks suc
 (EMG light, EMG traces, calibration result) whenever a channel correlates with SYNC (r > 0.5). Connect the
 amplifier outputs, or remove unused channels in Settings → EMG / extra channels.
 
+### SID Lab spine-brace firmware (senior's handover, 2026-11-25)
+
+The GUI also runs the brace with the senior's firmware `teensy_spine_imu.ino` (8 × BNO086 on two muxes, 120 Hz),
+uploaded unchanged. The host detects it by itself (`proto=sidlab` in the board info) and switches to its protocol.
+
+| | SID Lab firmware | how the GUI uses it |
+|---|---|---|
+| IMUs | C7 T3 T6 T9 (mux A, Wire1) · T11 L1 L3 S1 (mux B, Wire) | 8 pods; spine angles use **T6 relative to T11** |
+| USB | `F` lines all the time (+ `age_us` per pod), `#` status, one-letter commands | live view; **Start** = `p`, wait 0.7 s, `g` → new SD file at frame 0; **Stop** = `p`, then `D` copies the SD file, then `g` |
+| SYNC | pin 2 → **AI31** (terminal 59); pulse width encodes the frame number | each pulse is read as its own frame number (`daq_sync.method = frame-coded SYNC`) |
+| Data line | pin 1 (TX1, 230400 baud) → **P0.0** (terminal 65), one 110-byte packet per frame | sampled at 2 MHz with the EMG; saved as `imu_daq.csv`; used for frame times when SYNC cannot be read |
+| EMG | 8 ch, **RSE** ±5 V, AI16–AI23 (R/L longissimus, multifidus, iliocostalis, external oblique) | default DAQ settings (`host/channels.py`) |
+| Ground | Teensy GND → D GND (terminal 82) | required for SYNC and P0.0 |
+
+Because that firmware reads commands one character at a time, the host sends it only `h v g p D`
+(a word like `start` would run `r` = restart pods). There is no ping, so `pc_unix_s` is not written; frames get
+their DAQ time from SYNC or the data line. Test without hardware: `python host/tests/test_sidlab_link.py`,
+or `python host/tests/run_fake_board.py` for the GUI on a fake board (http://127.0.0.1:8766).
+
 ## How it works
 
 **Firmware** (`firmware/imu_daq/imu_daq.ino`):
@@ -229,6 +265,7 @@ A repeat of an existing trial number is saved as `…_trial<NN>_2`; nothing is o
 | `spine_cal.json` | spine calibration used (neutral quaternions, body axes, sensor map, height) |
 | `calibration.json` | static calibration used (still hold results) |
 | `emg_norm.json` | EMG normalization used (offset, noise, MVC / RVC per channel), if made |
+| `session_info.json`, `participant.json`, `jig_alignment.json`, `setup_check.json` | experiment information from steps 1–3, if saved |
 
 Read the DAQ file in Python:
 ```python

@@ -39,12 +39,13 @@ const idx = Object.fromEntries(ORDER.map((n, i) => [n, i]));
 const toOs = (q) => new THREE.Quaternion(-q[2], q[3], -q[1], q[0]);   // body frame -> OpenSim frame
 const MODEL_HEIGHT_CM = 180;
 
-// IMU placement (6 sensors). S2 sits on the sacrum, so it drives the pelvis segment.
-export const SENSOR_SEGS = ["T1", "T7", "T12", "L3", "L5", "S2"];
-export const NODE_OF = { S2: "pelvis" };
+// IMU placement: the SID Lab spine brace (8 sensors). S1 sits on the sacrum, so it drives the pelvis segment;
+// the model has no C7, so the C7 sensor drives T1 (the top vertebra of the model).
+export const SENSOR_SEGS = ["C7", "T3", "T6", "T9", "T11", "L1", "L3", "S1"];
+export const NODE_OF = { S1: "pelvis", C7: "T1" };
 const nodeOf = (s) => NODE_OF[s] || s;
 // segQ: {segment name: body-frame rotation from standing, or null}. Levels between two sensors share
-// the relative rotation equally; levels above the top sensor follow it. Without a pelvis (S2) sensor,
+// the relative rotation equally; levels above the top sensor follow it. Without a pelvis (S1) sensor,
 // (1 - share) of the lowest sensor's rotation goes to the pelvis and the rest is spread up to it.
 export function jointsFromSensors(segQ, share = 0.7) {
   const J = ORDER.map(() => [1, 0, 0, 0]);

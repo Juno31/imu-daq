@@ -81,7 +81,7 @@ class Session:
     SENSOR_COLS = ["acc_new", "gyr_new", "mag_new", "ax", "ay", "az", "gx", "gy", "gz", "mx", "my", "mz", "mag_acc"]
     SENSOR_INT = {0, 1, 2, 12}          # flag / accuracy columns inside a 13-value sensor block
 
-    def __init__(self, root, meta, pod_names, sensors=False):
+    def __init__(self, root, meta, pod_names, sensors=False, ages=False):
         self.started_unix = time.time()
         meta = dict(meta)
         tb = trial_base(meta)
@@ -106,6 +106,9 @@ class Session:
         for p in self.pod_names:
             cols += [f"{p}_ok", f"{p}_fresh", f"{p}_w", f"{p}_x", f"{p}_y", f"{p}_z"]
         self.sensors = bool(sensors)    # firmware >= 1.2: accelerometer, gyroscope, magnetometer
+        self.ages = bool(ages) and not self.sensors   # SID Lab firmware: <pod>_age_us after the quaternions
+        if self.ages:
+            cols += [f"{p}_age_us" for p in self.pod_names]
         if self.sensors:
             for p in self.pod_names:
                 cols += [f"{p}_{c}" for c in self.SENSOR_COLS]
@@ -147,7 +150,10 @@ class Session:
         self.last_frame = num
         self.frames += 1
         nq = 6 * len(self.pod_names)
-        if not self.sensors:
+        if self.ages:
+            vals = list(vals[:nq + len(self.pod_names)])
+            vals += [float("nan")] * (nq + len(self.pod_names) - len(vals))
+        elif not self.sensors:
             vals = vals[:nq]
         elif len(vals) < len(self.columns) - 2:          # a v1.1 line in a v1.2 session: pad
             vals = list(vals) + [float("nan")] * (len(self.columns) - 2 - len(vals))
@@ -155,6 +161,8 @@ class Session:
         for k, v in enumerate(vals):
             if k < nq:
                 out.append(str(int(v)) if (k % 6) < 2 else f"{v:.5f}")
+            elif self.ages:
+                out.append(str(int(v)) if v == v else "")
             else:
                 j = (k - nq) % 13
                 out.append(str(int(v)) if j in self.SENSOR_INT and v == v else
@@ -246,7 +254,7 @@ class Session:
         nf = ns = 0
         with open(sd_path, encoding="utf-8", errors="replace") as fh:
             for line in fh:
-                if line.startswith("F,"):
+                if line.startswith("F,") and line[2:3].isdigit():      # (skip the SID Lab header line)
                     p = line.rstrip().split(",")
                     self.frame(int(p[1]), unwrap(int(p[2])), [float(v) for v in p[3:]])
                     nf += 1

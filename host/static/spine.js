@@ -1,4 +1,4 @@
-// Spine view: six IMUs (T1, T7, T12, L3, L5, S2) -> calibrated segment orientations -> 3D spine model.
+// Spine view: eight IMUs (C7, T3, T6, T9, T11, L1, L3, S1) -> calibrated segment orientations -> 3D spine model.
 //
 // Conventions
 //  * Quaternions are [w, x, y, z]; an IMU quaternion q rotates sensor-frame vectors into the
@@ -75,7 +75,7 @@ let status = null, podNames = [];
 const live = {};                             // pod name -> latest quaternion
 const cal = load("spineCal") || { q0: null, B: null, map: null, when: null };
 let capture = null;                          // {kind, until, samples: {name: []}}
-const hist = { t: [], a: [] };               // T7-vs-T12 angles
+const hist = { t: [], a: [] };               // T6-vs-T11 angles
 
 function load(k) { try { return JSON.parse(localStorage.getItem(k)); } catch { return null; } }
 function save(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch { /* private mode */ } }
@@ -97,7 +97,7 @@ function setMsg(text, cls = "") { const m = $("calMsg"); m.textContent = text; m
 function startCapture(kind, secs) {
   const m = mapping();
   const names = mappedNames(m), missing = names.filter((n) => !live[n]);
-  if (names.length < 2 || !m.T7 || !m.T12) { setMsg("Assign at least the T7 and T12 sensors.", "warn"); return; }
+  if (names.length < 2 || !m.T6 || !m.T11) { setMsg("Assign at least the T6 and T11 sensors.", "warn"); return; }
   if (missing.length) { setMsg(`No data from ${missing.join(", ")} yet. Check the connection on the Acquisition page.`, "warn"); return; }
   if (new Set(names).size !== names.length) { setMsg("Each position needs a different sensor.", "warn"); return; }
   if (kind === "flex" && !cal.q0) { setMsg("Capture neutral first.", "warn"); return; }
@@ -305,7 +305,7 @@ function connect() {
           live[podNames[k]] = [r[o + 2], r[o + 3], r[o + 4], r[o + 5]];
         }
         onCaptureSample();
-        const mp = mapping(), a = segment(mp.T7), b = segment(mp.T12);
+        const mp = mapping(), a = segment(mp.T6), b = segment(mp.T11);
         if (a && b) {
           hist.t.push(r[0] / 1e6); hist.a.push(eulerXYZ(qmul(qconj(b), a)));
           const cut = hist.t[hist.t.length - 1] - H;
@@ -420,22 +420,22 @@ document.querySelectorAll("[data-view]").forEach((b) => (b.onclick = () => { if 
 const wp = new THREE.Vector3();
 function updateModel() {
   const mp = mapping(), live3d = isCalibrated();       // not calibrated: static neutral model, no angles
-  const qT7 = live3d ? segment(mp.T7) : null, qT12 = live3d ? segment(mp.T12) : null;
+  const qT6 = live3d ? segment(mp.T6) : null, qT11 = live3d ? segment(mp.T11) : null;
   const segQ = live3d ? Object.fromEntries(SENSOR_SEGS.map((s) => [s, mp[s] ? segment(mp[s]) : null])) : null;
   const J = jointsFromSensors(segQ, LUMBAR_SHARE);   // joint rotation of each segment w.r.t. the one below
   three.nodes.forEach((nd, i) => nd.node.quaternion.copy(toOs(J[i])));
   for (const r of three.ribs) r.visible = $("showRibs").checked;
   const t = three; t.trail.visible = $("showTrail").checked;
-  if (t.trail.visible && qT7) {
-    const n7 = t.nodes[idx.T7].node; n7.updateWorldMatrix(true, false);
+  if (t.trail.visible && qT6) {
+    const n7 = t.nodes[idx.T6].node; n7.updateWorldMatrix(true, false);
     wp.set(-6, 3, 0).applyMatrix4(n7.matrixWorld);
     t.trailPos.copyWithin(0, 3); t.trailPos.set([wp.x, wp.y, wp.z], (t.trailN - 1) * 3);
     if (t.trailCount < t.trailN) { for (let k = 0; k < t.trailN - 1; k++) t.trailPos.set([wp.x, wp.y, wp.z], k * 3); t.trailCount = t.trailN; }
     t.trail.geometry.attributes.position.needsUpdate = true;
   } else t.trailCount = 0;
-  angleBox($("angRel"), qT7 && qT12 ? eulerXYZ(qmul(qconj(qT12), qT7)) : null);
-  angleBox($("angT12"), qT12 ? eulerXYZ(qT12) : null);
-  angleBox($("angT7"), qT7 ? eulerXYZ(qT7) : null);
+  angleBox($("angRel"), qT6 && qT11 ? eulerXYZ(qmul(qconj(qT11), qT6)) : null);
+  angleBox($("angT11"), qT11 ? eulerXYZ(qT11) : null);
+  angleBox($("angT6"), qT6 ? eulerXYZ(qT6) : null);
 }
 
 // ---------------- plot ----------------

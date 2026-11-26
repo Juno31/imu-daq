@@ -5,6 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Recording Review</title>
 <link rel="stylesheet" href="/static/app.css">
+<link rel="stylesheet" href="/static/workflow.css">
 <link rel="stylesheet" href="/static/review.css">
 <script type="importmap">
 { "imports": {
@@ -17,9 +18,8 @@
 <header class="topbar">
   <div class="brand"><span class="logo">◆</span> Review</div>
   <span class="hint" id="rvTitle">Pick a recording on the left</span>
+  <nav class="flownav" id="flowNav" aria-label="Experiment steps"></nav>
   <div class="spacer"></div>
-  <a class="chip linkchip" href="/" title="Recording, sync and device settings">← Acquisition</a>
-  <a class="chip linkchip" href="/emg" title="Baseline offset and MVC / RVC">EMG norm</a>
   <a class="chip linkchip" href="/spine" title="Live spine view">Spine view</a>
 </header>
 
@@ -81,13 +81,13 @@
             </div>
           </div>
           <div class="rv-angles" id="rvAngles"></div>
-          <p class="cap">T7 relative to T12 at the cursor: flexion +forward, lateral bend +left, axial rotation +left.</p>
+          <p class="cap">T6 relative to T11 at the cursor: flexion +forward, lateral bend +left, axial rotation +left.</p>
         </section>
 
         <!-- signals -->
         <div class="rv-plots" id="rvPlots">
           <section class="card rv-plotcard" id="rvSpinePlot">
-            <div class="fileshead"><h2>Spine angles</h2><span class="hint">T7 relative to T12</span><div class="spacer"></div>
+            <div class="fileshead"><h2>Spine angles</h2><span class="hint">T6 relative to T11</span><div class="spacer"></div>
               <span class="legend"><span><i style="background:var(--roll)"></i>Flexion</span><span><i style="background:var(--pitch)"></i>Lat. bend</span><span><i style="background:var(--yaw)"></i>Axial rot.</span></span></div>
             <div class="rv-tracks" id="rvSpineTracks"></div>
           </section>
@@ -110,5 +110,7 @@
 
 <div class="toasts" id="toasts" role="status" aria-live="polite"></div>
 <script type="module" src="/static/review.js"></script>
+<script src="/static/nav.js"></script>
+<script>FlowNav.mount(document.getElementById("flowNav"), "review");</script>
 </body>
 </html>

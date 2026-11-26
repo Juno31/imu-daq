@@ -12,6 +12,7 @@ let windowSec = LS.get("window", 10);
 const pods = new Map();       // name -> pod view
 const MAXKEEP = 35;           // seconds of samples kept per pod
 let lastLogLevelFilter = "all";
+let FRAME_HOOK = null;         // workflow.js: jig capture (pod view, quaternion valid)
 
 // ---------------- math ----------------
 function qmul(a, b) {
@@ -96,6 +97,7 @@ function addFrames(rows) {
         p.s.push(null); p.x = null; p.hz = null;
       }
       p.dirty = true;
+      if (FRAME_HOOK) FRAME_HOOK(p, !!r[o]);
     }
   }
   for (const p of pods.values()) {
@@ -654,8 +656,16 @@ function applyTiles(s) {
   else if (!cfg.enabled) tile("stDaq", "", "Off", "Recordings are IMU-only");
   else if (lv && lv.error) tile("stDaq", "bad", "Error", lv.error);
   else if (!rec && daq.preview_error) tile("stDaq", "bad", "Error", daq.preview_error);
-  else if (lv) tile("stDaq", "ok", rec ? "Recording" : "Connected",
-    `${dev ? dev.product : cfg.device} · ${(+cfg.rate / 1000).toFixed(0)} kHz`, rec);
+  else if (lv) {
+    // SID Lab firmware: IMU packets on the DAQ digital line (P0.0, terminal 65) are part of the DAQ check
+    const dl = lv.data_line, sid = s.hello && s.hello.proto === "sidlab";
+    const dlText = dl ? (dl.error ? "P0.0 error" : dl.silent_s === null ? "P0.0 no packets" :
+      dl.silent_s > 1 ? `P0.0 silent ${dl.silent_s.toFixed(0)} s` : "P0.0 IMU packets OK") : "";
+    const dlBad = sid && dl && (dl.error || dl.silent_s === null || dl.silent_s > 1);
+    tile("stDaq", dlBad ? "warn" : "ok", rec ? "Recording" : dlBad ? "No IMU data line" : "Connected",
+      [`${dev ? dev.product : cfg.device} · ${(+cfg.rate / 1000).toFixed(0)} kHz`, dlText].filter(Boolean).join(" · ") +
+      (dlBad ? " (Teensy pin 1 → terminal 65, GND → 82)" : ""), rec);
+  }
   else tile("stDaq", "warn", "Starting…", `${cfg.device}`);
   // IMU
   const pods = s.pods || [];
@@ -704,9 +714,16 @@ function applyTiles(s) {
     else tile("stSync", "ok", "Locked", `${sm.matched.toLocaleString()} frames matched` +
       (sm.resid_sd_us !== null ? ` · ±${sm.resid_sd_us} µs` : ""), true);
   } else if (rec) tile("stSync", "warn", "PC clock only", pc || "no DAQ in this recording", true);
+  else if (s.hello && s.hello.proto === "sidlab") {
+    // SID Lab firmware: SYNC pulses run all the time (frame-coded widths); no PC ping clock
+    if (!daqOk) tile("stSync", "warn", "No DAQ", "SYNC (AI31) and the data line need the DAQ");
+    else if (lv.sync_hi < 2.0) tile("stSync", "bad", "No SYNC pulses", `${cfg.sync_chan}: check Teensy pin 2 → terminal 59`);
+    else if (ls && ls.daq_sync && !ls.daq_sync.ok) tile("stSync", "bad", "Ready · last FAIL", ls.daq_sync.reason || "");
+    else tile("stSync", "ok", "Ready", ["SYNC pulses on " + cfg.sync_chan, last].filter(Boolean).join(" · "));
+  }
   else if (!c.n) tile("stSync", "", "Waiting", "needs the board connected");
   else if (!daqOk) tile("stSync", "warn", "PC clock only", [pc, last].filter(Boolean).join(" · "));
-  else if (lv.sync_hi > 1.0) tile("stSync", "warn", "Check SYNC wire", `ai0 not low while idle (${lv.sync_hi.toFixed(1)} V)`);
+  else if (lv.sync_hi > 1.0) tile("stSync", "warn", "Check SYNC wire", `${cfg.sync_chan} not low while idle (${lv.sync_hi.toFixed(1)} V)`);
   else if (ls && ls.daq_sync && !ls.daq_sync.ok) tile("stSync", "bad", "Ready · last FAIL", pc + " · DAQ ready");
   else tile("stSync", "ok", "Ready", [pc, "DAQ ready", last].filter(Boolean).join(" · "));
   // Cameras (GoPro)
@@ -1069,6 +1086,7 @@ function applyStatus(s) {
   applyGopro(s.gopro, st);
   // summary banner after a recording
   if (prevState === "stopping" && st !== "stopping" && s.last_summary) { showSummary(s.last_summary); loadSessions(true); }
+  if (window.onWorkflowStatus) onWorkflowStatus(s, prevState);
 }
 
 // GoPro videos copied from the SD cards -> trial folders (dry run, confirm, then copy in the background)
@@ -1263,6 +1281,7 @@ function addLog(items) {
 }
 
 // ---------------- static calibration (step 3) ----------------
+let calShown = false;
 let calSecs = +LS.get("calSecs", 5), calApplied = LS.get("calApplied", ""), calRenderKey = "";
 
 async function runCalibration() {
@@ -1380,8 +1399,8 @@ function applyCalToViews(cur) {
     const names = Object.keys(sc.q0);
     if (!sc.map && names.length >= 2) {
       sc.map = {};                                // pods named after their segment map to it
-      for (const s of ["T1", "T7", "T12", "L3", "L5", "S2"]) if (names.includes(s)) sc.map[s] = s;
-      if (!sc.map.T7 || !sc.map.T12) sc.map = { T7: names[0], T12: names[1] };
+      for (const s of ["C7", "T3", "T6", "T9", "T11", "L1", "L3", "S1"]) if (names.includes(s)) sc.map[s] = s;
+      if (!sc.map.T6 || !sc.map.T11) sc.map = { T6: names[0], T11: names[1] };
     }
     sc.when = new Date().toISOString();
     localStorage.setItem("spineCal", JSON.stringify(sc));
@@ -1401,8 +1420,8 @@ function applyCalib(s) {
   const c = s.calib || {}, cur = c.current, att = c.attempt;
   const subj = $("subject").value.trim();
   $("calProg").classList.toggle("hidden", !c.running);
-  if (c.running && $("step3").classList.contains("min")) setStep(3, false);   // show the countdown
-  if (c.running && $("setupGroup").classList.contains("min")) setSetup(false);
+  if (c.running && !calShown && window.showRoute) showRoute("equip-imu");   // show the countdown once
+  calShown = !!c.running;
   if (c.running) {
     const f = c.seconds ? 1 - c.remaining_s / c.seconds : 0;
     $("calBar").style.width = `${Math.max(0, Math.min(100, f * 100)).toFixed(0)}%`;
@@ -1456,11 +1475,10 @@ function runBend() {
   if (!bendAllowed()) { toast(S ? `Not now: ${S.state}` : "Server not connected", true); return; }
   if (bend) return;
   if (!sc || !sc.q0 || Object.keys(sc.q0).length < 2) { toast("Do the static calibration first", true); return; }
-  const names = sc.map ? [sc.map.T7, sc.map.T12] : Object.keys(sc.q0).slice(0, 2);
+  const names = sc.map ? [sc.map.T6, sc.map.T11] : Object.keys(sc.q0).slice(0, 2);
   if (!names.every((n) => sc.q0[n] && pods.has(n) && pods.get(n).q)) { toast("No live data from both IMUs", true); return; }
   bend = { until: performance.now() + BEND_SECS * 1000, samples: Object.fromEntries(names.map((n) => [n, []])) };
-  if ($("step3").classList.contains("min")) setStep(3, false);
-  if ($("setupGroup").classList.contains("min")) setSetup(false);
+  if (window.showRoute) showRoute("equip-imu");
   $("bendProg").classList.remove("hidden");
   $("btnBend").disabled = true;
   applyBend();
@@ -1787,7 +1805,7 @@ function wireCalib() {
 async function startRec() {
   saveForm();
   if (!$("subject").value.trim() || !$("taskSel").value) {
-    toast(!$("subject").value.trim() ? "Enter the subject first (step 2)" : "Pick a task first", true);
+    toast(!$("subject").value.trim() ? "Enter the subject first (1 · Session)" : "Pick a task first (5 · Task recording)", true);
     return;
   }
   const t = TASKS.find((x) => x.key === $("taskSel").value) || {};
@@ -1815,7 +1833,7 @@ async function loadPorts() {
 }
 
 function daqCfgFromForm() {
-  return { enabled: $("daqEnabled").checked, device: $("daqDevice").value, sync_chan: $("daqSync").value.trim() || "ai0",
+  return { enabled: $("daqEnabled").checked, device: $("daqDevice").value, sync_chan: $("daqSync").value.trim() || "ai31",
     rate: +$("daqRate").value, terminal: $("daqTerm").value, range: +$("daqRange").value, extra_chans: $("daqExtra").value.trim() };
 }
 
@@ -1923,8 +1941,6 @@ function wire() {
   }
   for (const t of document.querySelectorAll(".stile")) t.onclick = () => goTo(t.dataset.go);
   wireFolds();
-  wireSteps();
-  wireSetup();
   wireSpine();
   wireCalib();
   wireParticipant();
@@ -1957,9 +1973,11 @@ function wireSpine() {
   syncSpineCal();
   const mq = matchMedia("(min-width: 1780px)"), fr = $("spineFrame");
   const apply = () => {
-    if (mq.matches && fr.dataset.on !== "1") { fr.dataset.on = "1"; fr.src = "/spine?embed=1"; }
-    else if (!mq.matches && fr.dataset.on === "1") { fr.dataset.on = "0"; fr.src = "about:blank"; }
+    const want = mq.matches && document.body.dataset.route === "record";   // only on the Task recording page
+    if (want && fr.dataset.on !== "1") { fr.dataset.on = "1"; fr.src = "/spine?embed=1"; }
+    else if (!want && fr.dataset.on === "1") { fr.dataset.on = "0"; fr.src = "about:blank"; }
   };
+  window.spineApply = apply;
   mq.addEventListener("change", apply);
   apply();
   // model options (same controls as the Spine view's "Model" card), sent to the embedded view

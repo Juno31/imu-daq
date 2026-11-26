@@ -5,6 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>EMG Normalization</title>
 <link rel="stylesheet" href="/static/app.css">
+<link rel="stylesheet" href="/static/workflow.css">
 <link rel="stylesheet" href="/static/emg.css">
 </head>
 <body>
@@ -12,9 +13,8 @@
   <div class="brand"><span class="logo">◆</span> EMG normalization</div>
   <div class="chip" id="connChip"><span class="dot" id="connDot"></span><span id="connText">Connecting…</span></div>
   <div class="badge" id="stateBadge">—</div>
+  <nav class="flownav" id="flowNav" aria-label="Experiment steps"></nav>
   <div class="spacer"></div>
-  <a class="chip linkchip" href="/">← Acquisition</a>
-  <a class="chip linkchip" href="/review">Review</a>
 </header>
 
 <div class="banner hidden" id="banner"></div>
@@ -131,5 +131,7 @@
 <div class="toasts" id="toasts" role="status" aria-live="polite"></div>
 <script src="/static/stream.js"></script>
 <script src="/static/emg.js"></script>
+<script src="/static/nav.js"></script>
+<script>FlowNav.mount(document.getElementById("flowNav"), "mvc");</script>
 </body>
 </html>

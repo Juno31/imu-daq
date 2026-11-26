@@ -1,25 +1,34 @@
-"""EMG channel map: which DAQ input records which muscle.
+"""DAQ channel map: which NI USB-6363 input records what.
 
-Differential wiring on the USB-6363: channel aiN uses pin AI N (+) and AI N+8 (-),
-e.g. ai16 = AI 16 (+) / AI 24 (-). Edit this table if the electrode layout changes.
+SID Lab spine brace (handover 2026-11-25, see the senior's SETUP.md and config/sensors.json):
+  * EMG single-ended (RSE, +-5 V): EMG 1..8 = AI16..AI23 = terminals 33, 36, 39, 42, 49, 52, 55, 58.
+    EMG 1-6 are the senior's map; EMG 7/8 (external oblique) were added on 2026-11-26 in the same pattern.
+  * SYNC from Teensy pin 2 = AI31 (terminal 59). Its pulse width carries the frame number.
+  * IMU data packets from Teensy pin 1 (TX1) = P0.0 (terminal 65), read as a digital line.
+  * Teensy GND = D GND (terminal 82): required.
+Edit this table if the electrode layout changes (sites can also be re-assigned per session).
 """
+
+SYNC_CHAN = "ai31"
+TERMINAL = "RSE"
+DATA_LINE = "port0/line0"          # P0.0; "" = do not record the IMU data line
 
 EMG_CHANNELS = [
     # (DAQ channel, name, muscle, side, group)
-    ("ai16", "EMG01", "Lumbar erector spinae", "L", "Lumbar extensor group"),
-    ("ai17", "EMG02", "Lumbar erector spinae", "R", "Lumbar extensor group"),
-    ("ai18", "EMG03", "Lumbar multifidus region", "L", "Deep lumbar extensor/stabilizer group"),
-    ("ai19", "EMG04", "Lumbar multifidus region", "R", "Deep lumbar extensor/stabilizer group"),
-    ("ai20", "EMG05", "External oblique", "L", "Abdominal oblique group"),
-    ("ai21", "EMG06", "External oblique", "R", "Abdominal oblique group"),
-    ("ai22", "EMG07", "Internal oblique", "L", "Internal oblique"),
-    ("ai23", "EMG08", "Internal oblique", "R", "Internal oblique"),
+    ("ai16", "EMG1", "Longissimus, L1 (2 fingers lateral)", "R", "R-LG"),
+    ("ai17", "EMG2", "Longissimus, L1 (2 fingers lateral)", "L", "L-LG"),
+    ("ai18", "EMG3", "Multifidus, L5 (line PSIS - L1)", "R", "R-MF"),
+    ("ai19", "EMG4", "Multifidus, L5 (line PSIS - L1)", "L", "L-MF"),
+    ("ai20", "EMG5", "Iliocostalis, L2 (1 finger medial to iliac line)", "R", "R-IL"),
+    ("ai21", "EMG6", "Iliocostalis, L2 (1 finger medial to iliac line)", "L", "L-IL"),
+    ("ai22", "EMG7", "External oblique", "R", "R-EO"),
+    ("ai23", "EMG8", "External oblique", "L", "L-EO"),
 ]
 
 DEFAULT_EXTRA = ",".join(c[0] for c in EMG_CHANNELS)
 
 
-def label(chan, sync_chan="ai0"):
+def label(chan, sync_chan=SYNC_CHAN):
     """Description of one DAQ channel for metadata and the GUI."""
     if chan == sync_chan:
         return {"chan": chan, "name": "SYNC", "muscle": "", "side": "", "group": "IMU frame pulses"}
