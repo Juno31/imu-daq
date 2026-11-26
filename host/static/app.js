@@ -1805,7 +1805,7 @@ function wireCalib() {
 async function startRec() {
   saveForm();
   if (!$("subject").value.trim() || !$("taskSel").value) {
-    toast(!$("subject").value.trim() ? "Enter the subject first (1 · Session)" : "Pick a task first (5 · Task recording)", true);
+    toast(!$("subject").value.trim() ? "Enter the subject first (2 · Session)" : "Pick a task first (6 · Task recording)", true);
     return;
   }
   const t = TASKS.find((x) => x.key === $("taskSel").value) || {};

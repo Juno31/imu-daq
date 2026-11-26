@@ -1,15 +1,15 @@
 "use strict";
 // Experiment workflow on the main page: one view per step, chosen by the URL hash.
-//   #session  #participant  #equip-conn  #equip-jig  #equip-imu  #equip-emg  #equip-daq  #record
+//   #conn  #session  #participant  #equip-jig  #equip-imu  #equip-emg  #equip-daq  #record
 // MVC / RVC (/emg) and Data review (/review) are their own pages; nav.js draws the bar for all of them.
 // The live sections (status tiles, IMU, EMG, Sync detail, Event log) exist once; each view has empty
 // "slots" and the router moves the sections into the slots of the view on screen.
 // Uses app.js globals: $, S, LS, api, toast, pods, setFold, FOLD_DEFAULT, applyParticipant, ...
 
-const ROUTES = ["session", "participant", "equip-conn", "equip-jig", "equip-imu", "equip-emg", "equip-daq", "record"];
-const EQUIP = ["equip-conn", "equip-jig", "equip-imu", "equip-emg", "equip-daq"];
-const EQUIP_NAME = { "equip-conn": "3a · Connections", "equip-jig": "3b · IMU jig", "equip-imu": "3c · IMU attachment",
-  "equip-emg": "3d · EMG attachment", "equip-daq": "3e · DAQ & sync" };
+const ROUTES = ["conn", "session", "participant", "equip-jig", "equip-imu", "equip-emg", "equip-daq", "record"];
+const EQUIP = ["equip-jig", "equip-imu", "equip-emg", "equip-daq"];
+const EQUIP_NAME = { "equip-jig": "4a · IMU jig", "equip-imu": "4b · IMU attachment",
+  "equip-emg": "4c · EMG attachment", "equip-daq": "4d · Time sync" };
 const SLOT_EL = {};                   // slot name -> live section element
 let ROUTE = null;
 let INFO = {};                        // /api/expinfo for the current date + subject
@@ -19,7 +19,7 @@ const whoKey = () => { const w = who(); return `${w.date}/${subjId(w.subject)}`;
 
 // ---------------- router ----------------
 function showRoute(r, push = true) {
-  if (!ROUTES.includes(r)) r = "session";
+  if (!ROUTES.includes(r)) r = "conn";
   const changed = r !== ROUTE;
   ROUTE = r;
   document.body.dataset.route = r;
@@ -46,8 +46,8 @@ function showRoute(r, push = true) {
   // equipment: previous / next buttons
   const i = EQUIP.indexOf(r);
   if (i >= 0) {
-    const prev = i ? `<a class="btn ghost" href="#${EQUIP[i - 1]}">‹ ${EQUIP_NAME[EQUIP[i - 1]]}</a>` : `<a class="btn ghost" href="#participant">‹ 2 · Participant</a>`;
-    const next = i < EQUIP.length - 1 ? `<a class="btn" href="#${EQUIP[i + 1]}">Next: ${EQUIP_NAME[EQUIP[i + 1]]} ›</a>` : `<a class="btn" href="/emg">Next: 4 · MVC / RVC ›</a>`;
+    const prev = i ? `<a class="btn ghost" href="#${EQUIP[i - 1]}">‹ ${EQUIP_NAME[EQUIP[i - 1]]}</a>` : `<a class="btn ghost" href="#participant">‹ 3 · Participant</a>`;
+    const next = i < EQUIP.length - 1 ? `<a class="btn" href="#${EQUIP[i + 1]}">Next: ${EQUIP_NAME[EQUIP[i + 1]]} ›</a>` : `<a class="btn" href="/emg">Next: 5 · MVC / RVC ›</a>`;
     $("equipNext").innerHTML = prev + next;
   }
   if (push && location.hash !== "#" + r) history.replaceState(null, "", "#" + r);
@@ -59,7 +59,7 @@ function showRoute(r, push = true) {
 }
 window.showRoute = showRoute;
 
-// ---------------- 1 · Session information ----------------
+// ---------------- 2 · Session information ----------------
 const SI = { start_time: "si_start", end_time: "si_end", protocol: "si_protocol", irb: "si_irb", location: "si_location",
   room: "si_room", weather: "si_wcond", outdoor_temp_c: "si_wtemp", outdoor_rh_pct: "si_whum", indoor_temp_c: "si_itemp",
   indoor_rh_pct: "si_ihum", surface: "si_surface", notes: "si_notes" };
@@ -109,7 +109,7 @@ function piDirty(on) {
 }
 async function saveInfo(kind, data) {
   const w = who();
-  if (!w.subject) { toast("Enter the subject ID first (1 · Session)", true); showRoute("session"); $("subject").focus(); return null; }
+  if (!w.subject) { toast("Enter the subject ID first (2 · Session)", true); showRoute("session"); $("subject").focus(); return null; }
   const j = await api("/api/expinfo", { date: w.date, subject: w.subject, kind, data });
   if (j.ok) INFO[kind] = j.data;
   return j.ok ? j : null;
@@ -142,7 +142,7 @@ function fillParticipant(d) {
   $("pi_bmi").value = bmi() ?? "";
 }
 async function saveParticipant() {
-  if (!$("subject").value.trim()) { toast("Enter the subject ID first (1 · Session)", true); showRoute("session"); return; }
+  if (!$("subject").value.trim()) { toast("Enter the subject ID first (2 · Session)", true); showRoute("session"); return; }
   applyParticipant();
   const d = collectParticipant();
   if (!d.consent_signed) toast("Informed consent is not ticked", "warn");
@@ -259,7 +259,7 @@ async function finishJig() {
   }
   out.ok = names.every((n) => out.imus[n].still_max_deg < 1.5 && out.imus[n].tilt_to_ref_deg < 3);
   renderJig(out);
-  if (!who().subject) { toast("Jig orientation measured, not saved: enter the subject ID (1 · Session) and capture again", "warn"); return; }
+  if (!who().subject) { toast("Jig orientation measured, not saved: enter the subject ID (2 · Session) and capture again", "warn"); return; }
   const j = await saveInfo("jig_alignment", out);
   if (j) { toast(`Jig orientation saved (${names.length} IMUs) · ${j.path}`, out.ok ? undefined : "warn"); updateMarks(); }
 }
@@ -290,7 +290,7 @@ function renderJig(o) {
 let special = null;                    // {task, session, stopAt}
 async function startSpecial(task, name, secs) {
   const w = who();
-  if (!w.subject) { toast("Enter the subject ID first (1 · Session)", true); return; }
+  if (!w.subject) { toast("Enter the subject ID first (2 · Session)", true); return; }
   if (!S || S.state !== "idle") { toast(S ? `Not now: ${S.state}` : "Server not connected", true); return; }
   let trial = 1;
   try { trial = (await (await fetch("/api/next_trial?" + new URLSearchParams({ date: w.date, subject: w.subject, task }))).json()).trial || 1; } catch { }
@@ -382,7 +382,7 @@ function renderEmgCheck() {
   const ch = (S && S.emg && S.emg.chans) || [];
   if (!ch.length) {
     chkBuilt.emg = "";
-    $("emgCheck").innerHTML = `<p class="cap">No live EMG. ${S && S.daq && !S.daq.preview_on && S.state !== "recording" ? "Press <b>Preview</b> in the EMG section below." : "Check the DAQ (3a · Connections)."}</p>`;
+    $("emgCheck").innerHTML = `<p class="cap">No live EMG. ${S && S.daq && !S.daq.preview_on && S.state !== "recording" ? "Press <b>Preview</b> in the EMG section below." : "Check the DAQ (1 · Connections)."}</p>`;
     $("emgChkPill").textContent = "NO SIGNAL"; $("emgChkPill").className = "pill bad";
     return false;
   }
@@ -430,13 +430,13 @@ async function saveChecklist() {
   if (j) { chkDirty.imu = chkDirty.emg = false; toast("Checklist saved: " + j.path); }
 }
 function renderChecks() {
-  if (ROUTE === "equip-conn" && window.connRender) connRender();
+  if (ROUTE === "conn") { if (window.connRender) connRender(); if (window.connTestRender) connTestRender(); }
   if (ROUTE === "equip-imu") renderImuCheck();
   if (ROUTE === "equip-emg") renderEmgCheck();
   if (ROUTE === "equip-jig") jigRefOptions();
 }
 
-// ---------------- 3e · time sync test ----------------
+// ---------------- 4d · time sync test ----------------
 let syncSecs = +LS.get("syncSecs", 10);
 function renderSyncResult(r) {
   const p = $("syncTestPill");
@@ -471,7 +471,7 @@ function updateMarks() {
     const ch = (S.emg && S.emg.chans) || [];
     FlowNav.mark("equip-emg", have && ch.length > 0 && ch.every((c) => emgState(c)[0] !== "bad" && CHK.emg[c.chan] && CHK.emg[c.chan].prep && CHK.emg[c.chan].placed));
     const st = LS.get("syncTest", null);
-    FlowNav.mark("equip-daq", have && $("step1").classList.contains("done") && !!(st && st.key === whoKey() && st.ok));
+    FlowNav.mark("equip-daq", have && !!(st && st.key === whoKey() && st.ok));
   }
   FlowNav.mark("mvc", have && !!INFO.emg_norm);
   FlowNav.mark("record", have && (INFO.trials || []).some((t) => !/_(static_cal|synctest|jigcal|emg_[a-z]+)_trial/.test(t)));
@@ -496,7 +496,7 @@ window.onWorkflowStatus = (s, prev) => {
         LS.set("syncTest", r);
         renderSyncResult(r);
         setText("syncTestLeft", "");
-        toast(ok ? "Sync test PASS" : "Sync test FAIL: see 3e · DAQ & sync", ok ? undefined : true);
+        toast(ok ? "Sync test PASS" : "Sync test FAIL: see 4d · Time sync", ok ? undefined : true);
       } else if (special.task === "jigcal") {
         setText("jigRecInfo", `saved ${sm.session} · ${sm.duration_s ?? 0} s · press Analyse latest`);
       }
@@ -519,7 +519,7 @@ function seg(id, cur, set) {
 function wireWorkflow() {
   SLOT_EL.tiles = document.querySelector("#parking .statusrow");
   SLOT_EL.imu = $("foldImu"); SLOT_EL.emg = $("emgCard"); SLOT_EL.sync = $("syncCard"); SLOT_EL.log = $("foldLog");
-  FlowNav.mount($("flowNav"), "session", $("equipSubs"));
+  FlowNav.mount($("flowNav"), "conn", $("equipSubs"));
   // participant form: own Save buttons (app.js "Apply" text is replaced)
   participantDirty = () => { };                       // eslint-disable-line no-global-assign
   $("btnSessSave").onclick = saveSession;
@@ -560,8 +560,8 @@ function wireWorkflow() {
   $("tpTake").onclick = () => { showRoute("record"); const el = $("label"); el.focus(); el.select(); };
   window.addEventListener("hashchange", () => showRoute(location.hash.slice(1), false));
   window.addEventListener("beforeunload", (e) => { if (siIsDirty || piIsDirty) { e.preventDefault(); e.returnValue = ""; } });
-  const start = location.hash.slice(1) || LS.get("route", "session");
-  showRoute(ROUTES.includes(start) ? start : "session");
+  const start = location.hash.slice(1) || LS.get("route", "conn");
+  showRoute(ROUTES.includes(start) ? start : "conn");
   loadInfo(true);
 }
 wireWorkflow();

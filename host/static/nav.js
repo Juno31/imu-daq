@@ -1,16 +1,17 @@
-// Experiment workflow bar, shared by every page: 1 Session · 2 Participant · 3 Equipment · 4 MVC/RVC ·
-// 5 Task recording · 6 Data review. Steps 1-3 and 5 are views of the main page (/#route), 4 and 6 are
+// Experiment workflow bar, shared by every page: 1 Connections · 2 Session · 3 Participant · 4 Equipment ·
+// 5 MVC/RVC · 6 Task recording · 7 Data review. Steps 1-4 and 6 are views of the main page (/#route), 5 and 7 are
 // their own pages. Each page writes what is done into localStorage "imudaq.flow"; every page shows it.
 (function () {
   const STEPS = [
-    { key: "session", n: 1, label: "Session", href: "/#session" },
-    { key: "participant", n: 2, label: "Participant", href: "/#participant" },
-    { key: "equip", n: 3, label: "Equipment", href: "/#equip-conn",
-      subs: [["equip-conn", "a", "Connections"], ["equip-jig", "b", "IMU jig"], ["equip-imu", "c", "IMU attach"],
-        ["equip-emg", "d", "EMG attach"], ["equip-daq", "e", "DAQ & sync"]] },
-    { key: "mvc", n: 4, label: "MVC / RVC", href: "/emg" },
-    { key: "record", n: 5, label: "Task recording", href: "/#record" },
-    { key: "review", n: 6, label: "Data review", href: "/review" },
+    { key: "conn", n: 1, label: "Connections", href: "/#conn" },
+    { key: "session", n: 2, label: "Session", href: "/#session" },
+    { key: "participant", n: 3, label: "Participant", href: "/#participant" },
+    { key: "equip", n: 4, label: "Equipment", href: "/#equip-jig",
+      subs: [["equip-jig", "a", "IMU jig"], ["equip-imu", "b", "IMU attach"],
+        ["equip-emg", "c", "EMG attach"], ["equip-daq", "d", "Time sync"]] },
+    { key: "mvc", n: 5, label: "MVC / RVC", href: "/emg" },
+    { key: "record", n: 6, label: "Task recording", href: "/#record" },
+    { key: "review", n: 7, label: "Data review", href: "/review" },
   ];
   const read = () => { try { return JSON.parse(localStorage.getItem("imudaq.flow") || "{}") || {}; } catch { return {}; } };
 
@@ -34,12 +35,13 @@
     }).join('<i class="fsep">›</i>');
   }
 
-  // sub-tabs of step 3 (only on the main page)
+  // sub-tabs of step 4 Equipment (only on the main page)
   function renderSubs(el, current) {
     const done = read();
-    el.innerHTML = STEPS[2].subs.map(([k, l, name]) =>
+    const eq = STEPS.find((s) => s.key === "equip");
+    el.innerHTML = eq.subs.map(([k, l, name]) =>
       `<a class="esub${k === current ? " cur" : ""}${done[k] ? " done" : ""}" href="/#${k}">` +
-      `<span class="fn">${done[k] ? "✓" : "3" + l}</span>${name}</a>`).join("");
+      `<span class="fn">${done[k] ? "✓" : eq.n + l}</span>${name}</a>`).join("");
   }
 
   window.FlowNav = {

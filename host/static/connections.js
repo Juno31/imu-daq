@@ -1,5 +1,5 @@
 "use strict";
-// 3a · Connections: live pin-out of the SID Lab spine brace (teensy_spine_imu, handover 2026-11-25).
+// 1 · Connections: live pin-out of the SID Lab spine brace (teensy_spine_imu, handover 2026-11-25).
 // Every wire and part of the real wiring is drawn pin by pin and coloured by what the live data says about it:
 //   Teensy USB, Teensy -> DAQ (pin 1 data -> P0.0 / 65, pin 2 SYNC -> AI31 / 59, GND -> D GND / 82),
 //   Wire (19/18) -> Mux B -> T11 L1 L3 S1, Wire1 (17/16) -> Mux A -> C7 T3 T6 T9, EMG 1-8 -> AI16-23.
@@ -367,7 +367,6 @@
     const pill = $("connPill");
     pill.textContent = all ? "ALL CONNECTED" : `IMU ${imu}/8 · EMG ${emg}/${EMG.length} · DAQ ${daq}/3`;
     pill.className = "pill " + (all ? "ok" : imu + emg + daq ? "warn" : "bad");
-    if (window.FlowNav) FlowNav.mark("equip-conn", all);
     const order = ["usb", "busB", "busA", ...ORDER.map((n) => "imu_" + n), "daq", "sync", "data", "gnd", ...EMG.map(([c]) => "emg_" + c)];
     const probs = order.filter((k) => ST[k] && (ST[k].s === "bad" || ST[k].s === "warn") && !/BUS DOWN/.test(ST[k].badge));
     const key = probs.map((k) => k + ST[k].s + ST[k].badge).join("|");
@@ -416,6 +415,8 @@
     compute();
     paint();
   };
+  // conntest.js grades its automatic tests from these states
+  window.connEval = () => { compute(); return { ST, ORDER, EMG, rate }; };
   function wire() {
     $("btnConnScan").onclick = () => scan(false);
     $("btnConnStatus").onclick = async () => { const j = await api("/api/podstatus"); if (j.ok) toast("Asked the firmware for its status (see the event log)"); };

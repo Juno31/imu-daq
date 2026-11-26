@@ -89,3 +89,17 @@
 .cx-legend { display: flex; flex-wrap: wrap; gap: 4px 12px; font-size: 11.5px; color: var(--text-2); }
 .cx-legend .sw { display: inline-block; width: 16px; height: 6px; border-radius: 3px; margin-right: 5px; vertical-align: middle; background: var(--idle); opacity: .5; }
 .cx-legend .sw.st-ok { background: var(--ok); } .cx-legend .sw.st-warn { background: var(--warn); } .cx-legend .sw.st-bad { background: var(--bad); }
+
+/* 1 · Connection check: automatic tests */
+.ct-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 12px; margin-bottom: 14px; }
+.ct-card h2 { display: flex; align-items: center; gap: 8px; }
+.ct-card .spacer { flex: 1; }
+.ct-list { list-style: none; margin: 6px 0 0; padding: 0; }
+.ct-list li { display: grid; grid-template-columns: 12px 1fr auto; gap: 2px 8px; align-items: center; padding: 3px 0; border-top: 1px solid var(--line, #e5e5e5); font-size: 13px; }
+.ct-dot { width: 10px; height: 10px; border-radius: 50%; background: #999; }
+.ct-pass .ct-dot { background: var(--ok); } .ct-warn .ct-dot { background: var(--warn); }
+.ct-fail .ct-dot { background: var(--bad); } .ct-skip .ct-dot { background: transparent; border: 1.5px solid #999; }
+.ct-b { font: 600 11px/1.4 ui-monospace, monospace; padding: 0 6px; border-radius: 8px; background: rgba(127,127,127,.12); }
+.ct-fail .ct-b { color: var(--bad); } .ct-warn .ct-b { color: var(--warn); } .ct-pass .ct-b { color: var(--ok); }
+.ct-fix { grid-column: 2 / 4; margin: 0; font-size: 12px; opacity: .85; }
+.ct-when { margin: 0; min-height: 1em; }

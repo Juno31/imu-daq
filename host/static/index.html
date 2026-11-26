@@ -35,7 +35,7 @@
       <label class="tgl"><input type="checkbox" id="spRibs"> Ribs</label>
       <label class="tgl"><input type="checkbox" id="spTrail"> T6 trail</label>
     </div>
-    <p class="hint" id="spHeightHint">Height: set it in step 2 · Participant</p>
+    <p class="hint" id="spHeightHint">Height: set it in step 3 · Participant</p>
   </div>
 </aside>
 <main class="layout">
@@ -146,9 +146,74 @@
   </section>
   </div>
 
-  <!-- ================= 1 · Session information ================= -->
+
+  <!-- ================= 1 · Connection check ================= -->
+  <section class="view" data-view="conn">
+    <div class="viewhead"><span class="stepn">1</span><h1>Connection check</h1>
+      <span class="hint">automatic test per device · run before the participant arrives</span>
+      <span class="spacer"></span><span class="pill" id="connAllPill">NOT RUN</span>
+      <button class="btn" id="btnConnAll">▶ Run all</button></div>
+    <div class="ct-grid">
+      <section class="card stepcard ct-card" id="ct_board">
+        <h2>Board · Teensy <span class="pill ct-pill">NOT RUN</span><span class="spacer"></span>
+          <button class="btn small ct-run" data-test="board">▶ Test</button></h2>
+        <p class="cap">USB port found, SID Lab firmware, steady frame rate.</p>
+        <p class="hint ct-when"></p>
+        <ul class="ct-list"></ul>
+      </section>
+      <section class="card stepcard ct-card" id="ct_daq">
+        <h2>DAQ · NI USB-6363 <span class="pill ct-pill">NOT RUN</span><span class="spacer"></span>
+          <button class="btn small ct-run" data-test="daq">▶ Test</button></h2>
+        <p class="cap">Device found, SYNC on AI31 (59), IMU data on P0.0 (65), GND (82).</p>
+        <p class="hint ct-when"></p>
+        <ul class="ct-list"></ul>
+      </section>
+      <section class="card stepcard ct-card" id="ct_imu">
+        <h2>IMUs · BNO086 <span class="pill ct-pill">NOT RUN</span><span class="spacer"></span>
+          <button class="btn small ct-run" data-test="imu">▶ Test</button></h2>
+        <p class="cap">Re-scans both I²C buses, then checks every IMU. Resets the heading: run before the jig step.</p>
+        <p class="hint ct-when"></p>
+        <ul class="ct-list"></ul>
+      </section>
+      <section class="card stepcard ct-card" id="ct_emg">
+        <h2>EMG <span class="pill ct-pill">NOT RUN</span><span class="spacer"></span>
+          <button class="btn small ct-run" data-test="emg">▶ Test</button></h2>
+        <p class="cap">Every EMG channel present on the DAQ and its signal plausible.</p>
+        <p class="hint ct-when"></p>
+        <ul class="ct-list"></ul>
+      </section>
+    </div>
+    <div class="stephead" id="step1" data-step="1"><b>Devices</b>
+      <span class="hint">live status · click a tile for detail</span></div>
+    <div class="slot" data-slot="tiles"></div>
+      <section class="card stepcard cx-card">
+        <h2>Connections · live pin-out <span class="pill" id="connPill">—</span>
+          <span class="spacer"></span>
+          <span class="hint" id="connScan"></span>
+          <button class="btn small" id="btnConnScan" title="Firmware 'r': restarts every IMU and prints, per IMU, OK or why not (keeps the heading; idle only)">↻ Re-scan IMUs</button>
+          <button class="btn small ghost" id="btnConnStatus" title="Firmware 's': one status line per IMU in the event log">Firmware status</button>
+          <button class="btn small ghost" id="btnConnPreview" title="The DAQ preview checks SYNC, the data line and the EMG inputs">DAQ preview</button></h2>
+        <div class="cx-grid">
+          <div class="cx-map" id="connMap"></div>
+          <aside class="cx-side">
+            <div class="cx-detail hidden" id="connDetail"></div>
+            <h3>Check first</h3>
+            <ul class="cx-probs" id="connProblems"></ul>
+            <div class="cx-legend">
+              <span><i class="sw st-ok"></i>working</span><span><i class="sw st-warn"></i>marginal</span>
+              <span><i class="sw st-bad"></i>broken</span><span><i class="sw st-unk"></i>no evidence yet</span>
+            </div>
+            <p class="hint">Click a wire or part for its evidence. Mux B is drawn above Mux A (pin order on the Teensy). All pins 3.3 V only.</p>
+          </aside>
+        </div>
+      </section>
+    <div class="slot" data-slot="log"></div>
+    <div class="viewnext"><a class="btn" href="#session">Next: 2 · Session ›</a></div>
+  </section>
+
+  <!-- ================= 2 · Session information ================= -->
   <section class="view" data-view="session">
-    <div class="viewhead"><span class="stepn">1</span><h1>Session information</h1>
+    <div class="viewhead"><span class="stepn">2</span><h1>Session information</h1>
       <span class="hint">who, where, when, conditions · saved in the subject folder and copied into every trial</span></div>
     <div class="formgrid">
       <section class="card stepcard">
@@ -202,12 +267,12 @@
           <button class="btn" id="btnSessSave">Save session</button></div>
       </section>
     </div>
-    <div class="viewnext"><a class="btn" href="#participant">Next: 2 · Participant ›</a></div>
+    <div class="viewnext"><a class="btn" href="#participant">Next: 3 · Participant ›</a></div>
   </section>
 
-  <!-- ================= 2 · Participant information ================= -->
+  <!-- ================= 3 · Participant information ================= -->
   <section class="view" data-view="participant">
-    <div class="viewhead"><span class="stepn">2</span><h1>Participant information</h1>
+    <div class="viewhead"><span class="stepn">3</span><h1>Participant information</h1>
       <span class="hint" id="piWho"></span></div>
     <div class="formgrid">
       <section class="card stepcard" id="step2" data-step="2">
@@ -257,40 +322,15 @@
         </div>
       </section>
     </div>
-    <div class="viewnext"><a class="btn ghost" href="#session">‹ 1 · Session</a><a class="btn" href="#equip-conn">Next: 3 · Equipment ›</a></div>
+    <div class="viewnext"><a class="btn ghost" href="#session">‹ 2 · Session</a><a class="btn" href="#equip-jig">Next: 4 · Equipment ›</a></div>
   </section>
 
-  <!-- ================= 3 · Equipment configuration ================= -->
+  <!-- ================= 4 · Equipment configuration ================= -->
   <section class="view" data-view="equip">
-    <div class="viewhead"><span class="stepn">3</span><h1>Equipment configuration</h1>
+    <div class="viewhead"><span class="stepn">4</span><h1>Equipment configuration</h1>
       <nav class="esubs" id="equipSubs"></nav></div>
 
-    <!-- 3a: live connections (pin-out) -->
-    <div class="sub" data-sub="equip-conn">
-      <section class="card stepcard cx-card">
-        <h2>Connections · live pin-out <span class="pill" id="connPill">—</span>
-          <span class="spacer"></span>
-          <span class="hint" id="connScan"></span>
-          <button class="btn small" id="btnConnScan" title="Firmware 'r': restarts every IMU and prints, per IMU, OK or why not (keeps the heading; idle only)">↻ Re-scan IMUs</button>
-          <button class="btn small ghost" id="btnConnStatus" title="Firmware 's': one status line per IMU in the event log">Firmware status</button>
-          <button class="btn small ghost" id="btnConnPreview" title="The DAQ preview checks SYNC, the data line and the EMG inputs">DAQ preview</button></h2>
-        <div class="cx-grid">
-          <div class="cx-map" id="connMap"></div>
-          <aside class="cx-side">
-            <div class="cx-detail hidden" id="connDetail"></div>
-            <h3>Check first</h3>
-            <ul class="cx-probs" id="connProblems"></ul>
-            <div class="cx-legend">
-              <span><i class="sw st-ok"></i>working</span><span><i class="sw st-warn"></i>marginal</span>
-              <span><i class="sw st-bad"></i>broken</span><span><i class="sw st-unk"></i>no evidence yet</span>
-            </div>
-            <p class="hint">Click a wire or part for its evidence. Mux B is drawn above Mux A (pin order on the Teensy). All pins 3.3 V only.</p>
-          </aside>
-        </div>
-      </section>
-    </div>
-
-    <!-- 3b: IMU jig -->
+    <!-- 4a: IMU jig -->
     <div class="sub" data-sub="equip-jig">
       <div class="formgrid">
         <section class="card stepcard">
@@ -322,7 +362,7 @@
       <div class="slot" data-slot="imu"></div>
     </div>
 
-    <!-- 3c: IMU attachment -->
+    <!-- 4b: IMU attachment -->
     <div class="sub" data-sub="equip-imu">
       <div class="formgrid">
         <section class="card stepcard">
@@ -358,7 +398,7 @@
       <div class="slot" data-slot="imu"></div>
     </div>
 
-    <!-- 3d: EMG attachment -->
+    <!-- 4c: EMG attachment -->
     <div class="sub" data-sub="equip-emg">
       <div class="formgrid">
         <section class="card stepcard wide">
@@ -374,11 +414,8 @@
       <div class="slot" data-slot="emg"></div>
     </div>
 
-    <!-- 3e: DAQ connection & time sync -->
+    <!-- 4d: time sync test -->
     <div class="sub" data-sub="equip-daq">
-      <div class="stephead" id="step1" data-step="1"><b>Devices</b>
-        <span class="hint">all green before the participant arrives · click a tile for detail</span></div>
-      <div class="slot" data-slot="tiles"></div>
       <div class="formgrid">
         <section class="card stepcard wide">
           <h2>Time sync test <span class="pill" id="syncTestPill">NOT RUN</span></h2>
@@ -398,11 +435,11 @@
     <div class="viewnext" id="equipNext"></div>
   </section>
 
-  <!-- ================= 5 · Task recording ================= -->
+  <!-- ================= 6 · Task recording ================= -->
   <section class="view" data-view="record">
     <div class="slot" data-slot="tiles"></div>
   <section class="card stepcard recmain" id="step4" data-step="4">
-    <h2><span class="stepn">5</span>Record trials</h2>
+    <h2><span class="stepn">6</span>Record trials</h2>
     <div class="rm-grid">
       <div class="rm-col rm-task">
         <div class="taskrow">
@@ -420,7 +457,7 @@
     <div class="slot" data-slot="emg"></div>
     <div class="slot" data-slot="sync"></div>
     <div class="slot" data-slot="log"></div>
-    <div class="viewnext"><a class="btn ghost" href="/emg">‹ 4 · MVC / RVC</a><a class="btn" href="/review">Next: 6 · Data review ›</a></div>
+    <div class="viewnext"><a class="btn ghost" href="/emg">‹ 5 · MVC / RVC</a><a class="btn" href="/review">Next: 7 · Data review ›</a></div>
   </section>
 </main>
 
@@ -598,6 +635,7 @@
 <script src="/static/nav.js"></script>
 <script src="/static/app.js"></script>
 <script src="/static/connections.js"></script>
+<script src="/static/conntest.js"></script>
 <script src="/static/workflow.js"></script>
 </body>
 </html>
