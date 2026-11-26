@@ -1,5 +1,6 @@
 // Stage 1 - I2C map. Board: Teensy 4.1. No libraries needed.
-// Scans Wire (SDA 18 / SCL 19, mux A) and Wire1 (SDA1 17 / SCL1 16, mux B),
+// Scans Wire1 (SDA1 17 / SCL1 16, mux A) and Wire (SDA 18 / SCL 19, mux B),
+// wiring as in the senior's handover (hardware/wiring/teensy41_wiring.html),
 // then every channel of each mux. Prints the map every 3 s.
 // In each "ch" line, ignore 0x70 (the mux itself answers on its main bus)
 // and 0x6F (the Qwiic Button, if it sits on mux B's main bus).
@@ -54,7 +55,7 @@ void setup() {
 }
 
 void loop() {
-  mapBus(Wire, "Wire  (SDA 18, SCL 19) - mux A");
-  mapBus(Wire1, "Wire1 (SDA1 17, SCL1 16) - mux B");
+  mapBus(Wire1, "Wire1 (SDA1 17, SCL1 16) - mux A");
+  mapBus(Wire, "Wire  (SDA 18, SCL 19) - mux B");
   delay(3000);
 }

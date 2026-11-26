@@ -1,13 +1,13 @@
 <!doctype html>
 <html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Pilot system wiring</title><style>
+<title>SID Lab spine brace wiring</title><style>
 :root { --bg:#f6f7f6; --surface:#ffffff; --ink:#17201d; --muted:#5b6662; --line:#d5dcd9; --accent:#0b6870; --accent-soft:#e0eff0;
-  --w3:#d23a3a; --w5:#db7f12; --wg:#27302d; --wd:#2b67d1; --wc:#b08a00; --we:#17915a; --ws:#8446cf; --plug:#3b4441; }
+  --w3:#d23a3a; --w5:#db7f12; --wg:#27302d; --wd:#2b67d1; --wc:#b08a00; --we:#17915a; --ws:#8446cf; --wt:#0b8aa0; --wx:#8a9490; --plug:#3b4441; }
 @media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
   --bg:#111615; --surface:#1a201e; --ink:#e5ebe8; --muted:#9ba8a3; --line:#2e3835; --accent:#52b8c1; --accent-soft:#15302f;
-  --w3:#f26b6b; --w5:#f0a24a; --wg:#cfd6d3; --wd:#6c9df2; --wc:#e2bf3c; --we:#47c487; --ws:#b487f2; --plug:#8d9893; } }
+  --w3:#f26b6b; --w5:#f0a24a; --wg:#cfd6d3; --wd:#6c9df2; --wc:#e2bf3c; --we:#47c487; --ws:#b487f2; --wt:#3fc3d6; --wx:#7d8884; --plug:#8d9893; } }
 :root[data-theme="dark"] { --bg:#111615; --surface:#1a201e; --ink:#e5ebe8; --muted:#9ba8a3; --line:#2e3835; --accent:#52b8c1; --accent-soft:#15302f;
-  --w3:#f26b6b; --w5:#f0a24a; --wg:#cfd6d3; --wd:#6c9df2; --wc:#e2bf3c; --we:#47c487; --ws:#b487f2; --plug:#8d9893; }
+  --w3:#f26b6b; --w5:#f0a24a; --wg:#cfd6d3; --wd:#6c9df2; --wc:#e2bf3c; --we:#47c487; --ws:#b487f2; --wt:#3fc3d6; --wx:#7d8884; --plug:#8d9893; }
 html, body { margin:0; background:var(--bg); color:var(--ink); font:14px/1.45 "Segoe UI", system-ui, sans-serif; }
 main { max-width:1320px; margin:0 auto; padding:16px; }
 h1 { font-size:20px; margin:0 0 4px; } h2 { font-size:15px; margin:18px 0 6px; } p { margin:0 0 6px; color:var(--muted); }
@@ -21,573 +21,325 @@ svg text.pin { font-family:Consolas, monospace; font-size:10.5px; } svg text.pin
 svg text.pin8.b, svg text.pin.b { font-weight:700; fill:var(--ink); } svg text.lab { fill:var(--muted); font-style:italic; font-size:11.5px; }
 svg text.inv { fill:var(--surface); font-weight:700; } svg text.q { fill:var(--accent); font-weight:600; }
 svg text.t3 { fill:var(--w3); } svg text.t5 { fill:var(--w5); } svg text.tg { fill:var(--ink); } svg text.td { fill:var(--wd); }
-svg text.tc { fill:var(--wc); } svg text.te { fill:var(--we); } svg text.ts { fill:var(--ws); }
+svg text.tc { fill:var(--wc); } svg text.te { fill:var(--we); } svg text.ts { fill:var(--ws); } svg text.tt { fill:var(--wt); } svg text.tx { fill:var(--muted); }
 .pcb { fill:var(--bg); stroke:var(--ink); stroke-width:1.4; } .part { fill:var(--surface); stroke:var(--muted); stroke-width:1.1; }
 .part.fa { fill:var(--accent-soft); stroke:var(--accent); stroke-width:1.5; } .pad { fill:var(--surface); stroke:var(--ink); stroke-width:1.2; }
 .zone { fill:none; stroke:var(--line); stroke-width:1.2; stroke-dasharray:6 4; }
 .wago { fill:var(--surface); stroke:var(--muted); stroke-width:1.3; } .lever { fill:var(--line); stroke:var(--muted); stroke-width:1; }
 .daq { fill:var(--bg); stroke:var(--ink); stroke-width:1.3; } .screw { fill:var(--surface); stroke:var(--muted); stroke-width:1; }
 .res { fill:var(--surface); stroke:var(--wg); stroke-width:2; } .plug { fill:var(--plug); }
-.f3 { fill:var(--w3); } .f5 { fill:var(--w5); } .fg { fill:var(--wg); } .fd { fill:var(--wd); } .fc { fill:var(--wc); } .fe { fill:var(--we); } .fs { fill:var(--ws); }
-.pad.f3 { fill:var(--w3); } .pad.f5 { fill:var(--w5); } .pad.fg { fill:var(--wg); } .pad.fd { fill:var(--wd); } .pad.fc { fill:var(--wc); } .pad.fe { fill:var(--we); } .pad.fs { fill:var(--ws); }
+.f3 { fill:var(--w3); } .f5 { fill:var(--w5); } .fg { fill:var(--wg); } .fd { fill:var(--wd); } .fc { fill:var(--wc); } .fe { fill:var(--we); } .fs { fill:var(--ws); } .ft { fill:var(--wt); } .fx { fill:var(--wx); }
+.pad.f3 { fill:var(--w3); } .pad.f5 { fill:var(--w5); } .pad.fg { fill:var(--wg); } .pad.fd { fill:var(--wd); } .pad.fc { fill:var(--wc); } .pad.fe { fill:var(--we); } .pad.fs { fill:var(--ws); } .pad.ft { fill:var(--wt); } .pad.fx { fill:var(--wx); }
 .lever.f3, .lever.f5, .lever.fg, .lever.fe, .lever.fs { stroke:none; }
 .lever.f5 { fill:var(--w5); } .lever.fg { fill:var(--wg); } .lever.fe { fill:var(--we); } .lever.fs { fill:var(--ws); }
 .w { fill:none; stroke-width:2.4; stroke-linecap:round; stroke-linejoin:round; }
-.w3 { stroke:var(--w3); } .w5 { stroke:var(--w5); } .wg { stroke:var(--wg); } .wd { stroke:var(--wd); } .wc { stroke:var(--wc); } .we { stroke:var(--we); } .ws { stroke:var(--ws); }
+.w3 { stroke:var(--w3); } .w5 { stroke:var(--w5); } .wg { stroke:var(--wg); } .wd { stroke:var(--wd); } .wc { stroke:var(--wc); } .we { stroke:var(--we); } .ws { stroke:var(--ws); } .wt { stroke:var(--wt); } .wx { stroke:var(--wx); stroke-dasharray:7 5; }
 .qw { fill:none; stroke:var(--accent); stroke-width:5; stroke-linecap:round; stroke-linejoin:round; }
 .cab { fill:none; stroke:var(--muted); stroke-width:7; stroke-linecap:round; stroke-linejoin:round; }
 </style></head><body><main>
-<h1>Pilot system wiring · pin level</h1>
-<p>6 BNO086 on 2 muxes (3 each) · 8 MyoWare 2.0 in two thigh hubs · NI USB-6363 records EMG and SYNC. Pin map from the senior's pilot schematic (2026-11-19).</p>
-<div class="legend"><span><i style="border-color:var(--w3)"></i>3.3 V</span><span><i style="border-color:var(--w5)"></i>+5 V</span><span><i style="border-color:var(--wg)"></i>GND</span><span><i style="border-color:var(--wd)"></i>SDA</span><span><i style="border-color:var(--wc)"></i>SCL</span><span><i style="border-color:var(--we)"></i>EMG signal</span><span><i style="border-color:var(--ws)"></i>SYNC</span><span><i style="border-color:var(--accent);border-top-width:5px"></i>Qwiic cable</span><span><i style="border-color:var(--muted);border-top-width:6px"></i>Cat6</span></div>
-<h2>1 · Teensy, IMU bus, button</h2>
-<div class="dia"><svg viewBox="0 0 920 680" role="img" aria-label="Teensy 4.1 pin-level wiring to the Qwiic Button, two muxes and six BNO086" xmlns="http://www.w3.org/2000/svg">
-<rect class="pcb" x="70" y="470" width="592" height="128" rx="6"/>
-<rect class="part" x="56" y="510" width="38" height="48" rx="3"/>
-<text class="s" x="75" y="539" text-anchor="middle">USB</text>
-<rect class="part" x="526" y="500" width="108" height="68" rx="3"/>
-<text class="s" x="580" y="538" text-anchor="middle">microSD</text>
-<text class="b" x="366" y="540" text-anchor="middle">Teensy 4.1 · top view · logic hub</text>
-<circle class="pad f5" cx="88" cy="482" r="7.5"/>
-<text class="pin b t5" x="88" y="506" text-anchor="middle">VIN</text>
-<circle class="pad fg" cx="112" cy="482" r="7.5"/>
-<text class="pin b tg" x="112" y="506" text-anchor="middle">GND</text>
-<circle class="pad f3" cx="136" cy="482" r="7.5"/>
-<text class="pin b t3" x="136" y="506" text-anchor="middle">3V3</text>
-<circle class="pad" cx="160" cy="482" r="5"/>
-<text class="pin" x="160" y="506" text-anchor="middle">23</text>
-<circle class="pad" cx="184" cy="482" r="5"/>
-<text class="pin" x="184" y="506" text-anchor="middle">22</text>
-<circle class="pad" cx="208" cy="482" r="5"/>
-<text class="pin" x="208" y="506" text-anchor="middle">21</text>
-<circle class="pad" cx="232" cy="482" r="5"/>
-<text class="pin" x="232" y="506" text-anchor="middle">20</text>
-<circle class="pad fc" cx="256" cy="482" r="7.5"/>
-<text class="pin b tc" x="256" y="506" text-anchor="middle">19</text>
-<circle class="pad fd" cx="280" cy="482" r="7.5"/>
-<text class="pin b td" x="280" y="506" text-anchor="middle">18</text>
-<circle class="pad fd" cx="304" cy="482" r="7.5"/>
-<text class="pin b td" x="304" y="506" text-anchor="middle">17</text>
-<circle class="pad fc" cx="328" cy="482" r="7.5"/>
-<text class="pin b tc" x="328" y="506" text-anchor="middle">16</text>
-<circle class="pad" cx="352" cy="482" r="5"/>
-<text class="pin" x="352" y="506" text-anchor="middle">15</text>
-<circle class="pad" cx="376" cy="482" r="5"/>
-<text class="pin" x="376" y="506" text-anchor="middle">14</text>
-<circle class="pad" cx="400" cy="482" r="5"/>
-<text class="pin" x="400" y="506" text-anchor="middle">13</text>
-<circle class="pad fg" cx="424" cy="482" r="7.5"/>
-<text class="pin b tg" x="424" y="506" text-anchor="middle">GND</text>
-<circle class="pad" cx="448" cy="482" r="5"/>
-<text class="pin" x="448" y="506" text-anchor="middle">41</text>
-<circle class="pad" cx="472" cy="482" r="5"/>
-<text class="pin" x="472" y="506" text-anchor="middle">40</text>
-<circle class="pad" cx="496" cy="482" r="5"/>
-<text class="pin" x="496" y="506" text-anchor="middle">39</text>
-<circle class="pad" cx="520" cy="482" r="5"/>
-<text class="pin" x="520" y="506" text-anchor="middle">38</text>
-<circle class="pad" cx="544" cy="482" r="5"/>
-<text class="pin" x="544" y="506" text-anchor="middle">37</text>
-<circle class="pad" cx="568" cy="482" r="5"/>
-<text class="pin" x="568" y="506" text-anchor="middle">36</text>
-<circle class="pad" cx="592" cy="482" r="5"/>
-<text class="pin" x="592" y="506" text-anchor="middle">35</text>
-<circle class="pad" cx="616" cy="482" r="5"/>
-<text class="pin" x="616" y="506" text-anchor="middle">34</text>
-<circle class="pad" cx="640" cy="482" r="5"/>
-<text class="pin" x="640" y="506" text-anchor="middle">33</text>
-<circle class="pad fg" cx="88" cy="586" r="7.5"/>
-<text class="pin b tg" x="88" y="572" text-anchor="middle">GND</text>
-<circle class="pad" cx="112" cy="586" r="5"/>
-<text class="pin" x="112" y="572" text-anchor="middle">0</text>
-<circle class="pad" cx="136" cy="586" r="5"/>
-<text class="pin" x="136" y="572" text-anchor="middle">1</text>
-<circle class="pad fs" cx="160" cy="586" r="7.5"/>
-<text class="pin b ts" x="160" y="572" text-anchor="middle">2</text>
-<circle class="pad" cx="184" cy="586" r="5"/>
-<text class="pin" x="184" y="572" text-anchor="middle">3</text>
-<circle class="pad" cx="208" cy="586" r="5"/>
-<text class="pin" x="208" y="572" text-anchor="middle">4</text>
-<circle class="pad" cx="232" cy="586" r="5"/>
-<text class="pin" x="232" y="572" text-anchor="middle">5</text>
-<circle class="pad" cx="256" cy="586" r="5"/>
-<text class="pin" x="256" y="572" text-anchor="middle">6</text>
-<circle class="pad" cx="280" cy="586" r="5"/>
-<text class="pin" x="280" y="572" text-anchor="middle">7</text>
-<circle class="pad" cx="304" cy="586" r="5"/>
-<text class="pin" x="304" y="572" text-anchor="middle">8</text>
-<circle class="pad" cx="328" cy="586" r="5"/>
-<text class="pin" x="328" y="572" text-anchor="middle">9</text>
-<circle class="pad" cx="352" cy="586" r="5"/>
-<text class="pin" x="352" y="572" text-anchor="middle">10</text>
-<circle class="pad" cx="376" cy="586" r="5"/>
-<text class="pin" x="376" y="572" text-anchor="middle">11</text>
-<circle class="pad" cx="400" cy="586" r="5"/>
-<text class="pin" x="400" y="572" text-anchor="middle">12</text>
-<circle class="pad f3" cx="424" cy="586" r="7.5"/>
-<text class="pin b t3" x="424" y="572" text-anchor="middle">3V3</text>
-<circle class="pad" cx="448" cy="586" r="5"/>
-<text class="pin" x="448" y="572" text-anchor="middle">24</text>
-<circle class="pad" cx="472" cy="586" r="5"/>
-<text class="pin" x="472" y="572" text-anchor="middle">25</text>
-<circle class="pad" cx="496" cy="586" r="5"/>
-<text class="pin" x="496" y="572" text-anchor="middle">26</text>
-<circle class="pad" cx="520" cy="586" r="5"/>
-<text class="pin" x="520" y="572" text-anchor="middle">27</text>
-<circle class="pad" cx="544" cy="586" r="5"/>
-<text class="pin" x="544" y="572" text-anchor="middle">28</text>
-<circle class="pad" cx="568" cy="586" r="5"/>
-<text class="pin" x="568" y="572" text-anchor="middle">29</text>
-<circle class="pad" cx="592" cy="586" r="5"/>
-<text class="pin" x="592" y="572" text-anchor="middle">30</text>
-<circle class="pad" cx="616" cy="586" r="5"/>
-<text class="pin" x="616" y="572" text-anchor="middle">31</text>
-<circle class="pad" cx="640" cy="586" r="5"/>
-<text class="pin" x="640" y="572" text-anchor="middle">32</text>
-<rect class="plug" x="233" y="384" width="28" height="12" rx="2"/>
-<path class="w wc" d="M256 482 V438 H250 V396"/>
-<path class="w wd" d="M280 482 V430 H257 V396"/>
-<path class="w wg" d="M88 586 V622 H40 V412 H236 V396"/>
-<path class="w w3" d="M424 586 V632 H30 V420 H243 V396"/>
-<text class="lab" x="228" y="378" text-anchor="end">lead A</text>
-<rect class="plug" x="467" y="384" width="28" height="12" rx="2"/>
-<path class="w w3" d="M136 482 V448 H470 V396"/>
-<path class="w wd" d="M304 482 V444 H477 V396"/>
-<path class="w wc" d="M328 482 V440 H484 V396"/>
-<path class="w wg" d="M424 482 V436 H491 V396"/>
-<text class="lab" x="504" y="394">lead B</text>
-<path class="w w5" d="M88 482 V404 H30"/>
-<path class="w wg" d="M112 482 V388 H30"/>
-<text class="pin8" x="34" y="383">GND → W2 (hub R)</text>
-<text class="pin8 t5" x="110" y="400">VIN → W1 (hub R)</text>
-<path class="w ws" d="M160 586 V650"/>
-<text class="pin8 ts" x="168" y="646">SYNC → 100 Ω → RJ45 R pin 5 (figure 2)</text>
-<text class="s" x="70" y="668">USB ← power bank (always-on mode)</text>
-<rect class="part" x="150" y="320" width="110" height="40" rx="4"/>
-<text class="pin8 b" x="205" y="338" text-anchor="middle">Qwiic Button</text>
-<text class="pin8" x="205" y="352" text-anchor="middle">0x6F · MARK</text>
-<rect class="part fa" x="144" y="330" width="12" height="20" rx="2"/>
-<rect class="part fa" x="254" y="330" width="12" height="20" rx="2"/>
-<path class="qw" d="M247 384 V340 H266"/>
-<rect class="pcb" x="110" y="90" width="120" height="150" rx="4"/>
-<text class="b" x="170" y="64" text-anchor="middle">Mux A · Wire · 0x70</text>
-<text class="s" x="170" y="79" text-anchor="middle">taped right of the T7 pod</text>
-<rect class="part fa" x="159" y="222" width="22" height="14" rx="2"/>
-<text class="pin8 q" x="154" y="233" text-anchor="end">MAIN in</text>
-<rect class="part" x="156" y="150" width="28" height="40" rx="2"/>
-<text class="pin8" x="170" y="174" text-anchor="middle">TCA</text>
-<rect class="part fa" x="214" y="112" width="14" height="18" rx="2"/>
-<text class="pin8 b" x="210" y="125" text-anchor="end">ch0</text>
-<rect class="part" x="112" y="112" width="14" height="18" rx="2"/>
-<text class="pin8" x="130" y="125">ch7</text>
-<rect class="part fa" x="214" y="142" width="14" height="18" rx="2"/>
-<text class="pin8 b" x="210" y="155" text-anchor="end">ch1</text>
-<rect class="part" x="112" y="142" width="14" height="18" rx="2"/>
-<text class="pin8" x="130" y="155">ch6</text>
-<rect class="part fa" x="214" y="172" width="14" height="18" rx="2"/>
-<text class="pin8 b" x="210" y="185" text-anchor="end">ch2</text>
-<rect class="part" x="112" y="172" width="14" height="18" rx="2"/>
-<text class="pin8" x="130" y="185">ch5</text>
-<rect class="part" x="214" y="202" width="14" height="18" rx="2"/>
-<text class="pin8" x="210" y="215" text-anchor="end">ch3</text>
-<rect class="part" x="112" y="202" width="14" height="18" rx="2"/>
-<text class="pin8" x="130" y="215">ch4</text>
-<rect class="pcb" x="300" y="80" width="120" height="40" rx="3"/>
-<rect class="part fa" x="301" y="90" width="12" height="20" rx="2"/>
-<rect class="part" x="407" y="90" width="12" height="20" rx="2"/>
-<text class="b" x="362" y="98" text-anchor="middle">IMU · T1</text>
-<text class="pin8" x="362" y="113" text-anchor="middle">0x4B · 50 cm</text>
-<path class="qw" d="M228 121 H264.0 V100 H301"/>
-<rect class="pcb" x="300" y="136" width="120" height="40" rx="3"/>
-<rect class="part fa" x="301" y="146" width="12" height="20" rx="2"/>
-<rect class="part" x="407" y="146" width="12" height="20" rx="2"/>
-<text class="b" x="362" y="154" text-anchor="middle">IMU · T7</text>
-<text class="pin8" x="362" y="169" text-anchor="middle">0x4B · 50 cm</text>
-<path class="qw" d="M228 151 H264.0 V156 H301"/>
-<rect class="pcb" x="300" y="192" width="120" height="40" rx="3"/>
-<rect class="part fa" x="301" y="202" width="12" height="20" rx="2"/>
-<rect class="part" x="407" y="202" width="12" height="20" rx="2"/>
-<text class="b" x="362" y="210" text-anchor="middle">IMU · T12</text>
-<text class="pin8" x="362" y="225" text-anchor="middle">0x4B · 50 cm</text>
-<path class="qw" d="M228 181 H264.0 V212 H301"/>
-<rect class="pcb" x="560" y="90" width="120" height="150" rx="4"/>
-<text class="b" x="620" y="64" text-anchor="middle">Mux B · Wire1 · 0x70</text>
-<text class="s" x="620" y="79" text-anchor="middle">taped just below the S2 pod</text>
-<rect class="part fa" x="609" y="222" width="22" height="14" rx="2"/>
-<text class="pin8 q" x="604" y="233" text-anchor="end">MAIN in</text>
-<rect class="part" x="606" y="150" width="28" height="40" rx="2"/>
-<text class="pin8" x="620" y="174" text-anchor="middle">TCA</text>
-<rect class="part fa" x="664" y="112" width="14" height="18" rx="2"/>
-<text class="pin8 b" x="660" y="125" text-anchor="end">ch0</text>
-<rect class="part" x="562" y="112" width="14" height="18" rx="2"/>
-<text class="pin8" x="580" y="125">ch7</text>
-<rect class="part fa" x="664" y="142" width="14" height="18" rx="2"/>
-<text class="pin8 b" x="660" y="155" text-anchor="end">ch1</text>
-<rect class="part" x="562" y="142" width="14" height="18" rx="2"/>
-<text class="pin8" x="580" y="155">ch6</text>
-<rect class="part fa" x="664" y="172" width="14" height="18" rx="2"/>
-<text class="pin8 b" x="660" y="185" text-anchor="end">ch2</text>
-<rect class="part" x="562" y="172" width="14" height="18" rx="2"/>
-<text class="pin8" x="580" y="185">ch5</text>
-<rect class="part" x="664" y="202" width="14" height="18" rx="2"/>
-<text class="pin8" x="660" y="215" text-anchor="end">ch3</text>
-<rect class="part" x="562" y="202" width="14" height="18" rx="2"/>
-<text class="pin8" x="580" y="215">ch4</text>
-<rect class="pcb" x="750" y="80" width="120" height="40" rx="3"/>
-<rect class="part fa" x="751" y="90" width="12" height="20" rx="2"/>
-<rect class="part" x="857" y="90" width="12" height="20" rx="2"/>
-<text class="b" x="812" y="98" text-anchor="middle">IMU · L3</text>
-<text class="pin8" x="812" y="113" text-anchor="middle">0x4B · 50 cm</text>
-<path class="qw" d="M678 121 H714.0 V100 H751"/>
-<rect class="pcb" x="750" y="136" width="120" height="40" rx="3"/>
-<rect class="part fa" x="751" y="146" width="12" height="20" rx="2"/>
-<rect class="part" x="857" y="146" width="12" height="20" rx="2"/>
-<text class="b" x="812" y="154" text-anchor="middle">IMU · L5</text>
-<text class="pin8" x="812" y="169" text-anchor="middle">0x4B · 50 cm</text>
-<path class="qw" d="M678 151 H714.0 V156 H751"/>
-<rect class="pcb" x="750" y="192" width="120" height="40" rx="3"/>
-<rect class="part fa" x="751" y="202" width="12" height="20" rx="2"/>
-<rect class="part" x="857" y="202" width="12" height="20" rx="2"/>
-<text class="b" x="812" y="210" text-anchor="middle">IMU · S2</text>
-<text class="pin8" x="812" y="225" text-anchor="middle">0x4B · 50 cm</text>
-<path class="qw" d="M678 181 H714.0 V212 H751"/>
-<path class="qw" d="M144 340 H120 V300 H170 V238"/>
-<text class="lab" x="70" y="296">long cable A ≈ 1.2 m</text>
-<path class="qw" d="M481 384 V300 H620 V238"/>
-<text class="lab" x="490" y="318">long cable B ≈ 0.8 m</text>
-<text class="s" x="30" y="26">Back: 2 muxes, 3 IMUs each (ch 0–2), Qwiic 50 cm per IMU</text>
+<h1>SID Lab spine brace wiring · pin level</h1>
+<p>From the senior's handover (2026-11-25): firmware <code>teensy_spine_imu.ino</code>, PIN_DIAGRAM, SETUP.md §2.</p>
+<div class="legend"><span><i style="border-color:var(--w3)"></i>3.3 V</span><span><i style="border-color:var(--wg)"></i>GND</span><span><i style="border-color:var(--wd)"></i>SDA</span><span><i style="border-color:var(--wc)"></i>SCL</span><span><i style="border-color:var(--wt)"></i>IMU data (TX1 → P0.0)</span><span><i style="border-color:var(--ws)"></i>SYNC</span><span><i style="border-color:var(--we)"></i>EMG signal</span><span><i style="border-color:var(--wx);border-top-style:dashed"></i>optional</span><span><i style="border-color:var(--accent);border-top-width:5px"></i>Qwiic cable</span></div>
+<div class="dia"><svg viewBox="0 0 1220 970" role="img" aria-label="Pin-level wiring of the SID Lab spine brace: Teensy 4.1, two Qwiic muxes, eight BNO086, NI USB-6363 and six EMG inputs" xmlns="http://www.w3.org/2000/svg">
+<rect class="pcb" x="300" y="470" width="592" height="128" rx="6"/>
+<rect class="part" x="286" y="510" width="38" height="48" rx="3"/>
+<text class="s" x="305" y="539" text-anchor="middle">USB</text>
+<rect class="part" x="756" y="516" width="108" height="40" rx="3"/>
+<text class="s" x="810" y="538" text-anchor="middle">microSD</text>
+<text class="b" x="540" y="532" text-anchor="middle">Teensy 4.1 · top view</text>
+<text class="s" x="540" y="548" text-anchor="middle">3.3 V pins only · never 5 V on any pin</text>
+<circle class="pad" cx="318" cy="482" r="5"/>
+<text class="pin" x="318" y="506" text-anchor="middle">VIN</text>
+<circle class="pad fg" cx="342" cy="482" r="7.5"/>
+<text class="pin b tg" x="342" y="506" text-anchor="middle">GND</text>
+<circle class="pad f3" cx="366" cy="482" r="7.5"/>
+<text class="pin b t3" x="366" y="506" text-anchor="middle">3V3</text>
+<circle class="pad" cx="390" cy="482" r="5"/>
+<text class="pin" x="390" y="506" text-anchor="middle">23</text>
+<circle class="pad" cx="414" cy="482" r="5"/>
+<text class="pin" x="414" y="506" text-anchor="middle">22</text>
+<circle class="pad" cx="438" cy="482" r="5"/>
+<text class="pin" x="438" y="506" text-anchor="middle">21</text>
+<circle class="pad" cx="462" cy="482" r="5"/>
+<text class="pin" x="462" y="506" text-anchor="middle">20</text>
+<circle class="pad fc" cx="486" cy="482" r="7.5"/>
+<text class="pin b tc" x="486" y="506" text-anchor="middle">19</text>
+<circle class="pad fd" cx="510" cy="482" r="7.5"/>
+<text class="pin b td" x="510" y="506" text-anchor="middle">18</text>
+<circle class="pad fd" cx="534" cy="482" r="7.5"/>
+<text class="pin b td" x="534" y="506" text-anchor="middle">17</text>
+<circle class="pad fc" cx="558" cy="482" r="7.5"/>
+<text class="pin b tc" x="558" y="506" text-anchor="middle">16</text>
+<circle class="pad" cx="582" cy="482" r="5"/>
+<text class="pin" x="582" y="506" text-anchor="middle">15</text>
+<circle class="pad" cx="606" cy="482" r="5"/>
+<text class="pin" x="606" y="506" text-anchor="middle">14</text>
+<circle class="pad" cx="630" cy="482" r="5"/>
+<text class="pin" x="630" y="506" text-anchor="middle">13</text>
+<circle class="pad fg" cx="654" cy="482" r="7.5"/>
+<text class="pin b tg" x="654" y="506" text-anchor="middle">GND</text>
+<circle class="pad" cx="678" cy="482" r="5"/>
+<text class="pin" x="678" y="506" text-anchor="middle">41</text>
+<circle class="pad" cx="702" cy="482" r="5"/>
+<text class="pin" x="702" y="506" text-anchor="middle">40</text>
+<circle class="pad" cx="726" cy="482" r="5"/>
+<text class="pin" x="726" y="506" text-anchor="middle">39</text>
+<circle class="pad" cx="750" cy="482" r="5"/>
+<text class="pin" x="750" y="506" text-anchor="middle">38</text>
+<circle class="pad" cx="774" cy="482" r="5"/>
+<text class="pin" x="774" y="506" text-anchor="middle">37</text>
+<circle class="pad" cx="798" cy="482" r="5"/>
+<text class="pin" x="798" y="506" text-anchor="middle">36</text>
+<circle class="pad" cx="822" cy="482" r="5"/>
+<text class="pin" x="822" y="506" text-anchor="middle">35</text>
+<circle class="pad" cx="846" cy="482" r="5"/>
+<text class="pin" x="846" y="506" text-anchor="middle">34</text>
+<circle class="pad" cx="870" cy="482" r="5"/>
+<text class="pin" x="870" y="506" text-anchor="middle">33</text>
+<circle class="pad fg" cx="318" cy="586" r="7.5"/>
+<text class="pin b tg" x="318" y="572" text-anchor="middle">GND</text>
+<circle class="pad" cx="342" cy="586" r="5"/>
+<text class="pin" x="342" y="572" text-anchor="middle">0</text>
+<circle class="pad ft" cx="366" cy="586" r="7.5"/>
+<text class="pin b tt" x="366" y="572" text-anchor="middle">1</text>
+<circle class="pad fs" cx="390" cy="586" r="7.5"/>
+<text class="pin b ts" x="390" y="572" text-anchor="middle">2</text>
+<circle class="pad" cx="414" cy="586" r="5"/>
+<text class="pin" x="414" y="572" text-anchor="middle">3</text>
+<circle class="pad fx" cx="438" cy="586" r="7.5"/>
+<text class="pin b tx" x="438" y="572" text-anchor="middle">4</text>
+<circle class="pad" cx="462" cy="586" r="5"/>
+<text class="pin" x="462" y="572" text-anchor="middle">5</text>
+<circle class="pad" cx="486" cy="586" r="5"/>
+<text class="pin" x="486" y="572" text-anchor="middle">6</text>
+<circle class="pad" cx="510" cy="586" r="5"/>
+<text class="pin" x="510" y="572" text-anchor="middle">7</text>
+<circle class="pad" cx="534" cy="586" r="5"/>
+<text class="pin" x="534" y="572" text-anchor="middle">8</text>
+<circle class="pad" cx="558" cy="586" r="5"/>
+<text class="pin" x="558" y="572" text-anchor="middle">9</text>
+<circle class="pad" cx="582" cy="586" r="5"/>
+<text class="pin" x="582" y="572" text-anchor="middle">10</text>
+<circle class="pad" cx="606" cy="586" r="5"/>
+<text class="pin" x="606" y="572" text-anchor="middle">11</text>
+<circle class="pad" cx="630" cy="586" r="5"/>
+<text class="pin" x="630" y="572" text-anchor="middle">12</text>
+<circle class="pad f3" cx="654" cy="586" r="7.5"/>
+<text class="pin b t3" x="654" y="572" text-anchor="middle">3V3</text>
+<circle class="pad" cx="678" cy="586" r="5"/>
+<text class="pin" x="678" y="572" text-anchor="middle">24</text>
+<circle class="pad" cx="702" cy="586" r="5"/>
+<text class="pin" x="702" y="572" text-anchor="middle">25</text>
+<circle class="pad" cx="726" cy="586" r="5"/>
+<text class="pin" x="726" y="572" text-anchor="middle">26</text>
+<circle class="pad" cx="750" cy="586" r="5"/>
+<text class="pin" x="750" y="572" text-anchor="middle">27</text>
+<circle class="pad" cx="774" cy="586" r="5"/>
+<text class="pin" x="774" y="572" text-anchor="middle">28</text>
+<circle class="pad" cx="798" cy="586" r="5"/>
+<text class="pin" x="798" y="572" text-anchor="middle">29</text>
+<circle class="pad" cx="822" cy="586" r="5"/>
+<text class="pin" x="822" y="572" text-anchor="middle">30</text>
+<circle class="pad" cx="846" cy="586" r="5"/>
+<text class="pin" x="846" y="572" text-anchor="middle">31</text>
+<circle class="pad" cx="870" cy="586" r="5"/>
+<text class="pin" x="870" y="572" text-anchor="middle">32</text>
+<rect class="pcb" x="40" y="200" width="470" height="70" rx="5"/>
+<text class="b" x="275" y="240" text-anchor="middle">Mux B · Wire (19/18) · 0x70</text>
+<text class="s" x="275" y="256" text-anchor="middle">SparkFun Qwiic Mux (TCA9548A) · ch 4–7 free</text>
+<rect class="part fa" x="51" y="194" width="18" height="12" rx="2"/>
+<text class="pin8 b" x="60" y="220" text-anchor="middle">ch0</text>
+<rect class="part fa" x="106" y="194" width="18" height="12" rx="2"/>
+<text class="pin8 b" x="115" y="220" text-anchor="middle">ch1</text>
+<rect class="part fa" x="161" y="194" width="18" height="12" rx="2"/>
+<text class="pin8 b" x="170" y="220" text-anchor="middle">ch2</text>
+<rect class="part fa" x="216" y="194" width="18" height="12" rx="2"/>
+<text class="pin8 b" x="225" y="220" text-anchor="middle">ch3</text>
+<rect class="part" x="271" y="194" width="18" height="12" rx="2"/>
+<text class="pin8" x="280" y="220" text-anchor="middle">ch4</text>
+<rect class="part" x="326" y="194" width="18" height="12" rx="2"/>
+<text class="pin8" x="335" y="220" text-anchor="middle">ch5</text>
+<rect class="part" x="381" y="194" width="18" height="12" rx="2"/>
+<text class="pin8" x="390" y="220" text-anchor="middle">ch6</text>
+<rect class="part" x="436" y="194" width="18" height="12" rx="2"/>
+<text class="pin8" x="445" y="220" text-anchor="middle">ch7</text>
+<rect class="pcb" x="45" y="60" width="105" height="46" rx="3"/>
+<rect class="part fa" x="88" y="100" width="18" height="10" rx="2"/>
+<text class="b" x="97" y="78" text-anchor="middle">IMU5 · T11</text>
+<text class="pin8" x="97" y="93" text-anchor="middle">BNO086 · 0x4B</text>
+<path class="qw" d="M60 194 V130 H97 V110"/>
+<rect class="pcb" x="162" y="60" width="105" height="46" rx="3"/>
+<rect class="part fa" x="205" y="100" width="18" height="10" rx="2"/>
+<text class="b" x="214" y="78" text-anchor="middle">IMU6 · L1</text>
+<text class="pin8" x="214" y="93" text-anchor="middle">BNO086 · 0x4B</text>
+<path class="qw" d="M115 194 V144 H214 V110"/>
+<rect class="pcb" x="279" y="60" width="105" height="46" rx="3"/>
+<rect class="part fa" x="322" y="100" width="18" height="10" rx="2"/>
+<text class="b" x="331" y="78" text-anchor="middle">IMU7 · L3</text>
+<text class="pin8" x="331" y="93" text-anchor="middle">BNO086 · 0x4B</text>
+<path class="qw" d="M170 194 V158 H331 V110"/>
+<rect class="pcb" x="396" y="60" width="105" height="46" rx="3"/>
+<rect class="part fa" x="439" y="100" width="18" height="10" rx="2"/>
+<text class="b" x="448" y="78" text-anchor="middle">IMU8 · S1</text>
+<text class="pin8" x="448" y="93" text-anchor="middle">BNO086 · 0x4B</text>
+<path class="qw" d="M225 194 V172 H448 V110"/>
+<rect class="pcb" x="560" y="200" width="470" height="70" rx="5"/>
+<text class="b" x="795" y="240" text-anchor="middle">Mux A · Wire1 (16/17) · 0x70</text>
+<text class="s" x="795" y="256" text-anchor="middle">SparkFun Qwiic Mux (TCA9548A) · ch 4–7 free</text>
+<rect class="part fa" x="571" y="194" width="18" height="12" rx="2"/>
+<text class="pin8 b" x="580" y="220" text-anchor="middle">ch0</text>
+<rect class="part fa" x="626" y="194" width="18" height="12" rx="2"/>
+<text class="pin8 b" x="635" y="220" text-anchor="middle">ch1</text>
+<rect class="part fa" x="681" y="194" width="18" height="12" rx="2"/>
+<text class="pin8 b" x="690" y="220" text-anchor="middle">ch2</text>
+<rect class="part fa" x="736" y="194" width="18" height="12" rx="2"/>
+<text class="pin8 b" x="745" y="220" text-anchor="middle">ch3</text>
+<rect class="part" x="791" y="194" width="18" height="12" rx="2"/>
+<text class="pin8" x="800" y="220" text-anchor="middle">ch4</text>
+<rect class="part" x="846" y="194" width="18" height="12" rx="2"/>
+<text class="pin8" x="855" y="220" text-anchor="middle">ch5</text>
+<rect class="part" x="901" y="194" width="18" height="12" rx="2"/>
+<text class="pin8" x="910" y="220" text-anchor="middle">ch6</text>
+<rect class="part" x="956" y="194" width="18" height="12" rx="2"/>
+<text class="pin8" x="965" y="220" text-anchor="middle">ch7</text>
+<rect class="pcb" x="565" y="60" width="105" height="46" rx="3"/>
+<rect class="part fa" x="608" y="100" width="18" height="10" rx="2"/>
+<text class="b" x="617" y="78" text-anchor="middle">IMU1 · C7</text>
+<text class="pin8" x="617" y="93" text-anchor="middle">BNO086 · 0x4B</text>
+<path class="qw" d="M580 194 V130 H617 V110"/>
+<rect class="pcb" x="682" y="60" width="105" height="46" rx="3"/>
+<rect class="part fa" x="725" y="100" width="18" height="10" rx="2"/>
+<text class="b" x="734" y="78" text-anchor="middle">IMU2 · T3</text>
+<text class="pin8" x="734" y="93" text-anchor="middle">BNO086 · 0x4B</text>
+<path class="qw" d="M635 194 V144 H734 V110"/>
+<rect class="pcb" x="799" y="60" width="105" height="46" rx="3"/>
+<rect class="part fa" x="842" y="100" width="18" height="10" rx="2"/>
+<text class="b" x="851" y="78" text-anchor="middle">IMU3 · T6</text>
+<text class="pin8" x="851" y="93" text-anchor="middle">BNO086 · 0x4B</text>
+<path class="qw" d="M690 194 V158 H851 V110"/>
+<rect class="pcb" x="916" y="60" width="105" height="46" rx="3"/>
+<rect class="part fa" x="959" y="100" width="18" height="10" rx="2"/>
+<text class="b" x="968" y="78" text-anchor="middle">IMU4 · T9</text>
+<text class="pin8" x="968" y="93" text-anchor="middle">BNO086 · 0x4B</text>
+<path class="qw" d="M745 194 V172 H968 V110"/>
+<rect class="plug" x="396" y="400" width="30" height="12" rx="2"/>
+<text class="lab" x="390" y="410" text-anchor="end">lead B</text>
+<path class="w wg" d="M342 482 L342 440 L400 440 L400 412"/>
+<path class="w w3" d="M366 482 L366 456 L407 456 L407 412"/>
+<path class="w wc" d="M486 482 L486 456 L414 456 L414 412"/>
+<path class="w wd" d="M510 482 L510 440 L421 440 L421 412"/>
+<path class="qw" d="M411 400 V338.0 H411 V276"/>
+<rect class="part fa" x="400" y="270" width="22" height="12" rx="2"/>
+<text class="pin8 q" x="427" y="298">MAIN</text>
+<rect class="plug" x="586" y="400" width="30" height="12" rx="2"/>
+<text class="lab" x="580" y="410" text-anchor="end">lead A</text>
+<path class="w wd" d="M534 482 L534 440 L590 440 L590 412"/>
+<path class="w wc" d="M558 482 L558 456 L597 456 L597 412"/>
+<path class="w wg" d="M654 482 L654 456 L604 456 L604 412"/>
+<path class="qw" d="M601 400 V338.0 H601 V276"/>
+<rect class="part fa" x="590" y="270" width="22" height="12" rx="2"/>
+<text class="pin8 q" x="617" y="298">MAIN</text>
+<path class="w w3" d="M654 586 L654 616 L924 616 L924 432 L611 432 L611 412"/>
+<text class="pin8 b t3" x="930" y="520">3V3 (bottom row)</text>
+<text class="s" x="700" y="340">Qwiic: red 3V3 · black GND · blue SDA · yellow SCL</text>
+<rect class="daq" x="150" y="700" width="1030" height="140" rx="6"/>
+<text class="b" x="665" y="762" text-anchor="middle">NI USB-6363 · screw terminals (used ones only)</text>
+<text class="s" x="665" y="778" text-anchor="middle">EMG: RSE · ±5 V · 4 kHz · IMU packet on P0.0 · SYNC on AI31</text>
+<rect class="lever" x="189" y="701" width="22" height="18" rx="2"/>
+<circle class="screw" cx="200" cy="710" r="4.5"/>
+<text class="pin b tg" x="200" y="736" text-anchor="middle">82</text>
+<text class="pin8" x="200" y="748" text-anchor="middle">D GND</text>
+<path class="w wg" d="M318 586 L318 628 L200 628 L200 701"/>
+<rect class="lever" x="259" y="701" width="22" height="18" rx="2"/>
+<circle class="screw" cx="270" cy="710" r="4.5"/>
+<text class="pin b tt" x="270" y="736" text-anchor="middle">65</text>
+<text class="pin8" x="270" y="748" text-anchor="middle">P0.0</text>
+<path class="w wt" d="M366 586 L366 642 L270 642 L270 701"/>
+<rect class="lever" x="329" y="701" width="22" height="18" rx="2"/>
+<circle class="screw" cx="340" cy="710" r="4.5"/>
+<text class="pin b ts" x="340" y="736" text-anchor="middle">59</text>
+<text class="pin8" x="340" y="748" text-anchor="middle">AI31</text>
+<path class="w ws" d="M390 586 L390 656 L340 656 L340 701"/>
+<rect class="lever" x="459" y="701" width="22" height="18" rx="2"/>
+<circle class="screw" cx="470" cy="710" r="4.5"/>
+<text class="pin b" x="470" y="736" text-anchor="middle">PFI</text>
+<text class="pin8" x="470" y="748" text-anchor="middle">ctr out</text>
+<path class="w wx" d="M438 586 L438 670 L470 670 L470 701"/>
+<rect class="res" x="452" y="676" width="36" height="10" rx="2"/>
+<text class="pin8" x="496" y="684">optional · FRAME_CLOCK 1 · 1 kΩ PFI→pin 4, 2 kΩ pin 4→GND</text>
+<rect class="lever" x="549" y="821" width="22" height="18" rx="2"/>
+<circle class="screw" cx="560" cy="830" r="4.5"/>
+<text class="pin b te" x="560" y="812" text-anchor="middle">33</text>
+<text class="pin8" x="560" y="800" text-anchor="middle">AI16</text>
+<rect class="part" x="546" y="890" width="64" height="40" rx="3"/>
+<text class="pin8 b" x="578" y="906" text-anchor="middle">EMG1</text>
+<text class="pin8" x="578" y="920" text-anchor="middle">R-LG</text>
+<circle class="pad fe" cx="560" cy="890" r="4"/>
+<circle class="pad fg" cx="590" cy="930" r="4"/>
+<path class="w we" d="M560 890 L560 839"/>
+<path class="w wg" d="M590 930 L590 948"/>
+<rect class="lever" x="634" y="821" width="22" height="18" rx="2"/>
+<circle class="screw" cx="645" cy="830" r="4.5"/>
+<text class="pin b te" x="645" y="812" text-anchor="middle">36</text>
+<text class="pin8" x="645" y="800" text-anchor="middle">AI17</text>
+<rect class="part" x="631" y="890" width="64" height="40" rx="3"/>
+<text class="pin8 b" x="663" y="906" text-anchor="middle">EMG2</text>
+<text class="pin8" x="663" y="920" text-anchor="middle">L-LG</text>
+<circle class="pad fe" cx="645" cy="890" r="4"/>
+<circle class="pad fg" cx="675" cy="930" r="4"/>
+<path class="w we" d="M645 890 L645 839"/>
+<path class="w wg" d="M675 930 L675 948"/>
+<rect class="lever" x="719" y="821" width="22" height="18" rx="2"/>
+<circle class="screw" cx="730" cy="830" r="4.5"/>
+<text class="pin b te" x="730" y="812" text-anchor="middle">39</text>
+<text class="pin8" x="730" y="800" text-anchor="middle">AI18</text>
+<rect class="part" x="716" y="890" width="64" height="40" rx="3"/>
+<text class="pin8 b" x="748" y="906" text-anchor="middle">EMG3</text>
+<text class="pin8" x="748" y="920" text-anchor="middle">R-MF</text>
+<circle class="pad fe" cx="730" cy="890" r="4"/>
+<circle class="pad fg" cx="760" cy="930" r="4"/>
+<path class="w we" d="M730 890 L730 839"/>
+<path class="w wg" d="M760 930 L760 948"/>
+<rect class="lever" x="804" y="821" width="22" height="18" rx="2"/>
+<circle class="screw" cx="815" cy="830" r="4.5"/>
+<text class="pin b te" x="815" y="812" text-anchor="middle">42</text>
+<text class="pin8" x="815" y="800" text-anchor="middle">AI19</text>
+<rect class="part" x="801" y="890" width="64" height="40" rx="3"/>
+<text class="pin8 b" x="833" y="906" text-anchor="middle">EMG4</text>
+<text class="pin8" x="833" y="920" text-anchor="middle">L-MF</text>
+<circle class="pad fe" cx="815" cy="890" r="4"/>
+<circle class="pad fg" cx="845" cy="930" r="4"/>
+<path class="w we" d="M815 890 L815 839"/>
+<path class="w wg" d="M845 930 L845 948"/>
+<rect class="lever" x="889" y="821" width="22" height="18" rx="2"/>
+<circle class="screw" cx="900" cy="830" r="4.5"/>
+<text class="pin b te" x="900" y="812" text-anchor="middle">49</text>
+<text class="pin8" x="900" y="800" text-anchor="middle">AI20</text>
+<rect class="part" x="886" y="890" width="64" height="40" rx="3"/>
+<text class="pin8 b" x="918" y="906" text-anchor="middle">EMG5</text>
+<text class="pin8" x="918" y="920" text-anchor="middle">R-IL</text>
+<circle class="pad fe" cx="900" cy="890" r="4"/>
+<circle class="pad fg" cx="930" cy="930" r="4"/>
+<path class="w we" d="M900 890 L900 839"/>
+<path class="w wg" d="M930 930 L930 948"/>
+<rect class="lever" x="974" y="821" width="22" height="18" rx="2"/>
+<circle class="screw" cx="985" cy="830" r="4.5"/>
+<text class="pin b te" x="985" y="812" text-anchor="middle">52</text>
+<text class="pin8" x="985" y="800" text-anchor="middle">AI21</text>
+<rect class="part" x="971" y="890" width="64" height="40" rx="3"/>
+<text class="pin8 b" x="1003" y="906" text-anchor="middle">EMG6</text>
+<text class="pin8" x="1003" y="920" text-anchor="middle">L-IL</text>
+<circle class="pad fe" cx="985" cy="890" r="4"/>
+<circle class="pad fg" cx="1015" cy="930" r="4"/>
+<path class="w we" d="M985 890 L985 839"/>
+<path class="w wg" d="M1015 930 L1015 948"/>
+<rect class="lever" x="1059" y="821" width="22" height="18" rx="2"/>
+<circle class="screw" cx="1070" cy="830" r="4.5"/>
+<text class="pin b" x="1070" y="812" text-anchor="middle">AI GND</text>
+<text class="pin8" x="1070" y="800" text-anchor="middle">EMG ref</text>
+<path class="w wg" d="M590 948 L1070 948 L1070 839"/>
+<text class="s" x="150" y="910">EMG out → terminal; reference → AI GND</text>
+<text class="s" x="150" y="926">twisted pair (signal + GND) for any lead over ~1 m</text>
 </svg></div>
-<h2>2 · EMG hubs, Cat6, DAQ end</h2>
-<div class="dia"><svg viewBox="0 0 1340 900" role="img" aria-label="EMG wiring at pin level: two thigh hubs with four TRRS breakouts each, Cat6 R and L, DAQ-end WAGOs and NI USB-6363 terminals" xmlns="http://www.w3.org/2000/svg">
-<rect class="zone" x="106" y="160" width="470" height="288" rx="10"/>
-<text class="b" x="116" y="178">EMG hub R · upper right thigh band</text>
-<rect class="pcb" x="150" y="200" width="76" height="62" rx="4"/>
-<rect class="part" x="168" y="206" width="40" height="26" rx="3"/>
-<text class="pin8" x="188" y="223" text-anchor="middle">jack</text>
-<text class="pin8 b" x="188" y="192" text-anchor="middle">LT_T9 R</text>
-<circle class="pad fe" cx="164" cy="248" r="6.5"/>
-<text class="pin8 b" x="164" y="274" text-anchor="middle">T</text>
-<circle class="pad f5" cx="188" cy="248" r="6.5"/>
-<text class="pin8 b" x="188" y="274" text-anchor="middle">R</text>
-<circle class="pad fg" cx="212" cy="248" r="6.5"/>
-<text class="pin8 b" x="212" y="274" text-anchor="middle">S</text>
-<rect class="pcb" x="246" y="200" width="76" height="62" rx="4"/>
-<rect class="part" x="264" y="206" width="40" height="26" rx="3"/>
-<text class="pin8" x="284" y="223" text-anchor="middle">jack</text>
-<text class="pin8 b" x="284" y="192" text-anchor="middle">LT_L1 R</text>
-<circle class="pad fe" cx="260" cy="248" r="6.5"/>
-<text class="pin8 b" x="260" y="274" text-anchor="middle">T</text>
-<circle class="pad f5" cx="284" cy="248" r="6.5"/>
-<text class="pin8 b" x="284" y="274" text-anchor="middle">R</text>
-<circle class="pad fg" cx="308" cy="248" r="6.5"/>
-<text class="pin8 b" x="308" y="274" text-anchor="middle">S</text>
-<rect class="pcb" x="342" y="200" width="76" height="62" rx="4"/>
-<rect class="part" x="360" y="206" width="40" height="26" rx="3"/>
-<text class="pin8" x="380" y="223" text-anchor="middle">jack</text>
-<text class="pin8 b" x="380" y="192" text-anchor="middle">IL_L2 R</text>
-<circle class="pad fe" cx="356" cy="248" r="6.5"/>
-<text class="pin8 b" x="356" y="274" text-anchor="middle">T</text>
-<circle class="pad f5" cx="380" cy="248" r="6.5"/>
-<text class="pin8 b" x="380" y="274" text-anchor="middle">R</text>
-<circle class="pad fg" cx="404" cy="248" r="6.5"/>
-<text class="pin8 b" x="404" y="274" text-anchor="middle">S</text>
-<rect class="pcb" x="438" y="200" width="76" height="62" rx="4"/>
-<rect class="part" x="456" y="206" width="40" height="26" rx="3"/>
-<text class="pin8" x="476" y="223" text-anchor="middle">jack</text>
-<text class="pin8 b" x="476" y="192" text-anchor="middle">MF_L5 R</text>
-<circle class="pad fe" cx="452" cy="248" r="6.5"/>
-<text class="pin8 b" x="452" y="274" text-anchor="middle">T</text>
-<circle class="pad f5" cx="476" cy="248" r="6.5"/>
-<text class="pin8 b" x="476" y="274" text-anchor="middle">R</text>
-<circle class="pad fg" cx="500" cy="248" r="6.5"/>
-<text class="pin8 b" x="500" y="274" text-anchor="middle">S</text>
-<path class="w w5" d="M154 300 H526"/>
-<text class="pin8 b t5" x="148" y="304" text-anchor="end">+5 V</text>
-<path class="w wg" d="M154 314 H526"/>
-<text class="pin8 b" x="148" y="318" text-anchor="end">GND</text>
-<rect class="pcb" x="250" y="386" width="182" height="30" rx="4"/>
-<text class="b" x="240" y="406" text-anchor="end">hub RJ45 R</text>
-<rect class="lever fe" x="254" y="392" width="16" height="18" rx="2"/>
-<text class="pin8 inv" x="262" y="405" text-anchor="middle">1</text>
-<rect class="lever fe" x="276" y="392" width="16" height="18" rx="2"/>
-<text class="pin8 inv" x="284" y="405" text-anchor="middle">2</text>
-<rect class="lever fe" x="298" y="392" width="16" height="18" rx="2"/>
-<text class="pin8 inv" x="306" y="405" text-anchor="middle">3</text>
-<rect class="lever fg" x="320" y="392" width="16" height="18" rx="2"/>
-<text class="pin8 inv" x="328" y="405" text-anchor="middle">4</text>
-<rect class="lever fs" x="342" y="392" width="16" height="18" rx="2"/>
-<text class="pin8 inv" x="350" y="405" text-anchor="middle">5</text>
-<rect class="lever fe" x="364" y="392" width="16" height="18" rx="2"/>
-<text class="pin8 inv" x="372" y="405" text-anchor="middle">6</text>
-<rect class="lever f5" x="386" y="392" width="16" height="18" rx="2"/>
-<text class="pin8 inv" x="394" y="405" text-anchor="middle">7</text>
-<rect class="lever fg" x="408" y="392" width="16" height="18" rx="2"/>
-<text class="pin8 inv" x="416" y="405" text-anchor="middle">8</text>
-<path class="w w5" d="M188 248 V300"/>
-<circle class="f5" cx="188" cy="300" r="3.4"/>
-<path class="w wg" d="M212 248 V314"/>
-<circle class="fg" cx="212" cy="314" r="3.4"/>
-<path class="w we" d="M164 248 V362 H262 V386"/>
-<path class="w w5" d="M284 248 V300"/>
-<circle class="f5" cx="284" cy="300" r="3.4"/>
-<path class="w wg" d="M308 248 V314"/>
-<circle class="fg" cx="308" cy="314" r="3.4"/>
-<path class="w we" d="M260 248 V352 H284 V386"/>
-<path class="w w5" d="M380 248 V300"/>
-<circle class="f5" cx="380" cy="300" r="3.4"/>
-<path class="w wg" d="M404 248 V314"/>
-<circle class="fg" cx="404" cy="314" r="3.4"/>
-<path class="w we" d="M356 248 V342 H306 V386"/>
-<path class="w w5" d="M476 248 V300"/>
-<circle class="f5" cx="476" cy="300" r="3.4"/>
-<path class="w wg" d="M500 248 V314"/>
-<circle class="fg" cx="500" cy="314" r="3.4"/>
-<path class="w we" d="M452 248 V332 H372 V386"/>
-<rect class="zone" x="106" y="520" width="470" height="288" rx="10"/>
-<text class="b" x="116" y="538">EMG hub L · left thigh band</text>
-<rect class="pcb" x="150" y="560" width="76" height="62" rx="4"/>
-<rect class="part" x="168" y="566" width="40" height="26" rx="3"/>
-<text class="pin8" x="188" y="583" text-anchor="middle">jack</text>
-<text class="pin8 b" x="188" y="552" text-anchor="middle">LT_T9 L</text>
-<circle class="pad fe" cx="164" cy="608" r="6.5"/>
-<text class="pin8 b" x="164" y="634" text-anchor="middle">T</text>
-<circle class="pad f5" cx="188" cy="608" r="6.5"/>
-<text class="pin8 b" x="188" y="634" text-anchor="middle">R</text>
-<circle class="pad fg" cx="212" cy="608" r="6.5"/>
-<text class="pin8 b" x="212" y="634" text-anchor="middle">S</text>
-<rect class="pcb" x="246" y="560" width="76" height="62" rx="4"/>
-<rect class="part" x="264" y="566" width="40" height="26" rx="3"/>
-<text class="pin8" x="284" y="583" text-anchor="middle">jack</text>
-<text class="pin8 b" x="284" y="552" text-anchor="middle">LT_L1 L</text>
-<circle class="pad fe" cx="260" cy="608" r="6.5"/>
-<text class="pin8 b" x="260" y="634" text-anchor="middle">T</text>
-<circle class="pad f5" cx="284" cy="608" r="6.5"/>
-<text class="pin8 b" x="284" y="634" text-anchor="middle">R</text>
-<circle class="pad fg" cx="308" cy="608" r="6.5"/>
-<text class="pin8 b" x="308" y="634" text-anchor="middle">S</text>
-<rect class="pcb" x="342" y="560" width="76" height="62" rx="4"/>
-<rect class="part" x="360" y="566" width="40" height="26" rx="3"/>
-<text class="pin8" x="380" y="583" text-anchor="middle">jack</text>
-<text class="pin8 b" x="380" y="552" text-anchor="middle">IL_L2 L</text>
-<circle class="pad fe" cx="356" cy="608" r="6.5"/>
-<text class="pin8 b" x="356" y="634" text-anchor="middle">T</text>
-<circle class="pad f5" cx="380" cy="608" r="6.5"/>
-<text class="pin8 b" x="380" y="634" text-anchor="middle">R</text>
-<circle class="pad fg" cx="404" cy="608" r="6.5"/>
-<text class="pin8 b" x="404" y="634" text-anchor="middle">S</text>
-<rect class="pcb" x="438" y="560" width="76" height="62" rx="4"/>
-<rect class="part" x="456" y="566" width="40" height="26" rx="3"/>
-<text class="pin8" x="476" y="583" text-anchor="middle">jack</text>
-<text class="pin8 b" x="476" y="552" text-anchor="middle">MF_L5 L</text>
-<circle class="pad fe" cx="452" cy="608" r="6.5"/>
-<text class="pin8 b" x="452" y="634" text-anchor="middle">T</text>
-<circle class="pad f5" cx="476" cy="608" r="6.5"/>
-<text class="pin8 b" x="476" y="634" text-anchor="middle">R</text>
-<circle class="pad fg" cx="500" cy="608" r="6.5"/>
-<text class="pin8 b" x="500" y="634" text-anchor="middle">S</text>
-<path class="w w5" d="M154 660 H526"/>
-<text class="pin8 b t5" x="148" y="664" text-anchor="end">+5 V</text>
-<path class="w wg" d="M154 674 H526"/>
-<text class="pin8 b" x="148" y="678" text-anchor="end">GND</text>
-<rect class="pcb" x="250" y="746" width="182" height="30" rx="4"/>
-<text class="b" x="240" y="766" text-anchor="end">hub RJ45 L</text>
-<rect class="lever fe" x="254" y="752" width="16" height="18" rx="2"/>
-<text class="pin8 inv" x="262" y="765" text-anchor="middle">1</text>
-<rect class="lever fe" x="276" y="752" width="16" height="18" rx="2"/>
-<text class="pin8 inv" x="284" y="765" text-anchor="middle">2</text>
-<rect class="lever fe" x="298" y="752" width="16" height="18" rx="2"/>
-<text class="pin8 inv" x="306" y="765" text-anchor="middle">3</text>
-<rect class="lever fg" x="320" y="752" width="16" height="18" rx="2"/>
-<text class="pin8 inv" x="328" y="765" text-anchor="middle">4</text>
-<rect class="lever" x="342" y="752" width="16" height="18" rx="2"/>
-<text class="pin8" x="350" y="765" text-anchor="middle">5</text>
-<rect class="lever fe" x="364" y="752" width="16" height="18" rx="2"/>
-<text class="pin8 inv" x="372" y="765" text-anchor="middle">6</text>
-<rect class="lever f5" x="386" y="752" width="16" height="18" rx="2"/>
-<text class="pin8 inv" x="394" y="765" text-anchor="middle">7</text>
-<rect class="lever fg" x="408" y="752" width="16" height="18" rx="2"/>
-<text class="pin8 inv" x="416" y="765" text-anchor="middle">8</text>
-<path class="w w5" d="M188 608 V660"/>
-<circle class="f5" cx="188" cy="660" r="3.4"/>
-<path class="w wg" d="M212 608 V674"/>
-<circle class="fg" cx="212" cy="674" r="3.4"/>
-<path class="w we" d="M164 608 V722 H262 V746"/>
-<path class="w w5" d="M284 608 V660"/>
-<circle class="f5" cx="284" cy="660" r="3.4"/>
-<path class="w wg" d="M308 608 V674"/>
-<circle class="fg" cx="308" cy="674" r="3.4"/>
-<path class="w we" d="M260 608 V712 H284 V746"/>
-<path class="w w5" d="M380 608 V660"/>
-<circle class="f5" cx="380" cy="660" r="3.4"/>
-<path class="w wg" d="M404 608 V674"/>
-<circle class="fg" cx="404" cy="674" r="3.4"/>
-<path class="w we" d="M356 608 V702 H306 V746"/>
-<path class="w w5" d="M476 608 V660"/>
-<circle class="f5" cx="476" cy="660" r="3.4"/>
-<path class="w wg" d="M500 608 V674"/>
-<circle class="fg" cx="500" cy="674" r="3.4"/>
-<path class="w we" d="M452 608 V692 H372 V746"/>
-<circle class="pad fg" cx="36" cy="40" r="7.5"/>
-<text class="pin8 b" x="50" y="32">Teensy GND (top row, next to VIN)</text>
-<circle class="pad f5" cx="36" cy="70" r="7.5"/>
-<text class="pin8 b t5" x="50" y="62">Teensy VIN (5 V out)</text>
-<circle class="pad fs" cx="36" cy="100" r="7.5"/>
-<text class="pin8 b ts" x="50" y="92">Teensy pin 2 (SYNC)</text>
-<rect class="wago" x="650" y="220" width="138" height="30" rx="4"/>
-<text class="pin8 b" x="650" y="214">W1 · +5 V (hub R)</text>
-<rect class="lever f5" x="654" y="226" width="22" height="16" rx="2"/>
-<text class="pin8" x="665" y="264" text-anchor="middle">VIN</text>
-<rect class="lever f5" x="680" y="226" width="22" height="16" rx="2"/>
-<text class="pin8" x="691" y="264" text-anchor="middle">bus</text>
-<rect class="lever f5" x="706" y="226" width="22" height="16" rx="2"/>
-<text class="pin8" x="717" y="264" text-anchor="middle">R7</text>
-<rect class="lever" x="732" y="226" width="22" height="16" rx="2"/>
-<text class="pin8" x="743" y="264" text-anchor="middle">–</text>
-<rect class="lever" x="758" y="226" width="22" height="16" rx="2"/>
-<text class="pin8" x="769" y="264" text-anchor="middle">–</text>
-<rect class="wago" x="680" y="300" width="138" height="30" rx="4"/>
-<text class="pin8 b" x="680" y="294">W2 · GND (hub R)</text>
-<rect class="lever fg" x="684" y="306" width="22" height="16" rx="2"/>
-<text class="pin8" x="695" y="344" text-anchor="middle">bus</text>
-<rect class="lever fg" x="710" y="306" width="22" height="16" rx="2"/>
-<text class="pin8" x="721" y="344" text-anchor="middle">R4</text>
-<rect class="lever fg" x="736" y="306" width="22" height="16" rx="2"/>
-<text class="pin8" x="747" y="344" text-anchor="middle">R8</text>
-<rect class="lever" x="762" y="306" width="22" height="16" rx="2"/>
-<text class="pin8" x="773" y="344" text-anchor="middle">–</text>
-<rect class="lever fg" x="788" y="306" width="22" height="16" rx="2"/>
-<text class="pin8" x="799" y="344" text-anchor="middle">GND</text>
-<path class="w w5" d="M36 70 H665 V220"/>
-<path class="w wg" d="M36 40 H799 V300"/>
-<path class="w w5" d="M526 300 H691 V250"/>
-<path class="w wg" d="M526 314 H695 V300"/>
-<path class="w wg" d="M721 330 V430 H328 V416"/>
-<path class="w w5" d="M717 250 V438 H394 V416"/>
-<path class="w wg" d="M747 330 V446 H416 V416"/>
-<path class="w ws" d="M36 100 H60 V462 H306"/>
-<rect class="res" x="306" y="456" width="28" height="12" rx="2"/>
-<text class="pin8" x="320" y="484" text-anchor="middle">100 Ω</text>
-<path class="w ws" d="M334 462 H350 V416"/>
-<path class="w w5" d="M526 660 H560 V798 H394 V776"/>
-<path class="w wg" d="M526 674 H548 V790 H328 V776"/>
-<path class="w wg" d="M526 674 H572 V806 H416 V776"/>
-<text class="pin8" x="350" y="820" text-anchor="middle">pin 5 free (ECG later → AI 17)</text>
-<path class="cab" d="M434 401 H870 V160 H900"/>
-<text class="s" x="880" y="150" text-anchor="end">Cat6 R · 10 m</text>
-<path class="cab" d="M434 761 H860 V560 H900"/>
-<text class="s" x="880" y="550" text-anchor="end">Cat6 L · 10 m</text>
-<rect class="pcb" x="900" y="80" width="34" height="182" rx="4"/>
-<text class="b" x="917" y="70" text-anchor="middle">DAQ-end R</text>
-<rect class="lever fe" x="906" y="84" width="22" height="16" rx="2"/>
-<text class="pin8 inv" x="917" y="96" text-anchor="middle">1</text>
-<rect class="lever fe" x="906" y="106" width="22" height="16" rx="2"/>
-<text class="pin8 inv" x="917" y="118" text-anchor="middle">2</text>
-<rect class="lever fe" x="906" y="128" width="22" height="16" rx="2"/>
-<text class="pin8 inv" x="917" y="140" text-anchor="middle">3</text>
-<rect class="lever fg" x="906" y="150" width="22" height="16" rx="2"/>
-<text class="pin8 inv" x="917" y="162" text-anchor="middle">4</text>
-<rect class="lever fs" x="906" y="172" width="22" height="16" rx="2"/>
-<text class="pin8 inv" x="917" y="184" text-anchor="middle">5</text>
-<rect class="lever fe" x="906" y="194" width="22" height="16" rx="2"/>
-<text class="pin8 inv" x="917" y="206" text-anchor="middle">6</text>
-<rect class="lever f5" x="906" y="216" width="22" height="16" rx="2"/>
-<text class="pin8 inv" x="917" y="228" text-anchor="middle">7</text>
-<rect class="lever fg" x="906" y="238" width="22" height="16" rx="2"/>
-<text class="pin8 inv" x="917" y="250" text-anchor="middle">8</text>
-<rect class="pcb" x="900" y="480" width="34" height="182" rx="4"/>
-<text class="b" x="917" y="470" text-anchor="middle">DAQ-end L</text>
-<rect class="lever fe" x="906" y="484" width="22" height="16" rx="2"/>
-<text class="pin8 inv" x="917" y="496" text-anchor="middle">1</text>
-<rect class="lever fe" x="906" y="506" width="22" height="16" rx="2"/>
-<text class="pin8 inv" x="917" y="518" text-anchor="middle">2</text>
-<rect class="lever fe" x="906" y="528" width="22" height="16" rx="2"/>
-<text class="pin8 inv" x="917" y="540" text-anchor="middle">3</text>
-<rect class="lever fg" x="906" y="550" width="22" height="16" rx="2"/>
-<text class="pin8 inv" x="917" y="562" text-anchor="middle">4</text>
-<rect class="lever" x="906" y="572" width="22" height="16" rx="2"/>
-<text class="pin8" x="917" y="584" text-anchor="middle">5</text>
-<rect class="lever fe" x="906" y="594" width="22" height="16" rx="2"/>
-<text class="pin8 inv" x="917" y="606" text-anchor="middle">6</text>
-<rect class="lever f5" x="906" y="616" width="22" height="16" rx="2"/>
-<text class="pin8 inv" x="917" y="628" text-anchor="middle">7</text>
-<rect class="lever fg" x="906" y="638" width="22" height="16" rx="2"/>
-<text class="pin8 inv" x="917" y="650" text-anchor="middle">8</text>
-<rect class="daq" x="1120" y="50" width="200" height="800" rx="6"/>
-<text class="b" x="1220" y="36" text-anchor="middle">NI USB-6363 · RSE · ±5 V · ≥ 4 kS/s</text>
-<rect class="lever" x="1124" y="83" width="22" height="18" rx="2"/>
-<circle class="screw" cx="1135" cy="92" r="4.5"/>
-<text class="pin b te" x="1154" y="96">AI 0 · LT_T9 R</text>
-<path class="w we" d="M934 92 H1124"/>
-<rect class="lever" x="1124" y="483" width="22" height="18" rx="2"/>
-<circle class="screw" cx="1135" cy="492" r="4.5"/>
-<text class="pin b te" x="1154" y="496">AI 4 · LT_T9 L</text>
-<path class="w we" d="M934 492 H1124"/>
-<rect class="lever" x="1124" y="105" width="22" height="18" rx="2"/>
-<circle class="screw" cx="1135" cy="114" r="4.5"/>
-<text class="pin b te" x="1154" y="118">AI 1 · LT_L1 R</text>
-<path class="w we" d="M934 114 H1124"/>
-<rect class="lever" x="1124" y="505" width="22" height="18" rx="2"/>
-<circle class="screw" cx="1135" cy="514" r="4.5"/>
-<text class="pin b te" x="1154" y="518">AI 5 · LT_L1 L</text>
-<path class="w we" d="M934 514 H1124"/>
-<rect class="lever" x="1124" y="127" width="22" height="18" rx="2"/>
-<circle class="screw" cx="1135" cy="136" r="4.5"/>
-<text class="pin b te" x="1154" y="140">AI 2 · IL_L2 R</text>
-<path class="w we" d="M934 136 H1124"/>
-<rect class="lever" x="1124" y="527" width="22" height="18" rx="2"/>
-<circle class="screw" cx="1135" cy="536" r="4.5"/>
-<text class="pin b te" x="1154" y="540">AI 6 · IL_L2 L</text>
-<path class="w we" d="M934 536 H1124"/>
-<rect class="lever" x="1124" y="193" width="22" height="18" rx="2"/>
-<circle class="screw" cx="1135" cy="202" r="4.5"/>
-<text class="pin b te" x="1154" y="206">AI 3 · MF_L5 R</text>
-<path class="w we" d="M934 202 H1124"/>
-<rect class="lever" x="1124" y="593" width="22" height="18" rx="2"/>
-<circle class="screw" cx="1135" cy="602" r="4.5"/>
-<text class="pin b te" x="1154" y="606">AI 7 · MF_L5 L</text>
-<path class="w we" d="M934 602 H1124"/>
-<rect class="lever" x="1124" y="171" width="22" height="18" rx="2"/>
-<circle class="screw" cx="1135" cy="180" r="4.5"/>
-<text class="pin b ts" x="1154" y="184">AI 16 · SYNC</text>
-<path class="w ws" d="M934 180 H1124"/>
-<rect class="lever" x="1124" y="571" width="22" height="18" rx="2"/>
-<circle class="screw" cx="1135" cy="580" r="4.5"/>
-<text class="pin b" x="1154" y="584">AI 17 · ECG later</text>
-<rect class="wago" x="985" y="330" width="138" height="30" rx="4"/>
-<text class="pin8 b" x="985" y="324">W3 · GND star</text>
-<rect class="lever fg" x="989" y="336" width="22" height="16" rx="2"/>
-<text class="pin8" x="1000" y="374" text-anchor="middle">R4</text>
-<rect class="lever fg" x="1015" y="336" width="22" height="16" rx="2"/>
-<text class="pin8" x="1026" y="374" text-anchor="middle">R8</text>
-<rect class="lever fg" x="1041" y="336" width="22" height="16" rx="2"/>
-<text class="pin8" x="1052" y="374" text-anchor="middle">L4</text>
-<rect class="lever fg" x="1067" y="336" width="22" height="16" rx="2"/>
-<text class="pin8" x="1078" y="374" text-anchor="middle">L8</text>
-<rect class="lever fg" x="1093" y="336" width="22" height="16" rx="2"/>
-<text class="pin8" x="1104" y="374" text-anchor="middle">AI</text>
-<rect class="wago" x="985" y="730" width="138" height="30" rx="4"/>
-<text class="pin8 b" x="985" y="724">W4 · +5 V link</text>
-<rect class="lever f5" x="989" y="736" width="22" height="16" rx="2"/>
-<text class="pin8" x="1000" y="774" text-anchor="middle">R7</text>
-<rect class="lever f5" x="1015" y="736" width="22" height="16" rx="2"/>
-<text class="pin8" x="1026" y="774" text-anchor="middle">L7</text>
-<rect class="lever" x="1041" y="736" width="22" height="16" rx="2"/>
-<text class="pin8" x="1052" y="774" text-anchor="middle">–</text>
-<rect class="lever" x="1067" y="736" width="22" height="16" rx="2"/>
-<text class="pin8" x="1078" y="774" text-anchor="middle">–</text>
-<rect class="lever" x="1093" y="736" width="22" height="16" rx="2"/>
-<text class="pin8" x="1104" y="774" text-anchor="middle">–</text>
-<rect class="lever" x="1124" y="391" width="22" height="18" rx="2"/>
-<circle class="screw" cx="1135" cy="400" r="4.5"/>
-<text class="pin b" x="1154" y="404">AI GND</text>
-<path class="w wg" d="M934 158 H946 V316 H1000 V330"/>
-<path class="w wg" d="M934 246 H952 V316 H1026 V330"/>
-<path class="w wg" d="M934 558 H962 V400 H1052 V360"/>
-<path class="w wg" d="M934 646 H968 V406 H1078 V360"/>
-<path class="w wg" d="M1104 360 V400 H1124"/>
-<path class="w w5" d="M934 224 H950 V708 H1000 V730"/>
-<path class="w w5" d="M934 624 H954 V702 H1026 V730"/>
-<text class="s" x="36" y="880">Each stack: Link Shield (PWR ON, OUTPUT RAW) → sensor → Cable Shield; TRS cable from the Link jack to its TRRS breakout. Tip = signal, ring = +5 V, sleeve = GND. RAW sits at ≈ 2.5 V; remove the offset in software.</text>
-</svg></div>
-<p>Laptop on battery. Nothing on the participant is mains-powered, but the GND link to the DAQ remains: follow the lab's electrical-safety rule for the DAQ adapter.</p>
+<p>Teensy on USB to the PC (power + status). FRAME_CLOCK 2 (normal): Teensy makes its own 120 Hz frames, pin 4 stays unconnected.</p>
 </main></body></html>

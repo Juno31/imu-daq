@@ -1,7 +1,8 @@
-// Stage 1 - 7-IMU bring-up: a wiring and connection test, not the final firmware.
+// Stage 1 - 8-IMU bring-up: a wiring and connection test, not the final firmware.
 // Board: Teensy 4.1. Library: "SparkFun BNO080 Cortex Based IMU" (the one imu_daq v1.3 uses).
-// Mux A on Wire  (SDA 18,  SCL 19): ch 0-3 = IMU1-IMU4.
-// Mux B on Wire1 (SDA1 17, SCL1 16): ch 0-2 = IMU5-IMU7.
+// Wiring as in the senior's handover (hardware/wiring/teensy41_wiring.html):
+// Mux A on Wire1 (SDA1 17, SCL1 16): ch 0-3 = IMU1-IMU4 (C7 T3 T6 T9).
+// Mux B on Wire  (SDA 18,  SCL 19): ch 0-3 = IMU5-IMU8 (T11 L1 L3 S1).
 // Each IMU reports the game rotation vector every 10 ms. Once a second the sketch prints,
 // per IMU: reports per second, degrees turned since start-up, and restart count.
 // The buses are read one after the other here; the final firmware reads them in parallel.
@@ -23,9 +24,9 @@ struct Pod {
   float deg;
 };
 
-Pod pods[7] = {
-  {"IMU1-C7", &Wire, 0},   {"IMU2-T3", &Wire, 1},  {"IMU3-T6", &Wire, 2}, {"IMU4-T9", &Wire, 3},
-  {"IMU5-T12", &Wire1, 0}, {"IMU6-L3", &Wire1, 1}, {"IMU7-S1", &Wire1, 2}
+Pod pods[8] = {
+  {"IMU1-C7", &Wire1, 0},  {"IMU2-T3", &Wire1, 1}, {"IMU3-T6", &Wire1, 2}, {"IMU4-T9", &Wire1, 3},
+  {"IMU5-T11", &Wire, 0},  {"IMU6-L1", &Wire, 1},  {"IMU7-L3", &Wire, 2},  {"IMU8-S1", &Wire, 3}
 };
 
 void selectChannel(Pod &p) {

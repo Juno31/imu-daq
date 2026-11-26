@@ -1,18 +1,21 @@
 # IMU DAQ — IMU + EMG acquisition with DAQ time sync
 
-Two BNO085/BNO086 IMUs on a XIAO ESP32S3 (or ESP32C3) and 8 EMG channels on an NI USB-6363, recorded
-from one browser GUI. Every IMU frame is time-locked to the DAQ by a SYNC pulse wire, so IMU and EMG
-share one time base (≈ 14 µs).
+SID Lab spine brace: 8 BNO086 IMUs on a Teensy 4.1 (senior's `teensy_spine_imu` firmware) and 6 EMG
+channels on an NI USB-6363, recorded from one browser GUI. The Teensy sends each IMU frame to the DAQ as a
+data packet (TX1 → P0.0) and a SYNC pulse (pin 2 → AI31), so IMU and EMG share the DAQ time base.
 
 ```
- XIAO ESP32S3 ── I2C ── BNO085 A4B (0x4B) ── STEMMA QT ── BNO085 A4A (0x4A)
-   │ USB (frames)        │ SYNC pulse per frame (D1 → AI0)
-   ▼                     ▼
- PC: host/server.py ◄── NI USB-6363 (AI0 = SYNC, AI16–23 = EMG01–08)
+ 8 × BNO086 ── Qwiic ── Mux A (Wire1) / Mux B (Wire) ── Teensy 4.1
+                                                        │ USB (status, frames)
+                                                        │ TX1 → P0.0 · SYNC → AI31 · GND → D GND
+   ▼                                                    ▼
+ PC: host/server.py ◄─────────────────────────── NI USB-6363 (AI16–21 = EMG1–6, RSE)
    │ HTTP + live stream
    ▼
  Browser GUI  http://127.0.0.1:8765
 ```
+
+The older two-IMU XIAO ESP32 setup (`firmware/imu_daq`) is still supported; its pins are in that sketch's header.
 
 ## Install (Windows)
 
@@ -101,29 +104,47 @@ before Start; turn it off with **Preview** in the EMG section if another program
 
 ## Hardware
 
-| XIAO pin | S3 | C3 | to |
+Wiring of the SID Lab spine brace, reset to the senior's handover (2026-11-25: `PIN_DIAGRAM`,
+`SETUP.md` §2, `teensy_spine_imu.ino`). Pin-level drawing: [hardware/wiring/teensy41_wiring.html](hardware/wiring/teensy41_wiring.html)
+(regenerate with `python hardware/wiring/gen_wiring.py`).
+
+![SID Lab spine brace wiring: Teensy 4.1, 2 Qwiic muxes, 8 BNO086, NI USB-6363, 6 EMG](hardware/wiring/teensy41_wiring.png)
+
+**Teensy pins are 3.3 V only. Never put 5 V on any pin or on the Qwiic red wire.**
+
+| Teensy pin | Qwiic wire | Signal | to |
 |---|---|---|---|
-| 3V3 | | | IMU #1 VIN (never 5 V) |
-| GND | | | IMU #1 GND, DAQ AI 8 (AI0−) |
-| D4 SDA | GPIO5 | GPIO6 | IMU #1 SDA |
-| D5 SCL | GPIO6 | GPIO7 | IMU #1 SCL |
-| SYNC | D1 GPIO2 | D2 GPIO4 | DAQ AI 0 (AI0+) |
+| 16 | yellow | SCL1 (Wire1, bus A) | Mux A main |
+| 17 | blue | SDA1 (Wire1, bus A) | Mux A main |
+| 19 | yellow | SCL (Wire, bus B) | Mux B main |
+| 18 | blue | SDA (Wire, bus B) | Mux B main |
+| 3V3 | red | 3.3 V | both muxes |
+| GND | black | GND | both muxes |
 
-IMU #2 is chained from IMU #1 with a STEMMA QT / Qwiic cable. Addresses: the IMU wired to the XIAO is
-**0x4B** (pod `A4B`), the chained one **0x4A** (pod `A4A`).
-Adafruit BNO085: default 0x4A; DI soldered to 3Vo → 0x4B (read only at power-up).
-SparkFun BNO086: default 0x4B; ADR jumper closed → 0x4A.
+| Mux (0x70) | ch0 | ch1 | ch2 | ch3 |
+|---|---|---|---|---|
+| A (Wire1) | C7 (IMU 1) | T3 (IMU 2) | T6 (IMU 3) | T9 (IMU 4) |
+| B (Wire) | T11 (IMU 5) | L1 (IMU 6) | L3 (IMU 7) | S1 (IMU 8) |
 
-**EMG** (differential, Input = Differential): channel `aiN` uses pins AI N (+) and AI N+8 (−).
+All BNO086 at **0x4B** (ADR jumper open). IMU number = packet slot.
 
-| Channel | Name | Muscle | Side |
+| Teensy | USB-6363 terminal | Purpose |
+|---|---|---|
+| GND | **82** D GND | common ground, required |
+| pin 1 (TX1) | **65** P0.0 | one binary packet per frame, 230400 baud; the DAQ timestamps each frame |
+| pin 2 | **59** AI31 | SYNC, one pulse per frame, width codes the frame number |
+| pin 4 | PFI counter out (optional) | only with `FRAME_CLOCK 1`; 1 kΩ PFI → pin 4, 2 kΩ pin 4 → GND |
+
+**EMG** (single-ended RSE, ±5 V, 4 kHz; electrode reference to AI GND):
+
+| EMG | Terminal | AI | Default site |
 |---|---|---|---|
-| ai16 / ai17 | EMG01 / EMG02 | Lumbar erector spinae | L / R |
-| ai18 / ai19 | EMG03 / EMG04 | Lumbar multifidus region | L / R |
-| ai20 / ai21 | EMG05 / EMG06 | External oblique | L / R |
-| ai22 / ai23 | EMG07 / EMG08 | Internal oblique | L / R |
-
-Edit `host/channels.py` to change the map.
+| 1 | 33 | AI16 | R longissimus (R-LG) |
+| 2 | 36 | AI17 | L longissimus (L-LG) |
+| 3 | 39 | AI18 | R multifidus (R-MF) |
+| 4 | 42 | AI19 | L multifidus (L-MF) |
+| 5 | 49 | AI20 | R iliocostalis (R-IL) |
+| 6 | 52 | AI21 | L iliocostalis (L-IL) |
 
 **Unconnected EMG inputs copy SYNC.** The USB-6363 measures its channels one after another with one
 converter. An input with nothing connected cannot drive it, so it repeats the channel scanned just
@@ -132,25 +153,6 @@ before it: during recording, the SYNC pulses appear on every open EMG input at 3
 picks up only ~13 µV (0.0004 %), so real EMG is not affected. The GUI marks such channels **NOT CONNECTED**
 (EMG light, EMG traces, calibration result) whenever a channel correlates with SYNC (r > 0.5). Connect the
 amplifier outputs, or remove unused channels in Settings → EMG / extra channels.
-
-### Planned wiring: Teensy 4.1, 7 IMUs, 3 GoPros
-
-Next hardware revision (not built yet): a Teensy 4.1 with an Ethernet kit streams 7 IMUs to the PC over
-UDP, keeps the SYNC pulse to the USB-6363, and three GoPro HERO13 cameras connect through a powered USB 3 hub.
-The IMUs sit on two TCA9548A muxes on two separate I2C buses: mux A on `Wire` (pins 18/19, IMUs 1–4) and
-mux B on `Wire1` (pins 17/16, IMUs 5–7). The two buses are read in parallel; a timing simulation gave
-200 frames/s with a worst frame of 4.7 of 5 ms, while one bus overran even at 100 frames/s.
-Firmware `firmware/imu_daq_teensy` (v2.0) implements this over USB serial for bench tests, with the same
-line protocol as the XIAO firmware; it reports each bus's time per frame in `status` and in `summary.json`
-(`i2c_buses`). The Ethernet/UDP link replaces USB later.
-
-Optional DAQ clock (v2.1): wire the DAQ counter output (PFI 12 by default on the USB-6363) to Teensy pin 4
-and D GND to GND. Then the command `clock ext` (or `"board_clock": "ext"` in `host/host_settings.json`)
-starts one frame per rising edge instead of using the Teensy timer. SYNC on pin 2 stays as it is. Pin 4 takes
-3.3 V at most, so a 5 V counter output needs a divider (1 kΩ series, 2 kΩ to GND). `status` prints
-`@CLOCK` (edges, period, glitches), and the board reports `clock_lost` / `clock_ok` events.
-
-![Planned wiring: Teensy 4.1, 7 IMUs, NI USB-6363, 3 GoPros](hardware/wiring/teensy41_wiring.png)
 
 ## How it works
 
@@ -252,7 +254,7 @@ Details at the top of `imu_daq.ino`.
 | EMG "Clipping" | Raise Range to ±10 V or lower the amplifier gain |
 | A page keeps loading | Reload; all pages share one connection now. If it persists, close other IMU DAQ tabs |
 | EMG norm "NOT DONE" | Record rest and MVC / RVC on the EMG norm page, then **Save for this subject** |
-| SYNC FAIL | Check AI0+/AI0− wiring and Input = Differential; see `daq_pulses.csv`, `summary.json` |
+| SYNC FAIL | Check Teensy pin 2 → terminal 59 (AI31) and GND → 82 (D GND); see `daq_pulses.csv`, `summary.json` |
 
 Note: unconnected EMG inputs still read ~1.5–2 mV RMS, so a flat-signal check cannot detect a missing
 electrode; check that the trace rises when the muscle contracts.
